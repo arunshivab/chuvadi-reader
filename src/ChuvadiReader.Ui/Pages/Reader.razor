@@ -13,6 +13,8 @@
 @inject PressService Press
 @inject IAppStorage Storage
 @inject RedactService Redact
+@inject RedactRequestService RedactHandoff
+@inject IEntitlements Entitlements
 
 <PageTitle>Chuvadi · Reader</PageTitle>
 
@@ -80,6 +82,10 @@
                 <span class="rsep"></span>
                 <button class="vbtn @(_markup ? "on" : null)" @onclick="ToggleMarkup" title="Edit"><Icon Name="edit" Size="16" /></button>
                 <button class="vbtn" @onclick="OpenInBench" title="Open in Bench"><Icon Name="grid-view" Size="16" /></button>
+                @if (Entitlements.CanRedact)
+                {
+                    <button class="vbtn" @onclick="SendToRedact" title="Send to Redact"><Icon Name="redact" Size="16" /></button>
+                }
             }
         </div>
     </header>
@@ -88,33 +94,14 @@
     {
         <div class="mk-rail">
             <div class="mk-tools">
-                <button class="mk-tool @(_mkTool == "redact" ? "on" : null)" @onclick='() => SetMkTool("redact")' title="Redact"><Icon Name="redact" Size="15" /> Redact</button>
                 <button class="mk-tool @(_mkTool == "text" ? "on" : null)" @onclick='() => SetMkTool("text")' title="Add text"><Icon Name="text-box" Size="15" /> Text</button>
                 <button class="mk-tool @(_mkTool == "image" ? "on" : null)" @onclick="AddImageViaPicker" title="Add image"><Icon Name="image" Size="15" /> Image</button>
                 <button class="mk-tool @(_mkTool == "rect" ? "on" : null)" @onclick='() => SetMkTool("rect")' title="Rectangle"><Icon Name="shape-rect" Size="15" /> Rect</button>
                 <button class="mk-tool @(_mkTool == "line" ? "on" : null)" @onclick='() => SetMkTool("line")' title="Line"><Icon Name="minus" Size="15" /> Line</button>
             </div>
 
-            @if (_mkTool == "redact")
-            {
-                <span class="mk-hint">Drag to draw a redaction box.</span>
-                <span class="mk-colour">
-                    <span class="mk-colour-lbl">Colour</span>
-                    @foreach (var (cname, chex) in _mkColorPresets)
-                    {
-                        <button class="mk-swatch @(string.Equals(_mkColor, chex, StringComparison.OrdinalIgnoreCase) ? "on" : null)"
-                                style="background:@chex" title="@cname" @onclick="() => _mkColor = chex"></button>
-                    }
-                    <label class="mk-swatch custom @(IsCustomColor ? "on" : null)" title="Custom" style="background:@(IsCustomColor ? _mkColor : "transparent")">
-                        <input type="color" value="@_mkColor" @onchange="OnMkColor" />
-                        @if (!IsCustomColor)
-                        {
-                            <Icon Name="edit" Size="11" />
-                        }
-                    </label>
-                </span>
-            }
-            else if (_selText is { } sel)
+            @* Redaction relocated to the Redact destination (/redact). Markup is overlay-only. *@
+            @if (_selText is { } sel)
             {
                 <span class="mk-style">
                     <select class="mk-sel" value="@sel.FontFamily" @onchange="e => SetFont(sel, e)">
@@ -187,10 +174,6 @@
             }
 
             <span class="mk-spacer"></span>
-            @if (_mkTagged && RedactionCount > 0)
-            {
-                <span class="mk-warn"><Icon Name="warning" Size="13" /> Tagged PDF — redaction can't be removed yet; save will be blocked.</span>
-            }
             @if (_mkStatus is not null)
             {
                 <span class="mk-status @(_mkError ? "err" : null)">@_mkStatus</span>
@@ -199,13 +182,13 @@
                     <button class="mk-open" @onclick="OpenRedacted">Open it</button>
                 }
             }
-            <span class="mk-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s") · @TextCount text · @ShapeCount shape@(ShapeCount == 1 ? "" : "s") · @ImageCount image@(ImageCount == 1 ? "" : "s")</span>
+            <span class="mk-count">@TextCount text · @ShapeCount shape@(ShapeCount == 1 ? "" : "s") · @ImageCount image@(ImageCount == 1 ? "" : "s")</span>
             <button class="mk-btn" @onclick="ClearMarkup" disabled="@(MarkupCount == 0 || _mkSaving)">Clear</button>
-            @if (OverlayCount > 0 && RedactionCount == 0)
+            @if (OverlayCount > 0)
             {
                 <button class="mk-btn" @onclick="SaveInPlace" disabled="@_mkSaving" title="Overwrite the open file">@(_mkSaving ? "Saving…" : "Save")</button>
             }
-            <button class="mk-btn primary" @onclick="SaveMarkup" disabled="@(MarkupCount == 0 || _mkSaving)" title="@(RedactionCount > 0 ? "Redaction always saves to a new file" : "Save to a new file")">@(_mkSaving ? "Saving…" : "Save as new PDF")</button>
+            <button class="mk-btn primary" @onclick="SaveMarkup" disabled="@(MarkupCount == 0 || _mkSaving)" title="Save to a new file">@(_mkSaving ? "Saving…" : "Save as new PDF")</button>
             <button class="mk-btn" @onclick="ToggleMarkup">Done</button>
         </div>
     }
@@ -409,23 +392,8 @@
                         }
                         @if (_markup)
                         {
-                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null) @((_mkTool == "redact" || _mkTool == "rect" || _mkTool == "line") ? "drawmode" : null)" data-page="@n"
+                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null) @((_mkTool == "rect" || _mkTool == "line") ? "drawmode" : null)" data-page="@n"
                                  @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
-                                @if (_redactions.TryGetValue(n, out var boxes))
-                                {
-                                    @for (var i = 0; i < boxes.Count; i++)
-                                    {
-                                        var bi = i;
-                                        var b = boxes[bi];
-                                        <div class="mk-box" style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);background:@BoxFill(0.82)">
-                                            <button class="mk-box-x" @onclick="() => RemoveBox(n, bi)" @onpointerdown:stopPropagation="true" title="Remove">&times;</button>
-                                        </div>
-                                    }
-                                }
-                                @if (_mkDraft is { } dr && _mkDraftPage == n)
-                                {
-                                    <div class="mk-box draft" style="left:@Pct(dr.X);top:@Pct(dr.Y);width:@Pct(dr.W);height:@Pct(dr.H);background:@BoxFill(0.45)"></div>
-                                }
                                 @if (_texts.TryGetValue(n, out var tboxes))
                                 {
                                     @foreach (var t in tboxes)
@@ -649,6 +617,14 @@
 
         await Bench.AddSourceAsync(active.Path, active.FileName);
         Nav.NavigateTo("/bench");
+    }
+
+    private void SendToRedact()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null) return;
+        RedactHandoff.Request(active.Path, active.FileName);
+        Nav.NavigateTo("/redact");
     }
 
     private async Task ShowProperties()
@@ -938,7 +914,7 @@
 
     // ── Markup mode (redact + add text; view-only until Save As to a new file) ──
     private bool _markup;
-    private string _mkTool = "redact";
+    private string _mkTool = "text";
     private string? _mkDocPath;
     private string _mkColor = "#000000";
     private static readonly (string Name, string Hex)[] _mkColorPresets =
@@ -1137,13 +1113,7 @@
         _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
         _mkStatus = null; _mkSavedPath = null;
 
-        if (_mkTool == "redact")
-        {
-            _mkMode = MkMode.RedactDraw;
-            _mkDraftPage = page;
-            _mkDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
-        }
-        else if (_mkTool == "rect" || _mkTool == "line")
+        if (_mkTool == "rect" || _mkTool == "line")
         {
             _selShape = null;
             _mkMode = MkMode.ShapeDraw;

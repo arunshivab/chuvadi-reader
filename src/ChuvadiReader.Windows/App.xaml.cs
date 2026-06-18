@@ -79,6 +79,8 @@ public partial class App : Application
             services.AddSingleton<BenchComposer>();
             services.AddSingleton<BenchService>();
             services.AddSingleton<OpenDocumentService>();
+            services.AddSingleton<RedactRequestService>();
+            services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
             services.AddSingleton<IFilePicker, WpfFilePicker>();
             services.AddSingleton<IAppReadySignal, AppReadySignal>();
 
