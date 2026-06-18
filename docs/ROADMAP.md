@@ -5,7 +5,7 @@ library, known issues, and the direction ahead. Kept in one file (rather than sp
 "deferred" and "roadmap") because the two overlap heavily — most deferred items *are*
 the near-term roadmap.
 
-Last updated alongside **v24**.
+Last updated alongside **v40** (Add Image + shapes — Core).
 
 > **Incoming library package:** a new chuvadi-pdf build is ready that reportedly fixes some
 > bugs and adds **footer / page-number** support (unblocks §1.4). To pull it in: drop the
@@ -44,10 +44,48 @@ ask is to let the watermark use it — either bundle a LiPi/Indic font resolvabl
 let `TextWatermarkOptions` accept an embedded TrueType font/stream. Until then the watermark
 font picker can only honestly offer the three standard families.
 
+**New requests (v40 — from building Add Image + shapes).** Building the overlay tools surfaced
+four library gaps. All four are confirmed empirically (full API dumped by reflection; behaviour
+verified by stamping onto a real tagged PDF and rendering the result):
+
+1. **A transform / CTM on `PageBuilder`.** The authoring `PageBuilder` exposes only absolute
+   draw calls (`DrawRectangle`, `DrawLine`, `DrawImage`, `DrawTextBlock`, …) — there is **no**
+   `SaveState`/`Concat`/`Rotate`/`RestoreState`. So content can only be drawn axis-aligned.
+   Combined with #2 below, this makes **per-item rotation of filled rectangles and images
+   impossible** from the app. Ask: add a graphics-state transform (push/concat-matrix/pop, or a
+   rotation parameter on the draw calls). This single capability unlocks image rotation, filled-
+   rect rotation, *and* text rotation — all on one shared overlay. (Lines don't need it; we rotate
+   their endpoints. Rect/image can't be faked without a filled-polygon primitive, which also
+   doesn't exist.)
+2. **`PageStamper.Place` cannot composite multiple overlays.** Stamping a second overlay onto
+   already-stamped bytes **silently drops the first** (verified twice: two rects → only the last
+   survives). So today the rule is *one stamp per page*, which is why every shape and image for a
+   page must be drawn onto a single overlay (the app now does this). Ask: either let `Place`
+   accept multiple source overlays / be safely chainable, or — better — provide the CTM in #1 so
+   one overlay can hold everything at any angle. This limitation also affects multi-item text.
+3. **Image opacity.** `DrawImage(byte[]|ImageFrame, x, y, w, h)` has no alpha/opacity parameter,
+   so overlay images can only stamp at full opacity. Ask: a `DrawImage` overload (or builder
+   state) honouring an `/ca` constant-alpha so watermarks/translucent logos are possible. (Ties to
+   the SvgRenderer `/ca,/CA` drop noted elsewhere.)
+4. **Coordinate convention — please confirm/document.** All authoring draw methods
+   (`DrawRectangle`, `DrawLine`, `DrawImage`, **and** `DrawTextBlock`) place content in a
+   **top-left, y-DOWN** space (origin at the page's top-left, y increasing downward), not the
+   PDF-native bottom-left y-up. Verified with raw-coordinate probes. This is fine once known, but
+   it's undocumented and the opposite of what the page geometry (`Width`/`Height`, `/Rotate`)
+   implies — worth a doc note, or an option to choose origin. (This is also the root cause of the
+   Add-Text vertical-flip — see §2.)
+
 ---
 
 ## 2. Known issues
 
+- **Add Text lands vertically flipped (under separate investigation).** `StampText` maps the
+  on-screen box to a y-UP rect (`MapToPdf`) before calling `DrawTextBlock`, but `DrawTextBlock`
+  actually expects **top-left, y-DOWN** coordinates (§1 new-request 4). Net effect: text placed
+  near the top of the page is stamped near the bottom. The shape/image path (v40) was built with
+  the correct y-down mapping (`MapToPdfTopLeft`) and is unaffected. The text path is intentionally
+  left untouched here pending the owner's library-side fix; the clean resolution is the
+  `PageBuilder` CTM (§1 new-request 1), after which text can join the shared single overlay.
 - **Redaction does NOT remove text on tagged PDFs (library bug — open).** `Redactor.Apply`
   draws the overlay and rewrites the plain content stream, but text inside marked-content
   (BDC/EMC) on tagged pages survives and extracts straight back out. Repro: open a file with
@@ -139,8 +177,15 @@ the library on Save As:
   authored + stamped on Save As. Works on tagged PDFs (overlay, not removal). Standard-14 fonts
   only — **Tamil/Indic deferred** to a font-embedding pass (the library has `TrueTypeFontEmbedder`).
 - **Add Image** — overlay an image on a page at a position (distinct from the Bench's
-  "fetch image as its own page"). *Next in Batch C* — same canvas, `PageBuilder.DrawImage` +
-  `PageStamper`.
+  "fetch image as its own page"). **Core shipped v40** (`RedactService` image + shape stamping,
+  one-overlay-per-page, verified on a tagged PDF). Non-rotated images + rectangles (fill/stroke)
+  + lines at any angle. **Image/rect rotation deferred** to the library CTM (§1 new-request 1).
+  **UI is the next delta** (toolbar Image/Rect/Line tools, property panels, place/move/resize,
+  aspect-lock, clipboard paste + drag-drop). Uses `PageBuilder.DrawImage`/`DrawRectangle`/
+  `DrawLine` + `PageStamper.Place`.
+- **Shapes (Rectangle, Line)** — shipped alongside Add Image (v40 Core). More primitives
+  (ellipse, arrow, ink/freehand, polygon) are **not in the library** — added to the asks list;
+  build when delivered.
 - **Signature**, **Snapshot** — also Reader-side, later.
 - **Watermark / Header-footer in the Reader** — agreed to also offer these in the Reader
   (acting on the open document, Save As), as their own delta after the markup tools. They remain

@@ -590,6 +590,7 @@ export function setScrollTop(deskEl, top) {
 }
 
 export function dispose() {
+    disableImageDrops();
     teardownObservers();
     if (scrollTarget && scrollHandler) scrollTarget.removeEventListener('scroll', scrollHandler);
     scrollTarget = null; scrollHandler = null;
@@ -704,3 +705,76 @@ window.chuvadiReaderMkRect = function (page) {
     const r = el.getBoundingClientRect();
     return { left: r.left, top: r.top, width: r.width, height: r.height };
 };
+
+// ── Add Image: clipboard paste + drag-and-drop ───────────────────────────────
+// While markup mode is on, pasting or dropping an image onto a page hands the
+// bytes (base64) to C#, which adds it as an editable overlay. Embedded WebView2
+// fires these DOM events reliably; we gate on a .mk-layer being present.
+let imageDrops = null;
+
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => {
+            const s = String(r.result || '');
+            const comma = s.indexOf(',');
+            resolve({ base64: comma >= 0 ? s.slice(comma + 1) : s, mime: file.type || 'image/png' });
+        };
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(file);
+    });
+}
+
+export function enableImageDrops() {
+    if (imageDrops || !dotnet) return;
+    const onPaste = async (e) => {
+        if (!document.querySelector('.mk-layer')) return;
+        const items = e.clipboardData && e.clipboardData.items;
+        if (!items) return;
+        for (const it of items) {
+            if (it.kind === 'file' && it.type && it.type.startsWith('image/')) {
+                const file = it.getAsFile();
+                if (!file) continue;
+                e.preventDefault();
+                try {
+                    const { base64, mime } = await fileToBase64(file);
+                    dotnet.invokeMethodAsync('OnImagePasted', base64, mime);
+                } catch (_) { }
+                return;
+            }
+        }
+    };
+    const onDragOver = (e) => {
+        const layer = e.target && e.target.closest ? e.target.closest('.mk-layer') : null;
+        if (layer && e.dataTransfer) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
+    };
+    const onDrop = async (e) => {
+        const layer = e.target && e.target.closest ? e.target.closest('.mk-layer') : null;
+        if (!layer) return;
+        const dt = e.dataTransfer;
+        if (!dt || !dt.files || dt.files.length === 0) return;
+        const file = Array.from(dt.files).find(f => f.type && f.type.startsWith('image/'));
+        if (!file) return;
+        e.preventDefault();
+        const page = parseInt(layer.getAttribute('data-page'), 10);
+        const r = layer.getBoundingClientRect();
+        const fx = r.width > 0 ? (e.clientX - r.left) / r.width : 0.5;
+        const fy = r.height > 0 ? (e.clientY - r.top) / r.height : 0.5;
+        try {
+            const { base64, mime } = await fileToBase64(file);
+            dotnet.invokeMethodAsync('OnImageDropped', page, fx, fy, base64, mime);
+        } catch (_) { }
+    };
+    document.addEventListener('paste', onPaste);
+    document.addEventListener('dragover', onDragOver, true);
+    document.addEventListener('drop', onDrop, true);
+    imageDrops = { onPaste, onDragOver, onDrop };
+}
+
+export function disableImageDrops() {
+    if (!imageDrops) return;
+    document.removeEventListener('paste', imageDrops.onPaste);
+    document.removeEventListener('dragover', imageDrops.onDragOver, true);
+    document.removeEventListener('drop', imageDrops.onDrop, true);
+    imageDrops = null;
+}
