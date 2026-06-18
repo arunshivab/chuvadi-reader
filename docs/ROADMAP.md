@@ -205,6 +205,30 @@ the library on Save As:
 
 ---
 
+## 5b. Testing & CI
+
+Added as its own delta after v40. Two pieces:
+
+- **`tests/ChuvadiReader.Tests`** (xUnit) — regression guards for the overlay pipeline. Fixtures
+  are authored in code (no binary PDFs); pages are rasterised with the library's own
+  `PdfRenderExtensions.RenderPageToBmp` (pure-managed, no GDI/poppler) and pixels are sampled out
+  of the BMP. Covers: shape/image placement, **multiple items coexisting on one page** (the
+  "PageStamper can't stack" guard), line angle, redaction removal on untagged input, and the
+  nothing-to-save guard. Runs identically on Linux/macOS/Windows.
+- **`.github/workflows/ci.yml`** — builds Core + Ui + Tests and runs the tests on an
+  **ubuntu / macos / windows** matrix; the WPF host (`ChuvadiReader.Windows`, net10.0-windows)
+  additionally builds on the Windows leg only.
+
+**Package feed for CI.** The dev tree restores chuvadi-pdf from `./localpackages` (git-ignored).
+CI can't see that, so a committed mirror of just the **3.11.1** set + `LiPicons.Blazor` lives in
+**`ci/packages/`**, selected via **`ci/nuget.config`**. When the library version bumps, refresh
+`ci/packages/` with the new `.nupkg`s and bump the pins. (A future move to GitHub Packages would
+retire this folder — parked with the post-icon-redesign distribution decision.)
+
+A tagged-PDF redaction-block test is intentionally **not** included yet: it needs a tagged fixture,
+and authored PDFs are untagged. Add it with a small committed fixture (or a library tagging API)
+when convenient.
+
 ## 6. How this list is maintained
 
 When an item ships, move it out of this file and add a line to the version history in

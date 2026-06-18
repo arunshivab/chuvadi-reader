@@ -4,4 +4,7 @@
     <Project Path="src/ChuvadiReader.Ui/ChuvadiReader.Ui.csproj" />
     <Project Path="src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ChuvadiReader.Tests/ChuvadiReader.Tests.csproj" />
+  </Folder>
 </Solution>

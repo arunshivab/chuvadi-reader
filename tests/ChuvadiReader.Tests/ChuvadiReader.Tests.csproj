@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!-- The rasterizer + authoring used to build fixtures and assert placement. -->
+    <PackageReference Include="Chuvadi.Pdf" Version="3.11.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Intra-repo reference, same convention as Ui/Windows → Core. -->
+    <ProjectReference Include="..\..\src\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
+  </ItemGroup>
+
+</Project>
