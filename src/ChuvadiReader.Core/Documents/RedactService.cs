@@ -34,11 +34,43 @@ public sealed record TextAnno(
 /// <summary>The text overlays for one page, plus that page's on-screen view rotation.</summary>
 public sealed record PageText(int ViewRotation, IReadOnlyList<TextAnno> Items);
 
+/// <summary>A single overlay image, normalised to the displayed page (top-left origin).
+/// <paramref name="ImageBytes"/> are the encoded image bytes (PNG/JPEG). Rotation is in
+/// degrees (clockwise on screen). Opacity is 0–1; the underlying library does not yet
+/// honour image alpha, so values below 1 are recorded but currently stamp at full opacity
+/// (a library-side capability is needed — see ROADMAP).</summary>
+public sealed record ImageAnno(
+    double X, double Y, double W, double H,
+    byte[] ImageBytes, double Rotation, double Opacity);
+
+/// <summary>The image overlays for one page, plus that page's on-screen view rotation.</summary>
+public sealed record PageImage(int ViewRotation, IReadOnlyList<ImageAnno> Items);
+
+/// <summary>The kind of vector shape an overlay draws.</summary>
+public enum ShapeKind
+{
+    Rectangle,
+    Line,
+}
+
+/// <summary>A single overlay shape, normalised to the displayed page (top-left origin).
+/// For <see cref="ShapeKind.Rectangle"/> the box is the rectangle bounds. For
+/// <see cref="ShapeKind.Line"/> the line runs from the box's top-left corner to its
+/// bottom-right corner (so the box is the line's bounding span). <paramref name="FillHex"/>
+/// is null/empty for no fill (rectangles only). Rotation is in degrees (clockwise on
+/// screen).</summary>
+public sealed record ShapeAnno(
+    double X, double Y, double W, double H,
+    ShapeKind Kind, string? FillHex, string StrokeHex, double StrokeWidthPt, double Rotation);
+
+/// <summary>The shape overlays for one page, plus that page's on-screen view rotation.</summary>
+public sealed record PageShape(int ViewRotation, IReadOnlyList<ShapeAnno> Items);
+
 /// <summary>
 /// Flattens reader markup into a NEW pdf: redactions (true byte-level removal via the
-/// library's <see cref="Redactor"/>, verified afterwards) and text overlays (authored and
-/// stamped over the page). The source file is only ever read; output is always a separate
-/// path chosen by the user, so the reader stays read-only.
+/// library's <see cref="Redactor"/>, verified afterwards) and overlays — shapes, images and
+/// text — authored and stamped over the page. The source file is only ever read; output is
+/// always a separate path chosen by the user, so the reader stays read-only.
 /// </summary>
 public sealed class RedactService
 {
@@ -50,24 +82,43 @@ public sealed class RedactService
         string overlayHex = "#000000",
         CancellationToken ct = default)
         => FlattenToFileAsync(sourcePath, outputPath, pages, overlayHex,
-            new Dictionary<int, PageText>(), ct);
+            new Dictionary<int, PageText>(),
+            new Dictionary<int, PageImage>(),
+            new Dictionary<int, PageShape>(), ct);
 
-    /// <summary>Apply redactions (if any) then text overlays (if any) and write the result
-    /// to <paramref name="outputPath"/> (a different file). Redactions are flattened first,
-    /// then text is stamped on top.</summary>
-    public async Task FlattenToFileAsync(
+    /// <summary>Back-compatible overload: redactions + text only (no images or shapes).</summary>
+    public Task FlattenToFileAsync(
         string sourcePath,
         string outputPath,
         IReadOnlyDictionary<int, PageRedaction> redactions,
         string overlayHex,
         IReadOnlyDictionary<int, PageText> texts,
         CancellationToken ct = default)
+        => FlattenToFileAsync(sourcePath, outputPath, redactions, overlayHex, texts,
+            new Dictionary<int, PageImage>(),
+            new Dictionary<int, PageShape>(), ct);
+
+    /// <summary>Apply redactions (if any) then overlays and write the result to
+    /// <paramref name="outputPath"/> (a different file). Order is: redactions flattened
+    /// first (true removal), then shapes, then images, then text stamped on top — so text
+    /// always reads above any image or shape it shares space with.</summary>
+    public async Task FlattenToFileAsync(
+        string sourcePath,
+        string outputPath,
+        IReadOnlyDictionary<int, PageRedaction> redactions,
+        string overlayHex,
+        IReadOnlyDictionary<int, PageText> texts,
+        IReadOnlyDictionary<int, PageImage> images,
+        IReadOnlyDictionary<int, PageShape> shapes,
+        CancellationToken ct = default)
     {
         var hasRedactions = redactions.Any(kv => kv.Value.Boxes.Count > 0);
         var hasText = texts.Any(kv => kv.Value.Items.Count > 0);
-        if (!hasRedactions && !hasText)
+        var hasImages = images.Any(kv => kv.Value.Items.Count > 0);
+        var hasShapes = shapes.Any(kv => kv.Value.Items.Count > 0);
+        if (!hasRedactions && !hasText && !hasImages && !hasShapes)
         {
-            throw new InvalidOperationException("Nothing to save — no redactions or text.");
+            throw new InvalidOperationException("Nothing to save — no redactions, shapes, images or text.");
         }
 
         await Task.Run(() =>
@@ -110,7 +161,32 @@ public sealed class RedactService
                     "tagged content. A library-side fix is needed before redaction is secure here.");
             }
 
-            // 3) Text overlays — one full-page overlay per box, stamped on top.
+            // 3) Shapes + images — drawn together onto ONE overlay per page and stamped once.
+            // The library's PageStamper.Place cannot composite multiple overlays (a second
+            // stamp drops the first), so every shape and image for a page must share a single
+            // overlay. Shapes are drawn first, then images, so an image sits above a shape it
+            // overlaps; text (its own later pass) sits above both.
+            if (hasShapes || hasImages)
+            {
+                var pageIndices = new SortedSet<int>();
+                foreach (var k in shapes.Keys) pageIndices.Add(k);
+                foreach (var k in images.Keys) pageIndices.Add(k);
+
+                foreach (var pageIndex in pageIndices)
+                {
+                    shapes.TryGetValue(pageIndex, out var pageShapes);
+                    images.TryGetValue(pageIndex, out var pageImages);
+                    var shapeItems = pageShapes?.Items ?? (IReadOnlyList<ShapeAnno>)Array.Empty<ShapeAnno>();
+                    var imageItems = pageImages?.Items ?? (IReadOnlyList<ImageAnno>)Array.Empty<ImageAnno>();
+                    if (shapeItems.Count == 0 && imageItems.Count == 0) continue;
+
+                    // View rotation is the same for every item on a page; take whichever exists.
+                    int viewRotation = pageShapes?.ViewRotation ?? pageImages?.ViewRotation ?? 0;
+                    current = StampPageOverlay(current, pageIndex, viewRotation, shapeItems, imageItems);
+                }
+            }
+
+            // 5) Text overlays — one full-page overlay per box, stamped on top.
             if (hasText)
             {
                 foreach (var (pageIndex, page) in texts)
@@ -155,28 +231,97 @@ public sealed class RedactService
         // text reads upright relative to how the page was shown. Negated for PDF's CCW,
         // y-up space vs the screen's CW, y-down. Rotate about the box centre.
         double eff = item.Rotation + rot;
-        Transform t;
-        if (Math.Abs(eff % 360) < 0.001)
-        {
-            t = Transform.Identity;
-        }
-        else
-        {
-            double cx = rect.X + rect.Width / 2.0;
-            double cy = rect.Y + rect.Height / 2.0;
-            t = Transform.CreateTranslation(-cx, -cy)
-                .Multiply(Transform.CreateRotationDegrees(-eff))
-                .Multiply(Transform.CreateTranslation(cx, cy));
-        }
+        var t = RotateAboutCentre(eff, rect);
 
         using var ms = new MemoryStream();
         PageStamper.Place(ms, target, pageIndex, overlayDoc, 0, t, StampPlacement.Overlay);
         return ms.ToArray();
     }
 
+    /// <summary>Draws every shape and image for one page onto a single overlay page and stamps
+    /// it once (identity transform). This is required because the library's PageStamper cannot
+    /// composite multiple overlays. Shapes are drawn first, then images, so images sit above
+    /// overlapping shapes. All authoring draw calls use the TOP-LEFT, y-DOWN coordinate system.
+    /// Lines carry their angle directly through their two mapped endpoints; filled rectangles and
+    /// images are axis-aligned (per-item rotation needs a library-side transform/CTM — ROADMAP).</summary>
+    private static byte[] StampPageOverlay(
+        byte[] source, int pageIndex, int viewRotation,
+        IReadOnlyList<ShapeAnno> shapes, IReadOnlyList<ImageAnno> imageItems)
+    {
+        using var target = PdfDocument.Open(new MemoryStream(source, writable: false));
+        if (pageIndex < 0 || pageIndex >= target.PageCount) return source;
+
+        var pdfPage = target.Pages[pageIndex];
+        double w = pdfPage.Width, h = pdfPage.Height;
+        var rot = NormalizeRotation(pdfPage.Rotate + viewRotation);
+
+        var overlay = PdfDocumentBuilder.Create();
+        var pb = overlay.AddPage(new PageSize(w, h));
+
+        // Shapes first.
+        foreach (var item in shapes)
+        {
+            var stroke = SafeColor(item.StrokeHex);
+            double strokeWidth = item.StrokeWidthPt <= 0 ? 1.0 : item.StrokeWidthPt;
+
+            if (item.Kind == ShapeKind.Rectangle)
+            {
+                var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+                Color? fill = string.IsNullOrWhiteSpace(item.FillHex) ? null : SafeColor(item.FillHex);
+                pb.DrawRectangle(rect.X, rect.Y, rect.Width, rect.Height, fill, stroke, strokeWidth);
+            }
+            else // Line: map both endpoints individually so any drawn angle is preserved.
+            {
+                var (ax, ay) = MapPointTopLeft(item.X, item.Y, rot, w, h);
+                var (bx, by) = MapPointTopLeft(item.X + item.W, item.Y + item.H, rot, w, h);
+                pb.DrawLine(ax, ay, bx, by, stroke, strokeWidth);
+            }
+        }
+
+        // Images above shapes.
+        foreach (var item in imageItems)
+        {
+            if (item.ImageBytes is null || item.ImageBytes.Length == 0) continue;
+            var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+            // NOTE: no image-opacity parameter in the library yet, so item.Opacity is not applied
+            // (images stamp at full opacity). Per-item rotation also needs a library CTM — ROADMAP.
+            pb.DrawImage(item.ImageBytes, rect.X, rect.Y, rect.Width, rect.Height);
+        }
+
+        using var overlayDoc = PdfDocument.Open(new MemoryStream(overlay.ToByteArray(), writable: false));
+        using var ms = new MemoryStream();
+        PageStamper.Place(ms, target, pageIndex, overlayDoc, 0, Transform.Identity, StampPlacement.Overlay);
+        return ms.ToArray();
+    }
+
+    /// <summary>Maps a single normalised on-screen point (top-left origin) through the page's
+    /// display rotation into TOP-LEFT, y-DOWN page points.</summary>
+    private static (double X, double Y) MapPointTopLeft(double nx, double ny, int rotation, double w, double h)
+    {
+        var (ux, uy) = InverseRotate(nx, ny, rotation);
+        return (ux * w, uy * h);
+    }
+
+    /// <summary>Builds a transform that rotates by <paramref name="effDegrees"/> (screen-CW,
+    /// converted to PDF-CCW) about the centre of <paramref name="rect"/> (y-up content space).
+    /// Identity when the effective rotation is a no-op. Used by the text path.</summary>
+    private static Transform RotateAboutCentre(double effDegrees, RectangleF rect)
+    {
+        if (Math.Abs(effDegrees % 360) < 0.001)
+        {
+            return Transform.Identity;
+        }
+
+        double cx = rect.X + rect.Width / 2.0;
+        double cy = rect.Y + rect.Height / 2.0;
+        return Transform.CreateTranslation(-cx, -cy)
+            .Multiply(Transform.CreateRotationDegrees(-effDegrees))
+            .Multiply(Transform.CreateTranslation(cx, cy));
+    }
+
     /// <summary>True if the document carries a structure tree (tagged PDF). Redaction can't
     /// yet fully strip tagged text, so the reader warns and the save is blocked by verification.
-    /// (Text overlays are unaffected — they add content rather than remove it.)</summary>
+    /// (Overlays — shapes, images, text — are unaffected; they add content rather than remove it.)</summary>
     public bool IsTagged(string sourcePath)
     {
         try
@@ -290,6 +435,27 @@ public sealed class RedactService
     /// origin bottom-left). <paramref name="rotation"/> is the clockwise display rotation the
     /// box was drawn under; <paramref name="w"/>/<paramref name="h"/> are the unrotated page
     /// dimensions in points.</summary>
+    /// <summary>Like <see cref="MapToPdf"/> but returns the rectangle in the authoring layer's
+    /// TOP-LEFT, y-DOWN coordinate system (origin at the page's top-left, y increases downward),
+    /// which is what DrawRectangle / DrawLine / DrawImage / DrawTextBlock all expect. Page
+    /// rotation is still applied via <see cref="InverseRotate"/>.</summary>
+    internal static RectangleF MapToPdfTopLeft(NormBox box, int rotation, double w, double h)
+    {
+        var (ux0, uy0) = InverseRotate(box.X, box.Y, rotation);
+        var (ux1, uy1) = InverseRotate(box.X + box.W, box.Y + box.H, rotation);
+
+        double ux = Math.Min(ux0, ux1);
+        double uy = Math.Min(uy0, uy1);
+        double uw = Math.Abs(ux1 - ux0);
+        double uh = Math.Abs(uy1 - uy0);
+
+        return new RectangleF(
+            (float)(ux * w),
+            (float)(uy * h),
+            (float)(uw * w),
+            (float)(uh * h));
+    }
+
     internal static RectangleF MapToPdf(NormBox box, int rotation, double w, double h)
     {
         var (ux0, uy0) = InverseRotate(box.X, box.Y, rotation);

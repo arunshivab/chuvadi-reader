@@ -90,7 +90,9 @@
             <div class="mk-tools">
                 <button class="mk-tool @(_mkTool == "redact" ? "on" : null)" @onclick='() => SetMkTool("redact")' title="Redact"><Icon Name="redact" Size="15" /> Redact</button>
                 <button class="mk-tool @(_mkTool == "text" ? "on" : null)" @onclick='() => SetMkTool("text")' title="Add text"><Icon Name="text-box" Size="15" /> Text</button>
-                <button class="mk-tool disabled" disabled title="Coming soon"><Icon Name="shape-rect" Size="15" /> Image</button>
+                <button class="mk-tool @(_mkTool == "image" ? "on" : null)" @onclick="AddImageViaPicker" title="Add image"><Icon Name="image" Size="15" /> Image</button>
+                <button class="mk-tool @(_mkTool == "rect" ? "on" : null)" @onclick='() => SetMkTool("rect")' title="Rectangle"><Icon Name="shape-rect" Size="15" /> Rect</button>
+                <button class="mk-tool @(_mkTool == "line" ? "on" : null)" @onclick='() => SetMkTool("line")' title="Line"><Icon Name="minus" Size="15" /> Line</button>
             </div>
 
             @if (_mkTool == "redact")
@@ -136,9 +138,52 @@
                     <button class="mk-tg del" @onclick="() => RemoveSelectedText()" title="Delete text">&times;</button>
                 </span>
             }
+            else if (_selShape is { } ssel)
+            {
+                <span class="mk-style">
+                    <span class="mk-style-lbl">@(ssel.Kind == ShapeKind.Line ? "Line" : "Rectangle")</span>
+                    <span class="mk-stroke-lbl">Stroke</span>
+                    <label class="mk-swatch custom on" title="Stroke colour" style="background:@ssel.StrokeHex">
+                        <input type="color" value="@ssel.StrokeHex" @onchange="e => SetShapeStroke(ssel, e)" />
+                    </label>
+                    <input class="mk-num" type="number" min="0.25" max="60" step="0.25" value="@ssel.StrokeWidthPt" @onchange="e => SetShapeWidth(ssel, e)" title="Stroke width (pt)" />
+                    @if (ssel.Kind == ShapeKind.Rectangle)
+                    {
+                        <span class="mk-fill-grp">
+                            <button class="mk-tg @(string.IsNullOrEmpty(ssel.FillHex) ? null : "on")" @onclick="() => ToggleShapeFill(ssel)" title="Toggle fill">Fill</button>
+                            @if (!string.IsNullOrEmpty(ssel.FillHex))
+                            {
+                                <label class="mk-swatch custom on" title="Fill colour" style="background:@ssel.FillHex">
+                                    <input type="color" value="@ssel.FillHex" @onchange="e => SetShapeFill(ssel, e)" />
+                                </label>
+                            }
+                        </span>
+                    }
+                    <button class="mk-tg del" @onclick="() => RemoveSelectedShape()" title="Delete shape">&times;</button>
+                </span>
+            }
+            else if (_selImage is { } isel)
+            {
+                <span class="mk-style">
+                    <span class="mk-style-lbl">Image</span>
+                    <button class="mk-tg @(isel.Lock ? "on" : null)" @onclick="() => ToggleImageLock(isel)" title="@(isel.Lock ? "Aspect locked" : "Aspect unlocked")"><Icon Name="lock" Size="13" /></button>
+                    <button class="mk-tg" @onclick="AddImageViaPicker" title="Replace / add another image"><Icon Name="image" Size="13" /></button>
+                    <span class="mk-note" title="The library can't apply image opacity yet (v40)">full opacity</span>
+                    <button class="mk-tg del" @onclick="() => RemoveSelectedImage()" title="Delete image">&times;</button>
+                </span>
+            }
             else
             {
-                <span class="mk-hint">Click to place a text box, or drag to size one.</span>
+                <span class="mk-hint">
+                    @(_mkTool switch
+                    {
+                        "text" => "Click to place a text box, or drag to size one.",
+                        "rect" => "Drag to draw a rectangle.",
+                        "line" => "Drag to draw a line.",
+                        "image" => "Pick an image, or paste / drop one onto the page.",
+                        _ => "Click to place a text box, or drag to size one.",
+                    })
+                </span>
             }
 
             <span class="mk-spacer"></span>
@@ -154,9 +199,9 @@
                     <button class="mk-open" @onclick="OpenRedacted">Open it</button>
                 }
             }
-            <span class="mk-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s") · @TextCount text</span>
+            <span class="mk-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s") · @TextCount text · @ShapeCount shape@(ShapeCount == 1 ? "" : "s") · @ImageCount image@(ImageCount == 1 ? "" : "s")</span>
             <button class="mk-btn" @onclick="ClearMarkup" disabled="@(MarkupCount == 0 || _mkSaving)">Clear</button>
-            @if (TextCount > 0 && RedactionCount == 0)
+            @if (OverlayCount > 0 && RedactionCount == 0)
             {
                 <button class="mk-btn" @onclick="SaveInPlace" disabled="@_mkSaving" title="Overwrite the open file">@(_mkSaving ? "Saving…" : "Save")</button>
             }
@@ -364,7 +409,7 @@
                         }
                         @if (_markup)
                         {
-                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null)" data-page="@n"
+                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null) @((_mkTool == "redact" || _mkTool == "rect" || _mkTool == "line") ? "drawmode" : null)" data-page="@n"
                                  @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
                                 @if (_redactions.TryGetValue(n, out var boxes))
                                 {
@@ -407,6 +452,84 @@
                                 @if (_textDraft is { } td && _textDraftPage == n)
                                 {
                                     <div class="mk-text draft" style="left:@Pct(td.X);top:@Pct(td.Y);width:@Pct(td.W);height:@Pct(td.H)"></div>
+                                }
+
+                                @* Shapes: rectangles as boxes, lines as an SVG overlay. *@
+                                @if (_shapes.TryGetValue(n, out var shapeList))
+                                {
+                                    @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Rectangle))
+                                    {
+                                        var sb = s;
+                                        var selS = ReferenceEquals(_selShape, sb);
+                                        <div class="mk-shape rect @(selS ? "sel" : null)"
+                                             style="left:@Pct(sb.X);top:@Pct(sb.Y);width:@Pct(sb.W);height:@Pct(sb.H);border-color:@sb.StrokeHex;border-width:@(ShapeBorderPx(sb.StrokeWidthPt))px;background:@(string.IsNullOrEmpty(sb.FillHex) ? "transparent" : sb.FillHex)"
+                                             @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveShape(e, n, sb)">
+                                            @if (selS)
+                                            {
+                                                <span class="mk-th resize" title="Resize"
+                                                      @onpointerdown:stopPropagation="true" @onpointerdown="e => StartResizeShape(e, n, sb)"></span>
+                                            }
+                                        </div>
+                                    }
+
+                                    <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                        @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Line))
+                                        {
+                                            var sb = s;
+                                            var selS = ReferenceEquals(_selShape, sb);
+                                            <line x1="@F(sb.X * 100)" y1="@F(sb.Y * 100)" x2="@F((sb.X + sb.W) * 100)" y2="@F((sb.Y + sb.H) * 100)"
+                                                  stroke="@sb.StrokeHex" stroke-width="@F(sb.StrokeWidthPt)" stroke-linecap="round"
+                                                  vector-effect="non-scaling-stroke" class="@(selS ? "sel" : null)" />
+                                            <line x1="@F(sb.X * 100)" y1="@F(sb.Y * 100)" x2="@F((sb.X + sb.W) * 100)" y2="@F((sb.Y + sb.H) * 100)"
+                                                  stroke="transparent" stroke-width="12" vector-effect="non-scaling-stroke"
+                                                  style="pointer-events:stroke;cursor:move"
+                                                  @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveShape(e, n, sb)" />
+                                        }
+                                    </svg>
+
+                                    @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Line && ReferenceEquals(_selShape, s)))
+                                    {
+                                        var sb = s;
+                                        <span class="mk-line-end" style="left:@Pct(sb.X);top:@Pct(sb.Y)" title="Move start"
+                                              @onpointerdown:stopPropagation="true" @onpointerdown="e => StartLineEnd(e, n, sb, false)"></span>
+                                        <span class="mk-line-end" style="left:@Pct(sb.X + sb.W);top:@Pct(sb.Y + sb.H)" title="Move end"
+                                              @onpointerdown:stopPropagation="true" @onpointerdown="e => StartLineEnd(e, n, sb, true)"></span>
+                                    }
+                                }
+                                @if (_shapeDraft is { } sd && _shapeDraftPage == n)
+                                {
+                                    @if (_mkTool == "line")
+                                    {
+                                        <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                            <line x1="@F(sd.X * 100)" y1="@F(sd.Y * 100)" x2="@F((sd.X + sd.W) * 100)" y2="@F((sd.Y + sd.H) * 100)"
+                                                  stroke="@_shapeStroke" stroke-width="@F(_shapeStrokeWidth)" stroke-linecap="round"
+                                                  vector-effect="non-scaling-stroke" stroke-dasharray="4 3" />
+                                        </svg>
+                                    }
+                                    else
+                                    {
+                                        <div class="mk-shape rect draft" style="left:@Pct(sd.X);top:@Pct(sd.Y);width:@Pct(sd.W);height:@Pct(sd.H);border-color:@_shapeStroke"></div>
+                                    }
+                                }
+
+                                @* Images. *@
+                                @if (_images.TryGetValue(n, out var imageList))
+                                {
+                                    @foreach (var im in imageList)
+                                    {
+                                        var ib = im;
+                                        var selI = ReferenceEquals(_selImage, ib);
+                                        <div class="mk-image @(selI ? "sel" : null)"
+                                             style="left:@Pct(ib.X);top:@Pct(ib.Y);width:@Pct(ib.W);height:@Pct(ib.H)"
+                                             @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveImage(e, n, ib)">
+                                            <img src="@ib.DataUrl" draggable="false" />
+                                            @if (selI)
+                                            {
+                                                <span class="mk-th resize" title="Resize"
+                                                      @onpointerdown:stopPropagation="true" @onpointerdown="e => StartResizeImage(e, n, ib)"></span>
+                                            }
+                                        </div>
+                                    }
                                 }
                             </div>
                         }
@@ -854,13 +977,56 @@
         public double LineHeight { get; set; } = 1.2;
     }
 
-    private enum MkMode { None, RedactDraw, TextDraw, MoveText, ResizeText }
+    private sealed class ImageBox
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double W { get; set; }
+        public double H { get; set; }
+        public byte[] Bytes { get; set; } = Array.Empty<byte>();
+        public string DataUrl { get; set; } = "";
+        public double Opacity { get; set; } = 1.0;   // recorded; library stamps full opacity (v40)
+        public bool Lock { get; set; } = true;        // aspect lock on by default
+        public double Aspect { get; set; } = 1.0;     // natural width/height (pixels)
+    }
+
+    private sealed class ShapeBox
+    {
+        public ShapeKind Kind { get; set; }
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double W { get; set; }   // for a Line, a signed delta to the end point
+        public double H { get; set; }
+        public string? FillHex { get; set; }            // rectangle only; null = no fill
+        public string StrokeHex { get; set; } = "#E03131";
+        public double StrokeWidthPt { get; set; } = 2;
+    }
+
+    private enum MkMode
+    {
+        None, RedactDraw, TextDraw, MoveText, ResizeText,
+        ShapeDraw, MoveShape, ResizeShape, MoveLineEnd,
+        MoveImage, ResizeImage,
+    }
     private MkMode _mkMode = MkMode.None;
 
     private readonly Dictionary<int, List<NormBox>> _redactions = new();
     private readonly Dictionary<int, List<TextBox>> _texts = new();
+    private readonly Dictionary<int, List<ShapeBox>> _shapes = new();
+    private readonly Dictionary<int, List<ImageBox>> _images = new();
     private TextBox? _selText;
     private int _selTextPage = -1;
+    private ShapeBox? _selShape;
+    private int _selShapePage = -1;
+    private ImageBox? _selImage;
+    private int _selImagePage = -1;
+
+    // Shape draft + style defaults for new shapes.
+    private int _shapeDraftPage = -1;
+    private NormBox? _shapeDraft;
+    private string _shapeStroke = "#E03131";
+    private string? _shapeFill = null;          // null = no fill
+    private double _shapeStrokeWidth = 2;
 
     private int _mkDraftPage = -1;
     private NormBox? _mkDraft;
@@ -870,7 +1036,10 @@
     private (double L, double T, double W, double H) _mkRect;
 
     private TextBox? _dragText;
+    private ShapeBox? _dragShape;
+    private ImageBox? _dragImage;
     private double _dragOX, _dragOY, _dragOW, _dragOH;
+    private bool _lineEndIsEnd = true;           // which end of a line is being dragged
 
     private bool _mkSaving;
     private string? _mkStatus;
@@ -881,11 +1050,18 @@
 
     private int RedactionCount => _redactions.Values.Sum(v => v.Count);
     private int TextCount => _texts.Values.Sum(v => v.Count);
-    private int MarkupCount => RedactionCount + TextCount;
+    private int ShapeCount => _shapes.Values.Sum(v => v.Count);
+    private int ImageCount => _images.Values.Sum(v => v.Count);
+    private int OverlayCount => TextCount + ShapeCount + ImageCount; // everything that's overlay-only
+    private int MarkupCount => RedactionCount + OverlayCount;
 
     private static string Pct(double f) =>
         (f * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
     private static string Deg(double d) => d.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    private static string F(double v) => v.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    // On-screen rectangle border thickness (px) — a readable preview of the stroke width in points.
+    private static string ShapeBorderPx(double strokeWidthPt) =>
+        Math.Clamp(strokeWidthPt, 1, 12).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
     private static double Clamp01(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
 
     private async Task CheckTaggedAsync()
@@ -904,14 +1080,23 @@
     {
         _markup = !_markup;
         _mkStatus = null; _mkSavedPath = null;
-        _mkMode = MkMode.None; _mkDraft = null; _textDraft = null; _selText = null;
-        if (_markup) _ = CheckTaggedAsync();
+        _mkMode = MkMode.None; _mkDraft = null; _textDraft = null; _shapeDraft = null;
+        _selText = null; _selShape = null; _selImage = null;
+        if (_markup)
+        {
+            _ = CheckTaggedAsync();
+            if (_js is not null) _ = _js.InvokeVoidAsync("enableImageDrops");
+        }
+        else
+        {
+            if (_js is not null) _ = _js.InvokeVoidAsync("disableImageDrops");
+        }
     }
 
     private void SetMkTool(string tool)
     {
         _mkTool = tool;
-        _selText = null;
+        _selText = null; _selShape = null; _selImage = null;
         _mkStatus = null; _mkSavedPath = null;
     }
 
@@ -923,7 +1108,9 @@
             _mkDocPath = path;
             _redactions.Clear();
             _texts.Clear();
-            _selText = null;
+            _shapes.Clear();
+            _images.Clear();
+            _selText = null; _selShape = null; _selImage = null;
             _mkStatus = null; _mkSavedPath = null;
         }
     }
@@ -955,6 +1142,18 @@
             _mkMode = MkMode.RedactDraw;
             _mkDraftPage = page;
             _mkDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
+        }
+        else if (_mkTool == "rect" || _mkTool == "line")
+        {
+            _selShape = null;
+            _mkMode = MkMode.ShapeDraw;
+            _shapeDraftPage = page;
+            _shapeDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
+        }
+        else if (_mkTool == "image")
+        {
+            // Image is placed via the picker / paste / drop, not by dragging on the page.
+            _mkMode = MkMode.None;
         }
         else
         {
@@ -990,6 +1189,78 @@
             case MkMode.ResizeText when _dragText is { } d:
                 d.W = Math.Clamp(_dragOW + (cx - _mkStartX), 0.03, 1 - d.X);
                 d.H = Math.Clamp(_dragOH + (cy - _mkStartY), 0.02, 1 - d.Y);
+                break;
+
+            case MkMode.ShapeDraw:
+                if (_mkTool == "line")
+                {
+                    // Free endpoints (signed), so any angle is allowed.
+                    _shapeDraft = new NormBox(_mkStartX, _mkStartY, cx - _mkStartX, cy - _mkStartY);
+                }
+                else
+                {
+                    _shapeDraft = new NormBox(Math.Min(_mkStartX, cx), Math.Min(_mkStartY, cy),
+                                              Math.Abs(cx - _mkStartX), Math.Abs(cy - _mkStartY));
+                }
+                break;
+
+            case MkMode.MoveShape when _dragShape is { } s:
+                if (s.Kind == ShapeKind.Line)
+                {
+                    // Translate both endpoints, keeping them on-page.
+                    var nx = _dragOX + (cx - _mkStartX);
+                    var ny = _dragOY + (cy - _mkStartY);
+                    var minX = Math.Min(0, s.W); var maxX = Math.Max(0, s.W);
+                    var minY = Math.Min(0, s.H); var maxY = Math.Max(0, s.H);
+                    s.X = Math.Clamp(nx, -minX, 1 - maxX);
+                    s.Y = Math.Clamp(ny, -minY, 1 - maxY);
+                }
+                else
+                {
+                    s.X = Clamp01(_dragOX + (cx - _mkStartX));
+                    s.Y = Clamp01(_dragOY + (cy - _mkStartY));
+                    if (s.X + s.W > 1) s.X = 1 - s.W;
+                    if (s.Y + s.H > 1) s.Y = 1 - s.H;
+                }
+                break;
+            case MkMode.ResizeShape when _dragShape is { } s:
+                s.W = Math.Clamp(_dragOW + (cx - _mkStartX), 0.01, 1 - s.X);
+                s.H = Math.Clamp(_dragOH + (cy - _mkStartY), 0.01, 1 - s.Y);
+                break;
+            case MkMode.MoveLineEnd when _dragShape is { } s:
+                if (_lineEndIsEnd)
+                {
+                    s.W = cx - s.X;
+                    s.H = cy - s.Y;
+                }
+                else
+                {
+                    var endX = s.X + s.W; var endY = s.Y + s.H;
+                    s.X = cx; s.Y = cy;
+                    s.W = endX - cx; s.H = endY - cy;
+                }
+                break;
+
+            case MkMode.MoveImage when _dragImage is { } im:
+                im.X = Clamp01(_dragOX + (cx - _mkStartX));
+                im.Y = Clamp01(_dragOY + (cy - _mkStartY));
+                if (im.X + im.W > 1) im.X = 1 - im.W;
+                if (im.Y + im.H > 1) im.Y = 1 - im.H;
+                break;
+            case MkMode.ResizeImage when _dragImage is { } im:
+                var rw = Math.Clamp(_dragOW + (cx - _mkStartX), 0.02, 1 - im.X);
+                im.W = rw;
+                if (im.Lock && _mkRect.W > 0 && _mkRect.H > 0 && im.Aspect > 0)
+                {
+                    // Keep the on-screen pixel aspect of the source image.
+                    var pxW = rw * _mkRect.W;
+                    var pxH = pxW / im.Aspect;
+                    im.H = Math.Clamp(pxH / _mkRect.H, 0.02, 1 - im.Y);
+                }
+                else
+                {
+                    im.H = Math.Clamp(_dragOH + (cy - _mkStartY), 0.02, 1 - im.Y);
+                }
                 break;
         }
     }
@@ -1028,12 +1299,57 @@
                     _selTextPage = _textDraftPage;
                 }
                 break;
+            case MkMode.ShapeDraw:
+                {
+                    var d = _shapeDraft ?? new NormBox(_mkStartX, _mkStartY, 0, 0);
+                    if (_mkTool == "line")
+                    {
+                        // Need a minimum length; a bare click does nothing.
+                        if (Math.Abs(d.W) > 0.01 || Math.Abs(d.H) > 0.01)
+                        {
+                            var sb = new ShapeBox
+                            {
+                                Kind = ShapeKind.Line,
+                                X = Clamp01(d.X), Y = Clamp01(d.Y), W = d.W, H = d.H,
+                                StrokeHex = _shapeStroke, StrokeWidthPt = _shapeStrokeWidth,
+                            };
+                            AddShape(_shapeDraftPage, sb);
+                        }
+                    }
+                    else
+                    {
+                        // Tiny drag = a click → default-sized rectangle at the click point.
+                        var w = d.W < 0.02 ? 0.20 : d.W;
+                        var h = d.H < 0.02 ? 0.12 : d.H;
+                        var x = Math.Min(d.X, 1 - w);
+                        var y = Math.Min(d.Y, 1 - h);
+                        var sb = new ShapeBox
+                        {
+                            Kind = ShapeKind.Rectangle,
+                            X = Clamp01(x), Y = Clamp01(y), W = w, H = h,
+                            FillHex = _shapeFill, StrokeHex = _shapeStroke, StrokeWidthPt = _shapeStrokeWidth,
+                        };
+                        AddShape(_shapeDraftPage, sb);
+                    }
+                }
+                break;
         }
 
         _mkMode = MkMode.None;
-        _mkDraft = null; _textDraft = null;
-        _mkDraftPage = -1; _textDraftPage = -1;
-        _dragText = null;
+        _mkDraft = null; _textDraft = null; _shapeDraft = null;
+        _mkDraftPage = -1; _textDraftPage = -1; _shapeDraftPage = -1;
+        _dragText = null; _dragShape = null; _dragImage = null;
+    }
+
+    private void AddShape(int page, ShapeBox sb)
+    {
+        if (!_shapes.TryGetValue(page, out var list))
+        {
+            list = new List<ShapeBox>();
+            _shapes[page] = list;
+        }
+        list.Add(sb);
+        _selShape = sb; _selShapePage = page;
     }
 
     private void RemoveBox(int page, int index)
@@ -1084,6 +1400,274 @@
         _mkMode = MkMode.ResizeText;
     }
 
+    // ── Shapes ────────────────────────────────────────────────────────────────
+    private void SelectShape(int page, ShapeBox sb)
+    {
+        _selShape = sb; _selShapePage = page;
+        _selText = null; _selImage = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void RemoveSelectedShape()
+    {
+        if (_selShape is null) return;
+        if (_shapes.TryGetValue(_selShapePage, out var list))
+        {
+            list.Remove(_selShape);
+            if (list.Count == 0) _shapes.Remove(_selShapePage);
+        }
+        _selShape = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private async Task StartMoveShape(PointerEventArgs e, int page, ShapeBox sb)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectShape(page, sb);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragShape = sb; _dragOX = sb.X; _dragOY = sb.Y;
+        _mkMode = MkMode.MoveShape;
+    }
+
+    private async Task StartResizeShape(PointerEventArgs e, int page, ShapeBox sb)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectShape(page, sb);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragShape = sb; _dragOW = sb.W; _dragOH = sb.H;
+        _mkMode = MkMode.ResizeShape;
+    }
+
+    private async Task StartLineEnd(PointerEventArgs e, int page, ShapeBox sb, bool isEnd)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectShape(page, sb);
+        _dragShape = sb; _lineEndIsEnd = isEnd;
+        _mkMode = MkMode.MoveLineEnd;
+    }
+
+    private void SetShapeStroke(ShapeBox sb, ChangeEventArgs e)
+    {
+        sb.StrokeHex = e.Value?.ToString() ?? "#E03131";
+        _shapeStroke = sb.StrokeHex;
+    }
+    private void SetShapeFill(ShapeBox sb, ChangeEventArgs e)
+    {
+        sb.FillHex = e.Value?.ToString();
+        _shapeFill = sb.FillHex;
+    }
+    private void ToggleShapeFill(ShapeBox sb)
+    {
+        sb.FillHex = string.IsNullOrEmpty(sb.FillHex) ? "#FFE08A" : null;
+        _shapeFill = sb.FillHex;
+    }
+    private void SetShapeWidth(ShapeBox sb, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+        {
+            sb.StrokeWidthPt = Math.Clamp(v, 0.25, 60);
+            _shapeStrokeWidth = sb.StrokeWidthPt;
+        }
+    }
+
+    // ── Images ────────────────────────────────────────────────────────────────
+    private async Task AddImageViaPicker()
+    {
+        SetMkTool("image");
+        if (!_markup) return;
+        EnsureMarkupDoc();
+        IReadOnlyList<string> paths;
+        try { paths = await Picker.PickImagesAsync(); }
+        catch { return; }
+        if (paths is null || paths.Count == 0) return;
+
+        // Place onto the page currently most in view.
+        int page = Math.Clamp(CurPage - 1, 0, (Doc?.PageCount ?? 1) - 1);
+        await CacheLayerRect(page);   // so the initial height respects the image's aspect ratio
+        var first = paths[0];
+        try
+        {
+            var bytes = await Task.Run(() => System.IO.File.ReadAllBytes(first));
+            var mime = MimeForPath(first);
+            AddImageBox(page, bytes, mime);
+        }
+        catch (Exception ex)
+        {
+            _mkStatus = $"Could not load image: {ex.Message}";
+            _mkError = true;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>Called from JS when an image is pasted or dropped (base64 payload).</summary>
+    [JSInvokable]
+    public void OnImageDropped(int page, double fx, double fy, string base64, string mime)
+    {
+        if (!_markup) return;
+        if (Doc is null) return;
+        EnsureMarkupDoc();
+        try
+        {
+            var bytes = Convert.FromBase64String(base64);
+            int p = Math.Clamp(page, 0, Doc.PageCount - 1);
+            AddImageBox(p, bytes, string.IsNullOrEmpty(mime) ? "image/png" : mime, fx, fy);
+            InvokeAsync(StateHasChanged);
+        }
+        catch { }
+    }
+
+    [JSInvokable]
+    public void OnImagePasted(string base64, string mime)
+    {
+        if (!_markup) return;
+        if (Doc is null) return;
+        int page = Math.Clamp(CurPage - 1, 0, Doc.PageCount - 1);
+        OnImageDropped(page, -1, -1, base64, mime);
+    }
+
+    private void AddImageBox(int page, byte[] bytes, string mime, double fx = -1, double fy = -1)
+    {
+        if (bytes is null || bytes.Length == 0) return;
+        var (natW, natH) = ImagePixelSize(bytes);
+        double aspect = natH > 0 ? (double)natW / natH : 1.0;
+
+        // Default width 30% of the page; height from aspect against the cached layer rect
+        // (fall back to a square-ish box if we can't measure the layer yet).
+        double w = 0.30;
+        double h = 0.30;
+        if (_mkRect.W > 0 && _mkRect.H > 0 && aspect > 0)
+        {
+            var pxW = w * _mkRect.W;
+            var pxH = pxW / aspect;
+            h = Clamp01(pxH / _mkRect.H);
+        }
+        double x = fx >= 0 ? Clamp01(fx - w / 2) : Clamp01(0.5 - w / 2);
+        double y = fy >= 0 ? Clamp01(fy - h / 2) : Clamp01(0.5 - h / 2);
+        if (x + w > 1) x = 1 - w;
+        if (y + h > 1) y = 1 - h;
+
+        var ib = new ImageBox
+        {
+            X = x, Y = y, W = w, H = h,
+            Bytes = bytes, Aspect = aspect, Lock = true, Opacity = 1.0,
+            DataUrl = $"data:{mime};base64,{Convert.ToBase64String(bytes)}",
+        };
+        if (!_images.TryGetValue(page, out var list))
+        {
+            list = new List<ImageBox>();
+            _images[page] = list;
+        }
+        list.Add(ib);
+        _selImage = ib; _selImagePage = page;
+        _selText = null; _selShape = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void SelectImage(int page, ImageBox ib)
+    {
+        _selImage = ib; _selImagePage = page;
+        _selText = null; _selShape = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void RemoveSelectedImage()
+    {
+        if (_selImage is null) return;
+        if (_images.TryGetValue(_selImagePage, out var list))
+        {
+            list.Remove(_selImage);
+            if (list.Count == 0) _images.Remove(_selImagePage);
+        }
+        _selImage = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void ToggleImageLock(ImageBox ib) => ib.Lock = !ib.Lock;
+
+    private async Task StartMoveImage(PointerEventArgs e, int page, ImageBox ib)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectImage(page, ib);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragImage = ib; _dragOX = ib.X; _dragOY = ib.Y;
+        _mkMode = MkMode.MoveImage;
+    }
+
+    private async Task StartResizeImage(PointerEventArgs e, int page, ImageBox ib)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectImage(page, ib);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragImage = ib; _dragOW = ib.W; _dragOH = ib.H;
+        _mkMode = MkMode.ResizeImage;
+    }
+
+    private static string MimeForPath(string path) =>
+        (System.IO.Path.GetExtension(path) ?? "").ToLowerInvariant() switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".gif" => "image/gif",
+            ".bmp" => "image/bmp",
+            ".webp" => "image/webp",
+            ".tif" or ".tiff" => "image/tiff",
+            _ => "image/png",
+        };
+
+    /// <summary>Reads pixel dimensions from a PNG, JPEG, GIF or BMP header without decoding the
+    /// whole image. Returns (0,0) if it can't be determined (callers fall back to a square box).</summary>
+    private static (int W, int H) ImagePixelSize(byte[] b)
+    {
+        try
+        {
+            // PNG
+            if (b.Length > 24 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47)
+            {
+                int w = (b[16] << 24) | (b[17] << 16) | (b[18] << 8) | b[19];
+                int h = (b[20] << 24) | (b[21] << 16) | (b[22] << 8) | b[23];
+                return (w, h);
+            }
+            // GIF
+            if (b.Length > 10 && b[0] == (byte)'G' && b[1] == (byte)'I' && b[2] == (byte)'F')
+            {
+                int w = b[6] | (b[7] << 8);
+                int h = b[8] | (b[9] << 8);
+                return (w, h);
+            }
+            // BMP
+            if (b.Length > 26 && b[0] == (byte)'B' && b[1] == (byte)'M')
+            {
+                int w = b[18] | (b[19] << 8) | (b[20] << 16) | (b[21] << 24);
+                int h = b[22] | (b[23] << 8) | (b[24] << 16) | (b[25] << 24);
+                return (w, Math.Abs(h));
+            }
+            // JPEG — scan for a SOF marker.
+            if (b.Length > 4 && b[0] == 0xFF && b[1] == 0xD8)
+            {
+                int i = 2;
+                while (i + 9 < b.Length)
+                {
+                    if (b[i] != 0xFF) { i++; continue; }
+                    int marker = b[i + 1];
+                    if (marker is >= 0xC0 and <= 0xCF && marker != 0xC4 && marker != 0xC8 && marker != 0xCC)
+                    {
+                        int h = (b[i + 5] << 8) | b[i + 6];
+                        int w = (b[i + 7] << 8) | b[i + 8];
+                        return (w, h);
+                    }
+                    int len = (b[i + 2] << 8) | b[i + 3];
+                    if (len <= 0) break;
+                    i += 2 + len;
+                }
+            }
+        }
+        catch { }
+        return (0, 0);
+    }
+
     private void SetFont(TextBox tb, ChangeEventArgs e) => tb.FontFamily = e.Value?.ToString() ?? "Helvetica";
     private void SetTextColor(TextBox tb, ChangeEventArgs e) => tb.ColorHex = e.Value?.ToString() ?? "#111111";
     private void SetSize(TextBox tb, ChangeEventArgs e)
@@ -1115,7 +1699,9 @@
     {
         _redactions.Clear();
         _texts.Clear();
-        _selText = null;
+        _shapes.Clear();
+        _images.Clear();
+        _selText = null; _selShape = null; _selImage = null;
         _mkStatus = null; _mkSavedPath = null;
     }
 
@@ -1130,11 +1716,33 @@
                             t.Bold, t.Italic, t.FontSizePt, t.ColorHex, t.Align, t.Rotation, t.LineHeight))
                         .ToList() as IReadOnlyList<TextAnno>));
 
+    private Dictionary<int, PageShape> BuildShapesDict() =>
+        _shapes
+            .Where(kv => kv.Value.Count > 0)
+            .ToDictionary(
+                kv => kv.Key,
+                kv => new PageShape(RotationFor(kv.Key),
+                    kv.Value.Select(s => new ShapeAnno(
+                            s.X, s.Y, s.W, s.H, s.Kind,
+                            s.Kind == ShapeKind.Rectangle ? s.FillHex : null,
+                            s.StrokeHex, s.StrokeWidthPt, 0))
+                        .ToList() as IReadOnlyList<ShapeAnno>));
+
+    private Dictionary<int, PageImage> BuildImagesDict() =>
+        _images
+            .Where(kv => kv.Value.Any(i => i.Bytes.Length > 0))
+            .ToDictionary(
+                kv => kv.Key,
+                kv => new PageImage(RotationFor(kv.Key),
+                    kv.Value.Where(i => i.Bytes.Length > 0)
+                        .Select(i => new ImageAnno(i.X, i.Y, i.W, i.H, i.Bytes, 0, i.Opacity))
+                        .ToList() as IReadOnlyList<ImageAnno>));
+
     private async Task SaveInPlace()
     {
         var active = Tabs.Active;
         // Overlay-only guard: never overwrite when a redaction is present.
-        if (active?.Path is null || TextCount == 0 || RedactionCount > 0) return;
+        if (active?.Path is null || OverlayCount == 0 || RedactionCount > 0) return;
 
         _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false;
         StateHasChanged();
@@ -1143,11 +1751,13 @@
         {
             var src = active.Path;
             var texts = BuildTextsDict();
+            var imgs = BuildImagesDict();
+            var shps = BuildShapesDict();
             var dir = System.IO.Path.GetDirectoryName(src) ?? "";
             var temp = System.IO.Path.Combine(dir, "~" + System.IO.Path.GetFileNameWithoutExtension(src) + ".chuvadi-tmp.pdf");
 
             // Build the edited file beside the original (no redactions here).
-            await Redact.FlattenToFileAsync(src, temp, new Dictionary<int, PageRedaction>(), _mkColor, texts);
+            await Redact.FlattenToFileAsync(src, temp, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
 
             // Release the open document, swap the file in, then reopen in place.
             await Tabs.ReloadActiveAsync(async () =>
@@ -1167,7 +1777,9 @@
 
             // Flattened into the file now — clear the editable overlays.
             _texts.Clear();
-            _selText = null;
+            _shapes.Clear();
+            _images.Clear();
+            _selText = null; _selShape = null; _selImage = null;
             _mkStatus = $"Saved to {System.IO.Path.GetFileName(src)}";
             _mkError = false;
         }
@@ -1189,8 +1801,8 @@
         if (active?.Path is null || MarkupCount == 0) return;
 
         var hasRed = RedactionCount > 0;
-        var hasTxt = TextCount > 0;
-        var suffix = hasRed && !hasTxt ? "-redacted" : "-edited";
+        var hasOverlay = OverlayCount > 0;
+        var suffix = hasRed && !hasOverlay ? "-redacted" : "-edited";
         var suggested = System.IO.Path.GetFileNameWithoutExtension(active.Path) + suffix + ".pdf";
         var output = await Picker.PickSavePdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(output)) return;
@@ -1205,8 +1817,10 @@
                 .ToDictionary(kv => kv.Key, kv => new PageRedaction(RotationFor(kv.Key), kv.Value.ToList()));
 
             var texts = BuildTextsDict();
+            var imgs = BuildImagesDict();
+            var shps = BuildShapesDict();
 
-            await Redact.FlattenToFileAsync(active.Path, output!, redactions, _mkColor, texts);
+            await Redact.FlattenToFileAsync(active.Path, output!, redactions, _mkColor, texts, imgs, shps);
             _mkSavedPath = output;
             _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
             _mkError = false;
@@ -1314,8 +1928,10 @@
                 _mkDocPath = tab?.Path;
                 _redactions.Clear();
                 _texts.Clear();
-                _selText = null;
-                _mkStatus = null; _mkSavedPath = null; _mkMode = MkMode.None; _mkDraft = null; _textDraft = null;
+                _shapes.Clear();
+                _images.Clear();
+                _selText = null; _selShape = null; _selImage = null;
+                _mkStatus = null; _mkSavedPath = null; _mkMode = MkMode.None; _mkDraft = null; _textDraft = null; _shapeDraft = null;
                 _mkTagged = false; _mkTaggedPath = null;
                 if (_markup) _ = CheckTaggedAsync();
             }

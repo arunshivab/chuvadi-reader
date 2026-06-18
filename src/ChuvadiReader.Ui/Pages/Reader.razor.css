@@ -437,3 +437,36 @@
 .mk-tg.del { color: var(--chvd-binding); }
 .mk-aligns { display: inline-flex; gap: 2px; }
 .mk-rot { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--chvd-ink-muted); }
+
+/* ── Add Image + Shapes (v40) ── */
+.mk-layer.drawmode { cursor: crosshair; }
+
+/* Rectangles */
+.mk-shape { position: absolute; box-sizing: border-box; }
+.mk-shape.rect { border-style: solid; cursor: move; }
+.mk-shape.rect.sel { outline: 1px dashed var(--chvd-binding); outline-offset: 2px; }
+.mk-shape.rect.draft { border-style: dashed; background: rgba(224,168,46,0.06); }
+
+/* Lines live in a full-layer SVG; the SVG itself never eats pointer events
+   (so drawing still works), only the per-line hit stroke does. */
+.mk-shape-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    overflow: visible; pointer-events: none; z-index: 6;
+}
+.mk-shape-svg line.sel { filter: drop-shadow(0 0 0 var(--chvd-binding)); }
+.mk-line-end {
+    position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px;
+    border-radius: 50%; background: #fff; border: 2px solid var(--chvd-binding);
+    cursor: crosshair; z-index: 7; touch-action: none;
+}
+
+/* Images */
+.mk-image { position: absolute; box-sizing: border-box; cursor: move; border: 1px solid transparent; }
+.mk-image img { width: 100%; height: 100%; object-fit: fill; display: block; pointer-events: none; user-select: none; }
+.mk-image.sel { border-color: var(--chvd-binding); outline: 1px dashed var(--chvd-binding); outline-offset: 1px; }
+
+/* Extra rail labels for the shape / image panels */
+.mk-style-lbl { font-size: 11.5px; font-weight: 600; color: var(--chvd-ink); }
+.mk-stroke-lbl { font-size: 11.5px; color: var(--chvd-ink-muted); }
+.mk-fill-grp { display: inline-flex; align-items: center; gap: 5px; }
+.mk-note { font-size: 10.5px; color: var(--chvd-ink-muted); font-style: italic; }
