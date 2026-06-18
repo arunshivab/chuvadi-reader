@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <!--
+      HARD RULE (inherited from Chuvadi): no third-party NuGet in the app.
+      The only allowed PackageReferences are the Blazor / BlazorWebView
+      framework packages published by Microsoft, because they ARE the
+      framework. Everything else is pure BCL or the Chuvadi libraries.
+    -->
+  </PropertyGroup>
+</Project>

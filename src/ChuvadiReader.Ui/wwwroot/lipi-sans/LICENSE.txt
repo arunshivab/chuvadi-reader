@@ -1,0 +1,58 @@
+SIL OPEN FONT LICENSE Version 1.1 — 26 February 2007
+
+LiPi Sans is a curated combination of two open-source font families:
+
+  • Inter — Copyright (c) 2016–2024 The Inter Project Authors
+            (https://github.com/rsms/inter)
+
+  • Noto Sans (Devanagari, Bengali, Tamil, Telugu, Malayalam, Kannada,
+    Gujarati, Gurmukhi, Odia) — Copyright Google LLC
+    (https://github.com/notofonts)
+
+Both are licensed under the SIL Open Font License, Version 1.1.
+
+"Inter" and "Noto" are Reserved Font Names. LiPi Sans does not use
+these names in its public font-family identifier.
+
+—————————————————————————————————————————————————————————————————
+PERMISSION & CONDITIONS
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+   in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+   redistributed and/or sold with any software, provided that each copy
+   contains the above copyright notice and this license. These can be
+   included either as stand-alone text files, human-readable headers or
+   in the appropriate machine-readable metadata fields within text or
+   binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+   Name(s) unless explicit written permission is granted by the
+   corresponding Copyright Holder.
+
+4) The Font Software, modified or unmodified, in part or in whole,
+   must be distributed entirely under this license, and must not be
+   distributed under any other license. The requirement for fonts to
+   remain under this license does not apply to any document created
+   using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL
+THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF THE USE OR INABILITY TO USE THE FONT
+SOFTWARE OR FROM OTHER DEALINGS IN THE FONT SOFTWARE.

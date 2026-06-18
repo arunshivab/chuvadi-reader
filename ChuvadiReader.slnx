@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ChuvadiReader.Core/ChuvadiReader.Core.csproj" />
+    <Project Path="src/ChuvadiReader.Ui/ChuvadiReader.Ui.csproj" />
+    <Project Path="src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj" />
+  </Folder>
+</Solution>

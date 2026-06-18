@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!--
+      The Windows version suffix is REQUIRED. Without it (plain net10.0-windows)
+      the Windows SDK projection assembly Microsoft.Windows.SDK.NET.dll is not
+      brought in, and WebView2 throws FileNotFoundException at window show time.
+    -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ChuvadiReader.Windows</RootNamespace>
+    <AssemblyName>ChuvadiReader.Windows</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>chuvadi.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="chuvadi.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- First-party Microsoft host control. The only host package. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
+    <ProjectReference Include="..\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
+  </ItemGroup>
+</Project>

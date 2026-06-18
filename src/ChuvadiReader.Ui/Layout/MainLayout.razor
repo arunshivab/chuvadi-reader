@@ -1,0 +1,269 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ThemeService Theme
+@inject SaveFolderService SaveFolders
+@inject IJSRuntime JS
+@inject IAppReadySignal Ready
+@inject IWindowControls Win
+@inject NavigationManager Nav
+@inject TabsService Tabs
+@inject IFilePicker Picker
+@inject RecentFilesService Recents
+@inject OpenDocumentService OpenDoc
+
+@*
+    The persistent app shell: a window title bar (always present, with drag,
+    double-click maximize, and the min/max/close buttons), a left navigation
+    rail, a bottom status bar, and a content slot. Pages render only into the
+    content area, so the chrome never disappears on navigation.
+*@
+
+<div class="shell">
+
+    <header class="titlebar" @onmousedown="StartDrag">
+        <BrandMark Size="20" />
+        @if (Tabs.Tabs.Count > 0)
+        {
+            <div class="rtabs">
+                @foreach (var t in Tabs.Tabs)
+                {
+                    <div class="rtab @(t.Id == Tabs.Active?.Id ? "active" : null)" @key="t.Id"
+                         data-tab-id="@t.Id" @onclick="() => SwitchTab(t.Id)" title="@t.Path"
+                         @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true"
+                         @onauxclick:stopPropagation="true" @onauxclick:preventDefault="true" @onauxclick="(e) => OnTabAux(e, t.Id)">
+                        <Icon Name="@t.Format.IconName()" Size="13" />
+                        <span class="rtab-name">@t.FileName</span>
+                        <button class="rtab-x" @onclick:stopPropagation="true" @onclick="() => CloseTab(t.Id)" aria-label="Close tab"><Icon Name="x" Size="11" /></button>
+                    </div>
+                }
+                <button class="rtab-add" @onmousedown:stopPropagation="true" @onclick="AddTab" aria-label="Open document"><Icon Name="plus" Size="13" /></button>
+            </div>
+            <div class="rtabs-actions" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+                <button class="rtabs-menu" @onclick="ToggleTabMenu" title="Tab actions" aria-label="Tab actions"><Icon Name="more-horizontal" Size="15" /></button>
+                @if (_tabMenuOpen)
+                {
+                    <div class="rtabs-menu-overlay" @onclick="CloseTabMenu"></div>
+                    <div class="rtabs-pop">
+                        <button class="rtabs-mi" @onclick="MenuCloseActive"><span>Close active tab</span><span class="rtabs-k">Ctrl+W</span></button>
+                        <button class="rtabs-mi" @onclick="MenuCloseOthers" disabled="@(Tabs.Tabs.Count < 2)"><span>Close inactive tabs</span><span class="rtabs-k">Ctrl+Alt+W</span></button>
+                        <div class="rtabs-msep"></div>
+                        <button class="rtabs-mi" @onclick="MenuCloseAll"><span>Close all tabs</span><span class="rtabs-k">Ctrl+Shift+W</span></button>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="tb-spacer"></div>
+        }
+        <div class="tb-controls" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+            <div class="find-pill"><Icon Name="search" Size="13" /> find <span class="kbd">Ctrl F</span></div>
+            <button class="icon-btn" @onclick="ToggleTheme" aria-label="@(Theme.Current == ChuvadiTheme.Dark ? "Switch to light theme" : "Switch to dark theme")"><Icon Name="@(Theme.Current == ChuvadiTheme.Dark ? "shift-day" : "shift-night")" Size="16" /></button>
+            <div class="traffic">
+                <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="11" /></button>
+                <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="10" /></button>
+                <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="11" /></button>
+            </div>
+        </div>
+    </header>
+
+    <div class="shell-body @(_railExpanded ? "rail-open" : "rail-closed")">
+        <nav class="rail @(_railExpanded ? "expanded" : null)" aria-label="Primary">
+            <NavLink class="rail-tab" href="/" Match="NavLinkMatch.All" title="Home"><Icon Name="home" Size="24" /><span class="rail-label">Home</span></NavLink>
+            <NavLink class="rail-tab" href="/reader" title="Reader"><Icon Name="reader" Size="24" /><span class="rail-label">Reader</span></NavLink>
+            <NavLink class="rail-tab" href="/bench" title="Bench"><Icon Name="grid-view" Size="24" /><span class="rail-label">Bench</span></NavLink>
+            <NavLink class="rail-tab" href="/library" title="Library"><Icon Name="library" Size="24" /><span class="rail-label">Library</span></NavLink>
+            <div class="rail-spacer"></div>
+            <div class="rail-divider"></div>
+            <NavLink class="rail-tab" href="/settings" title="Settings"><Icon Name="settings" Size="24" /><span class="rail-label">Settings</span></NavLink>
+        </nav>
+
+        <button class="rail-handle" @onclick="ToggleRail" aria-label="@(_railExpanded ? "Collapse sidebar" : "Expand sidebar")"><Icon Name="chevron-left" Size="14" /></button>
+
+        <main class="content">
+            @Body
+        </main>
+    </div>
+
+    <footer class="statusbar">
+        <span class="status-dot"></span>
+        <span>offline · ready</span>
+        <span class="status-right">v1.0.0-preview</span>
+    </footer>
+
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Theme.Changed += OnThemeChanged;
+        Win.StateChanged += OnWinChanged;
+        Tabs.Changed += OnTabsChanged;
+        OpenDoc.Requested += OnOpenRequested;
+    }
+
+    private void OnTabsChanged() => InvokeAsync(StateHasChanged);
+
+    // A file dropped on the window (handled WPF-side) sets a pending open; bring
+    // the reader forward so it consumes it.
+    private void OnOpenRequested() => InvokeAsync(() => Nav.NavigateTo("/reader"));
+
+    private async Task SwitchTab(string id)
+    {
+        await Tabs.ActivateAsync(id);
+        Nav.NavigateTo("/reader");
+    }
+
+    private async Task CloseTab(string id)
+    {
+        await Tabs.CloseAsync(id);
+        if (Tabs.Tabs.Count == 0)
+        {
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private bool _tabMenuOpen;
+
+    private void ToggleTabMenu() => _tabMenuOpen = !_tabMenuOpen;
+
+    private void CloseTabMenu() => _tabMenuOpen = false;
+
+    private async Task OnTabAux(MouseEventArgs e, string id)
+    {
+        // Middle button only (0 = left, 1 = middle, 2 = right).
+        if (e.Button != 1)
+        {
+            return;
+        }
+
+        if (e.CtrlKey)
+        {
+            await Tabs.CloseAllAsync();
+            Nav.NavigateTo("/");
+        }
+        else
+        {
+            await CloseTab(id);
+        }
+    }
+
+    private async Task MenuCloseActive()
+    {
+        _tabMenuOpen = false;
+        await Tabs.CloseActiveAsync();
+        if (Tabs.Tabs.Count == 0)
+        {
+            Nav.NavigateTo("/");
+        }
+    }
+
+    private async Task MenuCloseOthers()
+    {
+        _tabMenuOpen = false;
+        await Tabs.CloseOthersAsync();
+    }
+
+    private async Task MenuCloseAll()
+    {
+        _tabMenuOpen = false;
+        await Tabs.CloseAllAsync();
+        Nav.NavigateTo("/");
+    }
+
+    private async Task AddTab()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        var name = System.IO.Path.GetFileName(path);
+        var format = DocumentFormatExtensions.FromPath(path);
+        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+        await Tabs.OpenAsync(path, name, format);
+        Nav.NavigateTo("/reader");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            await SaveFolders.HydrateAsync();
+            await Theme.HydrateAsync();
+            await ApplyThemeAsync();
+        }
+        catch
+        {
+            // readiness matters more than a perfectly applied theme
+        }
+        finally
+        {
+            Ready.SignalReady();
+        }
+    }
+
+    private bool _railExpanded = true;
+
+    private void ToggleRail() => _railExpanded = !_railExpanded;
+
+    private async Task ToggleTheme() => await Theme.ToggleAsync();
+
+    private DateTime _lastTitleDown = DateTime.MinValue;
+
+    private void StartDrag(MouseEventArgs e)
+    {
+        if (e.Button != 0)
+        {
+            return;
+        }
+
+        // The first mousedown hands off to a native window-move loop, which swallows
+        // the second click — so the browser's own double-click count never reaches us.
+        // Detect it ourselves: two title presses within 350ms = maximize/restore.
+        var now = DateTime.UtcNow;
+        if ((now - _lastTitleDown).TotalMilliseconds < 350)
+        {
+            _lastTitleDown = DateTime.MinValue;
+            Win.ToggleMaximize();
+            return;
+        }
+
+        _lastTitleDown = now;
+        Win.BeginDrag();
+    }
+
+    private async void OnThemeChanged()
+    {
+        await ApplyThemeAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OnWinChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task ApplyThemeAsync()
+    {
+        var name = Theme.Current == ChuvadiTheme.Dark ? "dark" : "light";
+        try
+        {
+            await JS.InvokeVoidAsync("chuvadiTheme.set", name);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        Theme.Changed -= OnThemeChanged;
+        Win.StateChanged -= OnWinChanged;
+        Tabs.Changed -= OnTabsChanged;
+        OpenDoc.Requested -= OnOpenRequested;
+    }
+}

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      chuvadi-pdf consumed ONLY as its packaged distribution (the Chuvadi.Pdf
+      meta-package), restored from the local feed in ./localpackages via the
+      solution nuget.config. No project reference, no vendored source.
+      The meta-package pulls Chuvadi.Pdf.Documents + Chuvadi.Pdf.Svg (and the
+      rest of the cross-platform modules), which is what ChuvadiPdfReader uses.
+    -->
+    <PackageReference Include="Chuvadi.Pdf" Version="3.11.1" />
+  </ItemGroup>
+</Project>

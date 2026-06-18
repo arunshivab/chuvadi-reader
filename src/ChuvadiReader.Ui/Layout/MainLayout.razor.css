@@ -1,0 +1,7 @@
+/* Intentionally empty.
+
+   The app-shell layout styles (title bar, left rail, status bar) live in the
+   GLOBAL stylesheet wwwroot/css/app.css, not here. Scoped CSS cannot style the
+   rail's <NavLink> tabs or the <Icon> glyphs, because Blazor does not apply a
+   component's scope attribute to the elements rendered by its child components.
+   See the "App-shell layout" section in app.css. */

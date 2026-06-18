@@ -1,0 +1,89 @@
+@*
+    Renders a single page's SVG and refuses to re-render while the output is
+    unchanged. The reader re-renders whenever any other page finishes rendering
+    or the scroll position updates; without this guard those re-renders would
+    re-inject this page's markup and make it flicker (appear, blink, reappear).
+
+    Rotation is applied at the SVG level (swap width/height for 90/270 and wrap
+    the content in a rotate transform) so the page's layout box reflows
+    correctly — a CSS transform would rotate in place and overflow its row.
+*@
+@using System.Globalization
+@using System.Text.RegularExpressions
+@((MarkupString)_html)
+
+@code {
+    [Parameter] public string Svg { get; set; } = string.Empty;
+
+    /// <summary>View-only rotation in degrees: 0, 90, 180, 270.</summary>
+    [Parameter] public int Rotation { get; set; }
+
+    private string _html = string.Empty;
+    private string? _shown;
+
+    protected override void OnParametersSet() => _html = Rotate(Svg, Rotation);
+
+    protected override bool ShouldRender() => _html != _shown;
+
+    protected override void OnAfterRender(bool firstRender) => _shown = _html;
+
+    private static readonly Regex OpenTag = new(@"<svg\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex ViewBox = new(@"viewBox\s*=\s*""\s*([\d.+-]+)\s+([\d.+-]+)\s+([\d.+-]+)\s+([\d.+-]+)\s*""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex WidthAttr = new(@"\swidth\s*=\s*""[^""]*""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex HeightAttr = new(@"\sheight\s*=\s*""[^""]*""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    private static string Rotate(string svg, int rotation)
+    {
+        var r = ((rotation % 360) + 360) % 360;
+        if (r == 0 || string.IsNullOrEmpty(svg))
+        {
+            return svg;
+        }
+
+        var openMatch = OpenTag.Match(svg);
+        if (!openMatch.Success)
+        {
+            return svg;
+        }
+
+        var open = openMatch.Value;
+        var vb = ViewBox.Match(open);
+        if (!vb.Success
+            || !double.TryParse(vb.Groups[3].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var w)
+            || !double.TryParse(vb.Groups[4].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var h)
+            || w <= 0 || h <= 0)
+        {
+            return svg; // can't read page box — leave unrotated rather than mangle it
+        }
+
+        var minX = vb.Groups[1].Value;
+        var minY = vb.Groups[2].Value;
+        var swap = r == 90 || r == 270;
+
+        var boxW = swap ? h : w;
+        var boxH = swap ? w : h;
+
+        string t = r switch
+        {
+            90 => $"translate({F(h)},0) rotate(90)",
+            180 => $"translate({F(w)},{F(h)}) rotate(180)",
+            _ => $"translate(0,{F(w)}) rotate(270)",
+        };
+
+        var newOpen = open;
+        newOpen = WidthAttr.Replace(newOpen, "", 1);
+        newOpen = HeightAttr.Replace(newOpen, "", 1);
+        newOpen = ViewBox.Replace(newOpen, $@"viewBox=""{minX} {minY} {F(boxW)} {F(boxH)}""", 1);
+        newOpen = newOpen.Insert(4, $@" width=""{F(boxW)}"" height=""{F(boxH)}""");
+
+        var inner = svg.Substring(openMatch.Index + open.Length);
+        var closeIdx = inner.LastIndexOf("</svg>", StringComparison.OrdinalIgnoreCase);
+        var body = closeIdx >= 0 ? inner.Substring(0, closeIdx) : inner;
+        var tail = closeIdx >= 0 ? inner.Substring(closeIdx) : "</svg>";
+
+        var prefix = svg.Substring(0, openMatch.Index);
+        return $"{prefix}{newOpen}<g transform=\"{t}\">{body}</g>{tail}";
+    }
+
+    private static string F(double v) => v.ToString("0.####", CultureInfo.InvariantCulture);
+}

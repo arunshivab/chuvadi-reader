@@ -1,0 +1,106 @@
+/*
+ * Chuvadi Reader — Design Tokens
+ *
+ * Single source of truth for every color, font, and geometric value used
+ * across the app. Every component consumes these via var(--chvd-*).
+ *
+ * Token naming is semantic, not appearance-based. Do not write
+ *   --chvd-paper-cream
+ * because the cream paper exists only in the Light theme. Instead write
+ *   --chvd-surface-hi
+ * and let the [data-theme="dark"] override redefine it to a dark surface.
+ *
+ * The token-audit script in tools/token-audit.py greps the codebase for
+ * hardcoded colors / fonts / px values and fails CI when it finds them
+ * outside of this file.
+ */
+
+:root,
+[data-theme="light"] {
+    /* Surfaces */
+    --chvd-paper:        #fbf7ec;
+    --chvd-paper-warm:   #f2ead6;
+    --chvd-paper-deep:   #e8dcc4;
+    --chvd-surface-hi:   #fbf7ec;
+    --chvd-surface-mid:  #f2ead6;
+    --chvd-surface-lo:   #e8dcc4;
+
+    /* Ink */
+    --chvd-ink:          #1a1310;
+    --chvd-ink-soft:     #3a2f25;
+    --chvd-ink-muted:    #8a7c64;
+
+    /* Borders */
+    --chvd-border:       #c4b497;
+    --chvd-border-soft:  #d9cdb4;
+
+    /* Brand accents (from imagiQa brand identity package) */
+    --chvd-binding:      #8a3a1c;   /* binding red */
+    --chvd-marigold:     #c47416;   /* warm highlight */
+    --chvd-olive:        #6b7a3e;   /* manuscript olive */
+    --chvd-binding-soft: rgba(138, 58, 28, 0.12);
+    --chvd-marigold-glow: rgba(196, 116, 22, 0.30);
+
+    /* Functional */
+    --chvd-success:      #5d7a3a;
+    --chvd-warn:         #a6651d;
+    --chvd-error:        #a83a2a;
+
+    /* Type stacks */
+    --chvd-serif-display: "Instrument Serif", "Fraunces", Georgia, serif;
+    --chvd-serif-body:    "Fraunces", Georgia, serif;
+    --chvd-tamil:         "Tiro Tamil", "Noto Serif Tamil", serif;
+    --chvd-mono:          "IBM Plex Mono", ui-monospace, monospace;
+    --chvd-sans-display:  "LiPi Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+    /* Geometry */
+    --chvd-radius-sm: 3px;
+    --chvd-radius:    4px;
+    --chvd-radius-lg: 8px;
+    --chvd-stroke:    0.5px;
+
+    /* Shadows. Subtle layered shadow for elevation on paper surfaces. */
+    --chvd-shadow-soft:   rgba(26, 19, 16, 0.04);
+    --chvd-shadow-medium: rgba(26, 19, 16, 0.05);
+    --chvd-shadow-deep:   rgba(0, 0, 0, 0.6);
+    --chvd-shadow-rim:    rgba(0, 0, 0, 1);
+
+    /* Motion */
+    --chvd-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --chvd-quick: 120ms var(--chvd-ease);
+    --chvd-base:  180ms var(--chvd-ease);
+}
+
+[data-theme="dark"] {
+    --chvd-paper:        #1a1410;
+    --chvd-paper-warm:   #221a14;
+    --chvd-paper-deep:   #2a201a;
+    --chvd-surface-hi:   #221a14;
+    --chvd-surface-mid:  #1a1410;
+    --chvd-surface-lo:   #0e0a07;
+
+    --chvd-ink:          #f2ead6;
+    --chvd-ink-soft:     #d9cdb4;
+    --chvd-ink-muted:    #8a7c64;
+
+    --chvd-border:       #3a2f25;
+    --chvd-border-soft:  #2a201a;
+
+    --chvd-binding:      #d97842;
+    --chvd-marigold:     #e0a050;
+    --chvd-olive:        #9caf63;
+    --chvd-binding-soft: rgba(217, 120, 66, 0.18);
+    --chvd-marigold-glow: rgba(224, 160, 80, 0.30);
+
+    --chvd-success:      #9caf63;
+    --chvd-warn:         #e0a050;
+    --chvd-error:        #e0735a;
+}
+
+/* Reduce motion preference is respected globally */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --chvd-quick: 0ms;
+        --chvd-base:  0ms;
+    }
+}

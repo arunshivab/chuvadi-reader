@@ -1,0 +1,259 @@
+/* =============================================================================
+ * LiPi Sans v1.0 — Self-hosted, fully offline
+ * A unified type system for LiPi HIS and companion applications.
+ *
+ * Drop-in replacement for Google Fonts. No CDN calls. No internet required.
+ * Compatible with any web framework: React, Vue, Blazor, plain HTML.
+ *
+ * USAGE
+ *   1. Copy the entire lipi-sans/ folder into your project's static assets.
+ *   2. Add to your HTML <head>:
+ *        <link rel="preload" href="/lipi-sans/fonts/LiPi-Sans-Latin.woff2"
+ *              as="font" type="font/woff2" crossorigin>
+ *        <link rel="stylesheet" href="/lipi-sans/lipi-sans.css">
+ *   3. Apply the font:
+ *        body { font-family: "LiPi Sans", system-ui, sans-serif; }
+ *      — or use the CSS custom property:
+ *        body { font-family: var(--lipi-sans); }
+ *
+ * PROVENANCE
+ *   LiPi Sans is a derivative work, distributed under the SIL Open Font
+ *   License 1.1. It is built on:
+ *     • Inter — © The Inter Project Authors (rsms.me/inter)
+ *     • Noto Sans (Devanagari, Bengali, Tamil, Telugu, Malayalam,
+ *       Kannada, Gujarati, Gurmukhi, Odia) — © Google LLC
+ *   Both upstream families are OFL 1.1 licensed. "Inter" and "Noto" are
+ *   Reserved Font Names and are not used in LiPi's public family name.
+ *   See LICENSE.txt for the full license text.
+ * ============================================================================= */
+
+/* =============================================================================
+ * @font-face DECLARATIONS
+ * unicode-range routes each codepoint to the correct script file.
+ * The browser downloads a script file only when it encounters characters
+ * from that script — a pure-English page downloads only LiPi-Sans-Latin.woff2.
+ * ============================================================================= */
+
+/* Latin (Inter Variable) --------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-024F, U+0259, U+1E00-1EFF,
+    U+2000-206F, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Latin-Italic.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-024F, U+0259, U+1E00-1EFF,
+    U+2000-206F, U+2074, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/* Devanagari — Hindi, Marathi, Sanskrit, Nepali ---------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Devanagari.woff2") format("woff2-variations");
+  unicode-range:
+    U+0900-097F, U+1CD0-1CF9,
+    U+200C-200D, U+20A8, U+20B9,
+    U+25CC, U+A830-A839, U+A8E0-A8FF;
+}
+
+/* Bengali — Bengali, Assamese ---------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Bengali.woff2") format("woff2-variations");
+  unicode-range:
+    U+0980-09FE, U+200C-200D, U+20B9, U+25CC;
+}
+
+/* Tamil -------------------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Tamil.woff2") format("woff2-variations");
+  unicode-range:
+    U+0964-0965, U+0B82-0BFA,
+    U+200C-200D, U+20B9, U+25CC;
+}
+
+/* Telugu ------------------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Telugu.woff2") format("woff2-variations");
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0C00-0C7F,
+    U+1CDA, U+200C-200D, U+25CC;
+}
+
+/* Malayalam ---------------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Malayalam.woff2") format("woff2-variations");
+  unicode-range:
+    U+0D00-0D7F, U+200C-200D, U+20B9, U+25CC;
+}
+
+/* Kannada ------------------------------------------------------------------ */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Kannada.woff2") format("woff2-variations");
+  unicode-range:
+    U+0951-0952, U+0964-0965, U+0C82-0CF2,
+    U+200C-200D, U+20B9, U+25CC;
+}
+
+/* Gujarati ----------------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Gujarati.woff2") format("woff2-variations");
+  unicode-range:
+    U+0964-0965, U+0A80-0AFF,
+    U+200C-200D, U+20B9, U+25CC, U+A830-A839;
+}
+
+/* Gurmukhi — Punjabi ------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Gurmukhi.woff2") format("woff2-variations");
+  unicode-range:
+    U+0964-0965, U+0A01-0A75,
+    U+200C-200D, U+20B9, U+25CC, U+A830-A839;
+}
+
+/* Odia --------------------------------------------------------------------- */
+@font-face {
+  font-family: "LiPi Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("./fonts/LiPi-Sans-Odia.woff2") format("woff2-variations");
+  unicode-range:
+    U+0964-0965, U+0B01-0B77,
+    U+200C-200D, U+20B9, U+25CC;
+}
+
+/* =============================================================================
+ * CSS CUSTOM PROPERTIES
+ * Reference these in your design tokens rather than hardcoding the font name.
+ * ============================================================================= */
+:root {
+  /* Primary font stack — use this everywhere */
+  --lipi-sans: "LiPi Sans", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Line height scale — tuned for both Latin and Indic baseline rhythm */
+  --lipi-leading-body:    1.45;   /* body text, form fields, table cells */
+  --lipi-leading-tight:   1.1;    /* headings, display text */
+  --lipi-leading-relaxed: 1.65;   /* long-form prose, clinical notes */
+
+  /* Letter spacing scale */
+  --lipi-tracking-display: -0.022em;  /* headings 16px+ */
+  --lipi-tracking-body:    -0.005em;  /* body text, labels */
+  --lipi-tracking-caps:     0.07em;   /* uppercase labels, table headers */
+}
+
+/* =============================================================================
+ * BASE STYLES
+ * Apply to html/body. Override in your own stylesheet if needed.
+ * ============================================================================= */
+html, body {
+  font-family: var(--lipi-sans);
+
+  /* LiPi OpenType feature stack:
+     ss01 — open digits (distinguishes 1 from l)
+     cv11 — straight-leg R (cleaner for clinical codes)
+     calt — contextual alternates (smart glyph substitution)
+     kern — kerning
+     liga — common ligatures */
+  font-feature-settings: "ss01", "cv11", "calt", "kern", "liga";
+  font-optical-sizing: auto;
+
+  line-height: var(--lipi-leading-body);
+  letter-spacing: var(--lipi-tracking-body);
+
+  /* Rendering quality */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================================================
+ * UTILITY CLASSES
+ * These are opt-in. Apply to specific elements; don't put them on body.
+ * ============================================================================= */
+
+/* Numeric data — tabular figures + slashed zero
+   Use on: table cells with numbers, IDs, UHIDs, Aadhaar, dates,
+           vital signs, lab values, billing amounts, timestamps      */
+.lipi-num {
+  font-feature-settings: "tnum", "zero", "ss01", "cv11";
+  font-variant-numeric: tabular-nums slashed-zero;
+}
+
+/* Display / headline — negative tracking + tight leading
+   Use on: page titles, section headings, hero text                  */
+.lipi-display {
+  letter-spacing: var(--lipi-tracking-display);
+  line-height: var(--lipi-leading-tight);
+  font-weight: 600;
+}
+
+/* Uppercase label — spaced caps for table headers, section labels
+   Use on: <th>, badge text, status pills, section dividers          */
+.lipi-label {
+  letter-spacing: var(--lipi-tracking-caps);
+  text-transform: uppercase;
+  font-weight: 600;
+  font-feature-settings: "ss01", "cv11", "calt", "kern", "cpsp";
+}
+
+/* Prose / notes — relaxed leading for longer reads
+   Use on: clinical notes, discharge summaries, long descriptions     */
+.lipi-prose {
+  line-height: var(--lipi-leading-relaxed);
+  letter-spacing: 0;
+}
+
+/* Weight shorthands — variable font, any weight 100-900 is valid     */
+.lipi-thin     { font-weight: 100; }
+.lipi-light    { font-weight: 300; }
+.lipi-regular  { font-weight: 400; }
+.lipi-medium   { font-weight: 500; }
+.lipi-semibold { font-weight: 600; }
+.lipi-bold     { font-weight: 700; }
+.lipi-black    { font-weight: 900; }

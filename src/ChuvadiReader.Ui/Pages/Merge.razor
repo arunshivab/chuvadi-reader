@@ -1,0 +1,171 @@
+@page "/merge"
+@inject IFilePicker Picker
+@inject PdfToolsService Tools
+@inject TabsService Tabs
+@inject OpenDocumentService OpenDoc
+@inject NavigationManager Nav
+
+<PageTitle>Chuvadi · Merge</PageTitle>
+
+<div class="tool">
+    <header class="tool-head">
+        <a class="tool-back" href="/"><Icon Name="chevron-left" Size="14" /> dashboard</a>
+        <h1 class="tool-title"><Icon Name="merge" Size="22" /> Merge</h1>
+        <p class="tool-sub">Combine several PDFs into one. Order them, then save.</p>
+    </header>
+
+    <div class="tool-actions">
+        <button class="tbtn" @onclick="AddFiles"><Icon Name="upload" Size="15" /> Add files</button>
+        @if (Tabs.Tabs.Count > 0)
+        {
+            <button class="tbtn" @onclick="AddOpen"><Icon Name="library" Size="15" /> Add open documents</button>
+        }
+    </div>
+
+    @if (_entries.Count == 0)
+    {
+        <div class="tool-empty">No documents yet — add at least two PDFs to merge.</div>
+    }
+    else
+    {
+        <ol class="mlist">
+            @for (var i = 0; i < _entries.Count; i++)
+            {
+                var idx = i;
+                var entry = _entries[idx];
+                <li class="mrow" @key="entry.Path">
+                    <span class="mrow-n">@(idx + 1)</span>
+                    <Icon Name="file-pdf" Size="16" />
+                    <span class="mrow-name" title="@entry.Path">@entry.FileName</span>
+                    <span class="mrow-tools">
+                        <button class="mico" @onclick="() => MoveUp(idx)" disabled="@(idx == 0)" aria-label="Move up"><Icon Name="chevron-up" Size="14" /></button>
+                        <button class="mico" @onclick="() => MoveDown(idx)" disabled="@(idx == _entries.Count - 1)" aria-label="Move down"><Icon Name="chevron-down" Size="14" /></button>
+                        <button class="mico mico-x" @onclick="() => Remove(idx)" aria-label="Remove"><Icon Name="x" Size="14" /></button>
+                    </span>
+                </li>
+            }
+        </ol>
+    }
+
+    <div class="tool-run">
+        <button class="tbtn tbtn-go" @onclick="RunMerge" disabled="@(_entries.Count < 2 || _busy)">
+            @(_busy ? "Merging…" : "Merge & Save")
+        </button>
+        @if (_resultPath is not null && !_error)
+        {
+            <button class="tbtn" @onclick="OpenResult"><Icon Name="file-pdf" Size="14" /> Open result</button>
+        }
+        @if (_status is not null)
+        {
+            <span class="tool-status @(_error ? "err" : "ok")">@_status</span>
+        }
+    </div>
+</div>
+
+@code {
+    private sealed record Entry(string FileName, string Path);
+
+    private readonly List<Entry> _entries = new();
+    private bool _busy;
+    private bool _error;
+    private string? _status;
+    private string? _resultPath;
+
+    private async Task AddFiles()
+    {
+        var paths = await Picker.PickDocumentsAsync();
+        foreach (var p in paths)
+        {
+            if (!_entries.Any(x => string.Equals(x.Path, p, StringComparison.OrdinalIgnoreCase)))
+            {
+                _entries.Add(new Entry(System.IO.Path.GetFileName(p), p));
+            }
+        }
+        ResetStatus();
+    }
+
+    private void AddOpen()
+    {
+        foreach (var t in Tabs.Tabs)
+        {
+            if (!_entries.Any(x => string.Equals(x.Path, t.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                _entries.Add(new Entry(t.FileName, t.Path));
+            }
+        }
+        ResetStatus();
+    }
+
+    private void MoveUp(int i)
+    {
+        if (i > 0)
+        {
+            (_entries[i - 1], _entries[i]) = (_entries[i], _entries[i - 1]);
+        }
+    }
+
+    private void MoveDown(int i)
+    {
+        if (i < _entries.Count - 1)
+        {
+            (_entries[i + 1], _entries[i]) = (_entries[i], _entries[i + 1]);
+        }
+    }
+
+    private void Remove(int i)
+    {
+        _entries.RemoveAt(i);
+        ResetStatus();
+    }
+
+    private async Task RunMerge()
+    {
+        if (_entries.Count < 2)
+        {
+            return;
+        }
+
+        var outPath = await Picker.PickSavePdfAsync("merged.pdf");
+        if (string.IsNullOrEmpty(outPath))
+        {
+            return;
+        }
+
+        _busy = true;
+        ResetStatus();
+        StateHasChanged();
+        try
+        {
+            await Tools.MergeAsync(_entries.Select(e => e.Path).ToList(), outPath);
+            _resultPath = outPath;
+            _status = $"Merged {_entries.Count} documents into {System.IO.Path.GetFileName(outPath)}.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _status = $"Merge failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OpenResult()
+    {
+        if (_resultPath is null)
+        {
+            return;
+        }
+
+        OpenDoc.Request(_resultPath, System.IO.Path.GetFileName(_resultPath));
+        Nav.NavigateTo("/reader");
+    }
+
+    private void ResetStatus()
+    {
+        _status = null;
+        _resultPath = null;
+        _error = false;
+    }
+}

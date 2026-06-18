@@ -1,0 +1,2031 @@
+@page "/reader"
+@implements IAsyncDisposable
+@inject NavigationManager Nav
+@inject TabsService Tabs
+@inject IFilePicker Picker
+@inject OpenDocumentService OpenDoc
+@inject RecentFilesService Recents
+@inject IJSRuntime JS
+@inject BenchService Bench
+@inject DocumentPropertiesService DocProps
+@inject ExportService Export
+@inject SaveFolderService SaveFolders
+@inject PressService Press
+@inject IAppStorage Storage
+@inject RedactService Redact
+
+<PageTitle>Chuvadi · Reader</PageTitle>
+
+<div class="reader @(_reading ? "reading" : null) @(_drawerPinned && _drawerOpen ? "pinned" : null)" style="--reader-page-bg:@_pageBg">
+    @{
+        var tab = Tab;
+        var doc = tab?.Session?.Document;
+    }
+    <header class="rtop">
+        <div class="rtools">
+            @if (doc is not null)
+            {
+                <button class="ricon" @onclick="() => GoTo(CurPage - PageStep)" disabled="@(CurPage <= 1)" aria-label="Previous page"><Icon Name="chevron-left" Size="16" /></button>
+                <span class="rpagenav">
+                    <input class="rpagebox" value="@_pageInput" @onchange="OnJumpChange" inputmode="numeric" aria-label="Page number" />
+                    <span class="rpagetotal">/ @doc.PageCount</span>
+                </span>
+                <button class="ricon" @onclick="() => GoTo(CurPage + PageStep)" disabled="@(CurPage >= doc.PageCount)" aria-label="Next page"><Icon Name="chevron-right" Size="16" /></button>
+
+                <span class="rsep"></span>
+                <button class="ricon" @onclick="ZoomOut" disabled="@(CurScale <= 0.1)" aria-label="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
+                <span class="rzoom">@ZoomPct%</span>
+                <button class="ricon" @onclick="ZoomIn" disabled="@(CurScale >= 8.0)" aria-label="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
+
+                <span class="rsep"></span>
+                <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth" title="Fit width"><Icon Name="fit-width" Size="18" /></button>
+                <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage" title="Fit page"><Icon Name="fit-page" Size="18" /></button>
+                <button class="vbtn" @onclick="ActualSize" title="Actual size (100%)"><Icon Name="actual-size" Size="18" /></button>
+
+                <span class="rsep"></span>
+                <button class="vbtn @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)" title="Single page"><Icon Name="page-single" Size="18" /></button>
+                <button class="vbtn @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)" title="Two-page"><Icon Name="page-facing" Size="18" /></button>
+
+                <span class="rsep"></span>
+                <button class="vbtn" @onclick="() => RotateScopeBy(-90)" title="Rotate left (scope in View ▸ Rotate)"><Icon Name="rotate-ccw" Size="18" /></button>
+                <button class="vbtn" @onclick="() => RotateScopeBy(90)" title="Rotate right (scope in View ▸ Rotate)"><Icon Name="rotate-cw" Size="18" /></button>
+                <button class="vbtn @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)" title="Hand (pan)"><Icon Name="hand" Size="18" /></button>
+                <button class="vbtn @(_tool == ReaderTool.Marquee ? "on" : null)" @onclick="() => SetTool(ReaderTool.Marquee)" title="Marquee zoom"><Icon Name="zoom-area" Size="18" /></button>
+                <button class="vbtn @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)" title="Loupe"><Icon Name="loupe" Size="18" /></button>
+                <button class="vbtn @(Tab?.ScrollLocked == true ? "on" : null)" @onclick="ToggleScrollLock" title="Lock scrolling"><Icon Name="lock" Size="16" /></button>
+
+                <span class="rsep"></span>
+                <button class="vbtn @(_drawerOpen ? "on" : null)" @onclick="ToggleDrawer" title="View options"><Icon Name="eye" Size="16" /></button>
+                <span class="rpc-wrap">
+                    <button class="vbtn @(_pageColorOpen ? "on" : null)" @onclick="TogglePageColor" title="Page colour (view only)"><Icon Name="contrast" Size="16" /></button>
+                    @if (_pageColorOpen)
+                    {
+                        <div class="rpc-pop" @onclick:stopPropagation="true">
+                            <div class="rpc-h">Page colour <span class="rpc-sub">view only — not saved to file</span></div>
+                            <div class="rpc-swatches">
+                                @foreach (var (name, hex) in _pageBgPresets)
+                                {
+                                    <button class="rpc-sw @(SameColor(_pageBg, hex) ? "on" : null)" style="background:@hex"
+                                            title="@name" @onclick="() => SetPageBg(hex)"></button>
+                                }
+                            </div>
+                            <div class="rpc-custom">
+                                <label>Custom</label>
+                                <input type="color" value="@_pageBg" @oninput="OnCustomPageBg" />
+                                <button class="rpc-reset" @onclick='() => SetPageBg("#ffffff")'>Reset</button>
+                            </div>
+                        </div>
+                    }
+                </span>
+                <span class="rsep"></span>
+                <button class="vbtn @(_markup ? "on" : null)" @onclick="ToggleMarkup" title="Edit"><Icon Name="edit" Size="16" /></button>
+                <button class="vbtn" @onclick="OpenInBench" title="Open in Bench"><Icon Name="grid-view" Size="16" /></button>
+            }
+        </div>
+    </header>
+
+    @if (_markup && doc is not null)
+    {
+        <div class="mk-rail">
+            <div class="mk-tools">
+                <button class="mk-tool @(_mkTool == "redact" ? "on" : null)" @onclick='() => SetMkTool("redact")' title="Redact"><Icon Name="redact" Size="15" /> Redact</button>
+                <button class="mk-tool @(_mkTool == "text" ? "on" : null)" @onclick='() => SetMkTool("text")' title="Add text"><Icon Name="text-box" Size="15" /> Text</button>
+                <button class="mk-tool disabled" disabled title="Coming soon"><Icon Name="shape-rect" Size="15" /> Image</button>
+            </div>
+
+            @if (_mkTool == "redact")
+            {
+                <span class="mk-hint">Drag to draw a redaction box.</span>
+                <span class="mk-colour">
+                    <span class="mk-colour-lbl">Colour</span>
+                    @foreach (var (cname, chex) in _mkColorPresets)
+                    {
+                        <button class="mk-swatch @(string.Equals(_mkColor, chex, StringComparison.OrdinalIgnoreCase) ? "on" : null)"
+                                style="background:@chex" title="@cname" @onclick="() => _mkColor = chex"></button>
+                    }
+                    <label class="mk-swatch custom @(IsCustomColor ? "on" : null)" title="Custom" style="background:@(IsCustomColor ? _mkColor : "transparent")">
+                        <input type="color" value="@_mkColor" @onchange="OnMkColor" />
+                        @if (!IsCustomColor)
+                        {
+                            <Icon Name="edit" Size="11" />
+                        }
+                    </label>
+                </span>
+            }
+            else if (_selText is { } sel)
+            {
+                <span class="mk-style">
+                    <select class="mk-sel" value="@sel.FontFamily" @onchange="e => SetFont(sel, e)">
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Times">Times</option>
+                        <option value="Courier">Courier</option>
+                    </select>
+                    <button class="mk-tg @(sel.Bold ? "on" : null)" @onclick="() => { sel.Bold = !sel.Bold; }" title="Bold"><b>B</b></button>
+                    <button class="mk-tg @(sel.Italic ? "on" : null)" @onclick="() => { sel.Italic = !sel.Italic; }" title="Italic"><i>I</i></button>
+                    <input class="mk-num" type="number" min="6" max="200" step="1" value="@sel.FontSizePt" @onchange="e => SetSize(sel, e)" title="Size (pt)" />
+                    <span class="mk-aligns">
+                        <button class="mk-tg @(sel.Align == "left" ? "on" : null)" @onclick='() => sel.Align = "left"' title="Left">⯇</button>
+                        <button class="mk-tg @(sel.Align == "center" ? "on" : null)" @onclick='() => sel.Align = "center"' title="Center">≡</button>
+                        <button class="mk-tg @(sel.Align == "right" ? "on" : null)" @onclick='() => sel.Align = "right"' title="Right">⯈</button>
+                        <button class="mk-tg @(sel.Align == "justify" ? "on" : null)" @onclick='() => sel.Align = "justify"' title="Justify">☰</button>
+                    </span>
+                    <label class="mk-swatch custom on" title="Text colour" style="background:@sel.ColorHex">
+                        <input type="color" value="@sel.ColorHex" @onchange="e => SetTextColor(sel, e)" />
+                    </label>
+                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@sel.Rotation" @onchange="e => SetRotation(sel, e)" title="Rotation (°)" />°</span>
+                    <button class="mk-tg del" @onclick="() => RemoveSelectedText()" title="Delete text">&times;</button>
+                </span>
+            }
+            else
+            {
+                <span class="mk-hint">Click to place a text box, or drag to size one.</span>
+            }
+
+            <span class="mk-spacer"></span>
+            @if (_mkTagged && RedactionCount > 0)
+            {
+                <span class="mk-warn"><Icon Name="warning" Size="13" /> Tagged PDF — redaction can't be removed yet; save will be blocked.</span>
+            }
+            @if (_mkStatus is not null)
+            {
+                <span class="mk-status @(_mkError ? "err" : null)">@_mkStatus</span>
+                @if (_mkSavedPath is not null)
+                {
+                    <button class="mk-open" @onclick="OpenRedacted">Open it</button>
+                }
+            }
+            <span class="mk-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s") · @TextCount text</span>
+            <button class="mk-btn" @onclick="ClearMarkup" disabled="@(MarkupCount == 0 || _mkSaving)">Clear</button>
+            @if (TextCount > 0 && RedactionCount == 0)
+            {
+                <button class="mk-btn" @onclick="SaveInPlace" disabled="@_mkSaving" title="Overwrite the open file">@(_mkSaving ? "Saving…" : "Save")</button>
+            }
+            <button class="mk-btn primary" @onclick="SaveMarkup" disabled="@(MarkupCount == 0 || _mkSaving)" title="@(RedactionCount > 0 ? "Redaction always saves to a new file" : "Save to a new file")">@(_mkSaving ? "Saving…" : "Save as new PDF")</button>
+            <button class="mk-btn" @onclick="ToggleMarkup">Done</button>
+        </div>
+    }
+
+    @if (_showProps)
+    {
+        <div @onclick="CloseProperties" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:center;justify-content:center">
+            <div @onclick:stopPropagation="true" style="width:440px;max-width:90%;max-height:82%;overflow:auto;background:var(--chvd-surface-mid);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:12px;padding:18px 20px;color:var(--chvd-ink);font-family:var(--chvd-sans-display)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+                    <span style="font-family:var(--chvd-serif-display);font-size:18px">Document properties</span>
+                    <button @onclick="CloseProperties" aria-label="Close" style="background:none;border:none;color:var(--chvd-ink-muted);cursor:pointer"><Icon Name="x" Size="16" /></button>
+                </div>
+                @if (_props is null)
+                {
+                    <div style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">reading…</div>
+                }
+                else
+                {
+                    <table style="width:100%;font-size:13px;border-collapse:collapse">
+                        @foreach (var (label, value) in PropRows())
+                        {
+                            <tr>
+                                <td style="color:var(--chvd-ink-muted);font-family:var(--chvd-mono);font-size:11px;padding:5px 12px 5px 0;vertical-align:top;white-space:nowrap">@label</td>
+                                <td style="padding:5px 0;word-break:break-word">@value</td>
+                            </tr>
+                        }
+                    </table>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_showExport)
+    {
+        <div @onclick="CloseExport" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:center;justify-content:center">
+            <div @onclick:stopPropagation="true" style="width:470px;max-width:92%;background:var(--chvd-surface-mid);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:12px;padding:18px 20px;color:var(--chvd-ink);font-family:var(--chvd-sans-display)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-family:var(--chvd-serif-display);font-size:18px">Export as image</span>
+                    <button @onclick="CloseExport" aria-label="Close" style="background:none;border:none;color:var(--chvd-ink-muted);cursor:pointer"><Icon Name="x" Size="16" /></button>
+                </div>
+
+                <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);margin-bottom:7px">format</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">
+                    @foreach (var f in _formats)
+                    {
+                        <button @onclick="() => _expFormat = f" style="@Chip(_expFormat == f)">@f.ToString().ToUpperInvariant()</button>
+                    }
+                </div>
+
+                <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);margin-bottom:7px">pages</div>
+                <div style="display:flex;gap:6px;margin-bottom:16px">
+                    <button @onclick="() => _expAll = false" style="@Chip(!_expAll)">This page (@CurPage)</button>
+                    <button @onclick="() => _expAll = true" style="@Chip(_expAll)">All pages@(Doc is not null ? $" ({Doc.PageCount})" : "")</button>
+                </div>
+
+                @if (_expFormat != ExportFormat.Svg)
+                {
+                    <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);margin-bottom:7px">resolution</div>
+                    <div style="display:flex;gap:6px;margin-bottom:18px">
+                        @foreach (var d in _dpis)
+                        {
+                            <button @onclick="() => _expDpi = d" style="@Chip(_expDpi == d)">@d dpi</button>
+                        }
+                    </div>
+                }
+
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                    <Icon Name="folder" Size="13" />
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_expFolder">@_expFolder</span>
+                    <button @onclick="ChangeExportFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="font-family:var(--chvd-serif-body);font-size:12px;color:var(--chvd-ink-muted);flex:1">@(_expStatus ?? "Saved files are never overwritten.")</span>
+                    <button @onclick="RunExport" disabled="@_expBusy" style="font-family:var(--chvd-mono);font-size:13px;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:var(--chvd-binding);color:var(--chvd-surface-lo);@(_expBusy ? "opacity:0.6" : "")">@(_expBusy ? "exporting…" : "Export →")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_showPress)
+    {
+        <div @onclick="ClosePress" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:center;justify-content:center">
+            <div @onclick:stopPropagation="true" style="width:500px;max-width:94%;max-height:88%;overflow:auto;background:var(--chvd-surface-mid);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:12px;padding:18px 20px;color:var(--chvd-ink);font-family:var(--chvd-sans-display)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-family:var(--chvd-serif-display);font-size:18px">Press</span>
+                    <button @onclick="ClosePress" aria-label="Close" style="background:none;border:none;color:var(--chvd-ink-muted);cursor:pointer"><Icon Name="x" Size="16" /></button>
+                </div>
+
+                <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);margin-bottom:7px">quality preset</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+                    @foreach (var p in _presets)
+                    {
+                        <button @onclick="() => _pressPreset = p" style="@Chip(_pressPreset == p)">@p.ToString()</button>
+                    }
+                </div>
+
+                @if (_pressPreset == PressPreset.Custom)
+                {
+                    <div style="background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                            <span style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);width:96px">jpeg quality</span>
+                            <input type="range" min="10" max="95" step="1" @bind="_pressQuality" @bind:event="oninput" style="flex:1" />
+                            <span style="font-family:var(--chvd-mono);font-size:12px;width:28px;text-align:right">@_pressQuality</span>
+                        </div>
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer">
+                            <input type="checkbox" @bind="_pressRecompress" /> recompress images
+                        </label>
+                        <div style="display:flex;gap:14px">
+                            <label style="flex:1;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">min stream bytes
+                                <input type="number" @bind="_pressMinStream" style="width:100%;margin-top:3px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:4px 6px;font-family:var(--chvd-mono);font-size:12px" />
+                            </label>
+                            <label style="flex:1;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">min image pixels
+                                <input type="number" @bind="_pressMinPixels" style="width:100%;margin-top:3px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:4px 6px;font-family:var(--chvd-mono);font-size:12px" />
+                            </label>
+                        </div>
+                    </div>
+                }
+
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:@(_pressUseTarget ? "8px" : "14px");cursor:pointer">
+                    <input type="checkbox" @bind="_pressUseTarget" /> aim for a target size
+                </label>
+                @if (_pressUseTarget)
+                {
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                        <input type="number" step="0.1" min="0.1" @bind="_pressTargetMb" style="width:90px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:5px 8px;font-family:var(--chvd-mono);font-size:13px" />
+                        <span style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">MB — steps quality down until it fits</span>
+                    </div>
+                }
+
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                    <Icon Name="folder" Size="13" />
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_pressFolder">@_pressFolder</span>
+                    <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                </div>
+
+                @if (_pressResult is not null)
+                {
+                    <div style="background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+                        <div style="font-size:15px;margin-bottom:6px">@SizeOf(_pressResult.BeforeBytes) → <span style="color:var(--chvd-binding)">@SizeOf(_pressResult.AfterBytes)</span> <span style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">(@_pressResult.SavedPercent.ToString("0.#")% smaller)</span></div>
+                        <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">@_pressResult.ImagesRecompressed images · @_pressResult.StreamsCompressed streams · @_pressResult.ObjectsRemoved objects removed</div>
+                        <button @onclick="OpenPressResult" style="margin-top:10px;font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-binding);background:none;border:var(--chvd-stroke) solid var(--chvd-binding);border-radius:6px;padding:5px 12px;cursor:pointer">open pressed file</button>
+                    </div>
+                }
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="font-family:var(--chvd-serif-body);font-size:12px;color:var(--chvd-ink-muted);flex:1">@(_pressStatus ?? "A new …-pressed.pdf is created; the original is untouched.")</span>
+                    <button @onclick="RunPress" disabled="@_pressBusy" style="font-family:var(--chvd-mono);font-size:13px;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:var(--chvd-binding);color:var(--chvd-surface-lo);@(_pressBusy ? "opacity:0.6" : "")">@(_pressBusy ? "pressing…" : "Press →")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (tab is null)
+    {
+        <div class="rempty">
+            <Icon Name="file-pdf" Size="40" />
+            <div class="rempty-t">Open a document to start reading</div>
+            <button class="rempty-btn" @onclick="OpenViaPicker">Fetch…</button>
+        </div>
+    }
+    else if (tab.IsLoading)
+    {
+        <div class="rempty">
+            <div class="rload-icon"><Icon Name="file-pdf" Size="40" /></div>
+            <div class="rempty-t">Opening @tab.FileName…</div>
+        </div>
+    }
+    else if (tab.Error is not null)
+    {
+        <div class="rempty">
+            <Icon Name="file-pdf" Size="40" />
+            <div class="rempty-t">@tab.Error</div>
+            <button class="rempty-btn" @onclick="OpenViaPicker">Fetch…</button>
+        </div>
+    }
+    else if (tab.Session is { Document.IsXfaForm: true })
+    {
+        <div class="rempty">
+            <Icon Name="file-pdf" Size="40" />
+            <div class="rempty-t">@tab.FileName is an XFA form, which Chuvadi can't display yet.</div>
+            <div class="rempty-sub">XFA documents store their content in a separate form layer. Open it in Adobe Acrobat to view or fill it.</div>
+        </div>
+    }
+    else if (tab.Session is not null)
+    {
+        var session = tab.Session;
+        <div class="rdesk @LayoutClass @(CurScale > 1.001 ? "zoomed" : null) @(Tab?.ScrollLocked == true ? "locked" : null)"
+             style="--rpage-zoom:@Zoom" tabindex="-1" @ref="_desk">
+            @foreach (var n in _pages)
+            {
+                <div class="rpage-wrap" data-page="@n" @key="n">
+                    <div class="rpage @(_curl ? "curl" : null)">
+                        @if (session.TryGetRenderedSvg(n, out var svg))
+                        {
+                            <PageSvg Svg="@svg" Rotation="@RotationFor(n)" />
+                        }
+                        else
+                        {
+                            <div class="rpage-load">page @(n + 1)</div>
+                        }
+                        @if (_markup)
+                        {
+                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null)" data-page="@n"
+                                 @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
+                                @if (_redactions.TryGetValue(n, out var boxes))
+                                {
+                                    @for (var i = 0; i < boxes.Count; i++)
+                                    {
+                                        var bi = i;
+                                        var b = boxes[bi];
+                                        <div class="mk-box" style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);background:@BoxFill(0.82)">
+                                            <button class="mk-box-x" @onclick="() => RemoveBox(n, bi)" @onpointerdown:stopPropagation="true" title="Remove">&times;</button>
+                                        </div>
+                                    }
+                                }
+                                @if (_mkDraft is { } dr && _mkDraftPage == n)
+                                {
+                                    <div class="mk-box draft" style="left:@Pct(dr.X);top:@Pct(dr.Y);width:@Pct(dr.W);height:@Pct(dr.H);background:@BoxFill(0.45)"></div>
+                                }
+                                @if (_texts.TryGetValue(n, out var tboxes))
+                                {
+                                    @foreach (var t in tboxes)
+                                    {
+                                        var tb = t;
+                                        var isSel = ReferenceEquals(_selText, tb);
+                                        <div class="mk-text @(isSel ? "sel" : null)"
+                                             style="left:@Pct(tb.X);top:@Pct(tb.Y);width:@Pct(tb.W);height:@Pct(tb.H);transform:rotate(@Deg(tb.Rotation)deg)"
+                                             @onpointerdown:stopPropagation="true" @onpointerdown="() => SelectText(n, tb)">
+                                            <textarea class="mk-ta" spellcheck="false"
+                                                      style="@TextStyle(tb)"
+                                                      @bind="tb.Text" @bind:event="oninput"
+                                                      @onfocus="() => SelectText(n, tb)"></textarea>
+                                            @if (isSel)
+                                            {
+                                                <span class="mk-th move" title="Move"
+                                                      @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMove(e, n, tb)">✣</span>
+                                                <span class="mk-th resize" title="Resize"
+                                                      @onpointerdown:stopPropagation="true" @onpointerdown="e => StartResize(e, n, tb)"></span>
+                                            }
+                                        </div>
+                                    }
+                                }
+                                @if (_textDraft is { } td && _textDraftPage == n)
+                                {
+                                    <div class="mk-text draft" style="left:@Pct(td.X);top:@Pct(td.Y);width:@Pct(td.W);height:@Pct(td.H)"></div>
+                                }
+                            </div>
+                        }
+                        @if (_curl)
+                        {
+                            <span class="rcurl"></span>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    @if (doc is not null && _drawerOpen)
+    {
+        <div class="rdrawer">
+            <div class="rdrawer-h">
+                <span>View</span>
+                <span class="rd-h-btns">
+                    <button class="@(_drawerPinned ? "on" : null)" @onclick="TogglePin" title="@(_drawerPinned ? "Unpin" : "Pin to right")"><Icon Name="pin" Size="14" /></button>
+                    <button @onclick="ToggleDrawer" aria-label="Close"><Icon Name="x" Size="15" /></button>
+                </span>
+            </div>
+
+            <div class="rd-grp">FIT</div>
+            <button class="rd-item @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth"><Icon Name="fit-width" Size="17" /> <span>Fit width</span></button>
+            <button class="rd-item @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage"><Icon Name="fit-page" Size="17" /> <span>Fit page</span></button>
+            <button class="rd-item" @onclick="ActualSize"><Icon Name="actual-size" Size="17" /> <span>Actual size (100%)</span></button>
+
+            <div class="rd-grp">ZOOM</div>
+            <div class="rd-presets">
+                @foreach (var p in _zoomPresets)
+                {
+                    <button class="rd-chip @(ZoomPct == p ? "on" : null)" @onclick="() => ZoomPreset(p)">@p%</button>
+                }
+            </div>
+
+            <div class="rd-grp">PAGE LAYOUT</div>
+            <button class="rd-item @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)"><Icon Name="page-single" Size="17" /> <span>Single page</span></button>
+            <button class="rd-item @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)"><Icon Name="page-facing" Size="17" /> <span>Two-page</span></button>
+            <label class="rd-toggle"><input type="checkbox" checked="@(Tab?.CoverAlone == true)" @onchange="ToggleCover" /> Show cover alone</label>
+            <label class="rd-toggle"><input type="checkbox" checked="@ContinuousOn" @onchange="ToggleContinuous" /> Scroll (continuous)</label>
+
+            <div class="rd-grp">ROTATE VIEW</div>
+            <div class="rd-scope">
+                <button class="rd-seg @(_rotScope == RotateScopeKind.Page ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Page">This page</button>
+                <button class="rd-seg @(_rotScope == RotateScopeKind.Onward ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Onward">This page onwards</button>
+                <button class="rd-seg @(_rotScope == RotateScopeKind.Document ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Document">Whole document</button>
+            </div>
+            <div class="rd-rotrow">
+                <button class="rd-item rd-rot" @onclick="() => RotateScopeBy(-90)"><Icon Name="rotate-ccw" Size="17" /> <span>Left</span></button>
+                <button class="rd-item rd-rot" @onclick="() => RotateScopeBy(90)"><Icon Name="rotate-cw" Size="17" /> <span>Right</span></button>
+            </div>
+
+            <div class="rd-grp">TOOLS</div>
+            <button class="rd-item @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)"><Icon Name="hand" Size="17" /> <span>Hand / pan</span></button>
+            <button class="rd-item @(_tool == ReaderTool.Marquee ? "on" : null)" @onclick="() => SetTool(ReaderTool.Marquee)"><Icon Name="zoom-area" Size="17" /> <span>Marquee zoom</span></button>
+            <button class="rd-item @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)"><Icon Name="loupe" Size="17" /> <span>Loupe</span></button>
+            <div class="rd-sub">
+                <div class="rd-sublabel">Lens size</div>
+                <div class="rd-presets">
+                    <button class="rd-chip @(_loupeRadius == 60 ? "on" : null)" @onclick="() => SetLoupe(60, _loupeMag)">S</button>
+                    <button class="rd-chip @(_loupeRadius == 84 ? "on" : null)" @onclick="() => SetLoupe(84, _loupeMag)">M</button>
+                    <button class="rd-chip @(_loupeRadius == 112 ? "on" : null)" @onclick="() => SetLoupe(112, _loupeMag)">L</button>
+                </div>
+                <div class="rd-sublabel">Magnification</div>
+                <div class="rd-presets">
+                    <button class="rd-chip @(_loupeMag == 1.5 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 1.5)">1.5×</button>
+                    <button class="rd-chip @(_loupeMag == 2.2 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 2.2)">2×</button>
+                    <button class="rd-chip @(_loupeMag == 3.0 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 3.0)">3×</button>
+                </div>
+            </div>
+
+            <div class="rd-grp">DISPLAY</div>
+            <label class="rd-toggle"><input type="checkbox" checked="@(Tab?.ScrollLocked == true)" @onchange="ToggleScrollLock" /> Lock scrolling</label>
+            <label class="rd-toggle"><input type="checkbox" checked="@_hoverEnabled" @onchange="() => _hoverEnabled = !_hoverEnabled" /> Hover controls (bottom edge)</label>
+            <label class="rd-toggle"><input type="checkbox" checked="@_curl" @onchange="() => _curl = !_curl" /> Page-curl corner</label>
+            <button class="rd-item" @onclick="ToggleReading"><Icon Name="expand" Size="17" /> <span>@(_reading ? "Exit full screen" : "Full screen / reading")</span></button>
+        </div>
+    }
+
+    @if (doc is not null && _hoverEnabled && !_drawerOpen)
+    {
+        <div class="rhoverzone"></div>
+        <div class="rfloat">
+            <button class="vbtn" @onclick="ZoomOut" title="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
+            <span class="rzoom">@ZoomPct%</span>
+            <button class="vbtn" @onclick="ZoomIn" title="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
+            <span class="rsep"></span>
+            <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth" title="Fit width"><Icon Name="fit-width" Size="17" /></button>
+            <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage" title="Fit page"><Icon Name="fit-page" Size="17" /></button>
+            <span class="rsep"></span>
+            <button class="vbtn @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)" title="Single page"><Icon Name="page-single" Size="17" /></button>
+            <button class="vbtn @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)" title="Two-page"><Icon Name="page-facing" Size="17" /></button>
+            <span class="rsep"></span>
+            <button class="vbtn" @onclick="() => RotateScopeBy(-90)" title="Rotate left (scope in View ▸ Rotate)"><Icon Name="rotate-ccw" Size="17" /></button>
+            <button class="vbtn" @onclick="() => RotateScopeBy(90)" title="Rotate right (scope in View ▸ Rotate)"><Icon Name="rotate-cw" Size="17" /></button>
+            <button class="vbtn @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)" title="Hand (pan)"><Icon Name="hand" Size="17" /></button>
+            <button class="vbtn" @onclick="ToggleReading" title="Full screen"><Icon Name="expand" Size="15" /></button>
+        </div>
+    }
+
+    @if (doc is not null && _reading)
+    {
+        <button class="rexit" @onclick="ToggleReading" title="Exit full screen (Esc)"><Icon Name="x" Size="15" /> exit</button>
+    }
+</div>
+
+@code {
+    private async Task OpenInBench()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null)
+        {
+            return;
+        }
+
+        await Bench.AddSourceAsync(active.Path, active.FileName);
+        Nav.NavigateTo("/bench");
+    }
+
+    private async Task ShowProperties()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null)
+        {
+            return;
+        }
+
+        _showProps = true;
+        _props = null;
+        StateHasChanged();
+        try
+        {
+            _props = await DocProps.ReadAsync(active.Path);
+        }
+        catch
+        {
+            _props = new DocProperties(System.IO.Path.GetFileName(active.Path),
+                null, null, null, null, null, null, null, null,
+                active.Session?.Document.PageCount ?? 0, "—", false, null, false, false, 0);
+        }
+    }
+
+    private void CloseProperties()
+    {
+        _showProps = false;
+        _props = null;
+    }
+
+    private void ShowExport()
+    {
+        _showExport = true;
+        _expStatus = null;
+        _expFolder = SaveFolders.SubFolder("Export");
+    }
+
+    private void CloseExport() => _showExport = false;
+
+    private async Task ChangeExportFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            _expFolder = folder;
+        }
+    }
+
+    private async Task RunExport()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null || string.IsNullOrEmpty(_expFolder))
+        {
+            return;
+        }
+
+        _expBusy = true;
+        _expStatus = "exporting…";
+        StateHasChanged();
+        try
+        {
+            var n = await Export.ExportAsync(active.Path, _expFolder, _expFormat, _expAll, CurPage - 1, _expDpi);
+            _expStatus = $"Exported {n} file{(n == 1 ? "" : "s")} → {_expFolder}";
+        }
+        catch (Exception ex)
+        {
+            _expStatus = "Export failed: " + ex.Message;
+        }
+        finally
+        {
+            _expBusy = false;
+        }
+    }
+
+    private static string Chip(bool on) =>
+        "font-family:var(--chvd-mono);font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:var(--chvd-stroke) solid " +
+        (on
+            ? "var(--chvd-binding);color:var(--chvd-binding);background:var(--chvd-binding-soft)"
+            : "var(--chvd-border);color:var(--chvd-ink);background:var(--chvd-surface-lo)");
+
+    private void ShowPress()
+    {
+        _showPress = true;
+        _pressStatus = null;
+        _pressResult = null;
+        _pressFolder = Press.DefaultFolder;
+    }
+
+    private void ClosePress() => _showPress = false;
+
+    private async Task ChangePressFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            _pressFolder = folder;
+        }
+    }
+
+    private async Task RunPress()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null)
+        {
+            return;
+        }
+
+        _pressBusy = true;
+        _pressResult = null;
+        _pressStatus = "pressing…";
+        StateHasChanged();
+        try
+        {
+            if (_pressUseTarget && _pressTargetMb > 0)
+            {
+                _pressResult = await Press.PressToTargetAsync(active.Path, _pressFolder, (long)(_pressTargetMb * 1024 * 1024));
+            }
+            else
+            {
+                var opts = _pressPreset == PressPreset.Custom
+                    ? new PressOptions(_pressRecompress, _pressQuality, _pressMinStream, _pressMinPixels)
+                    : PressOptions.For(_pressPreset);
+                _pressResult = await Press.PressAsync(active.Path, _pressFolder, opts);
+            }
+
+            _pressStatus = null;
+        }
+        catch (Exception ex)
+        {
+            _pressStatus = "Press failed: " + ex.Message;
+        }
+        finally
+        {
+            _pressBusy = false;
+        }
+    }
+
+    private async Task OpenPressResult()
+    {
+        if (_pressResult is null)
+        {
+            return;
+        }
+
+        var path = _pressResult.OutputPath;
+        var name = System.IO.Path.GetFileName(path);
+        var format = DocumentFormatExtensions.FromPath(path);
+        _showPress = false;
+        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+        await Tabs.OpenAsync(path, name, format);
+    }
+
+    private IEnumerable<(string Label, string Value)> PropRows()
+    {
+        if (_props is null)
+        {
+            yield break;
+        }
+
+        yield return ("File", _props.FileName);
+        if (_props.Title is not null) yield return ("Title", _props.Title);
+        if (_props.Author is not null) yield return ("Author", _props.Author);
+        if (_props.Subject is not null) yield return ("Subject", _props.Subject);
+        if (_props.Keywords is not null) yield return ("Keywords", _props.Keywords);
+        if (_props.Creator is not null) yield return ("Creator", _props.Creator);
+        if (_props.Producer is not null) yield return ("Producer", _props.Producer);
+        if (_props.Created is not null) yield return ("Created", _props.Created);
+        if (_props.Modified is not null) yield return ("Modified", _props.Modified);
+        yield return ("Pages", _props.PageCount.ToString());
+        yield return ("Page size", _props.PageSize);
+        yield return ("Encryption", _props.Encrypted ? (_props.Encryption ?? "Encrypted") : "None");
+        yield return ("XFA form", _props.IsXfa ? "Yes" : "No");
+        yield return ("Fast web view", _props.Linearized ? "Yes" : "No");
+        yield return ("File size", SizeOf(_props.SizeBytes));
+    }
+
+    private static string SizeOf(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double s = bytes;
+        var i = 0;
+        while (s >= 1024 && i < units.Length - 1)
+        {
+            s /= 1024;
+            i++;
+        }
+
+        return $"{s:0.#} {units[i]}";
+    }
+
+    private readonly HashSet<int> _rendering = new();
+    private List<int> _pages = new();
+
+    private string? _activeId;
+    private int _shownPageCount;
+    private bool _restoreScroll;
+    private int? _pendingJumpPage;
+    private readonly HashSet<string> _initiallyFitted = new();
+    private DocProperties? _props;
+    private bool _showProps;
+    private static readonly ExportFormat[] _formats =
+        { ExportFormat.Svg, ExportFormat.Png, ExportFormat.Jpg, ExportFormat.Bmp };
+    private static readonly int[] _dpis = { 96, 150, 300, 600 };
+    private bool _showExport;
+    private ExportFormat _expFormat = ExportFormat.Png;
+    private bool _expAll;
+    private int _expDpi = 150;
+    private bool _expBusy;
+    private string _expFolder = string.Empty;
+    private string? _expStatus;
+
+    private static readonly PressPreset[] _presets =
+        { PressPreset.Light, PressPreset.Balanced, PressPreset.Strong, PressPreset.Custom };
+    private bool _showPress;
+    private PressPreset _pressPreset = PressPreset.Balanced;
+    private int _pressQuality = 70;
+    private bool _pressRecompress = true;
+    private int _pressMinStream = 256;
+    private int _pressMinPixels = 10000;
+    private bool _pressUseTarget;
+    private double _pressTargetMb = 2;
+    private string _pressFolder = string.Empty;
+    private bool _pressBusy;
+    private PressResult? _pressResult;
+    private string? _pressStatus;
+    private int _loadGen;       // bumped when the active document changes or finishes loading
+    private int _observedGen;   // last generation the JS observers were attached to
+
+    private bool _curl = true;
+    private string _pageInput = "1";
+
+    private ElementReference _desk;
+    private IJSObjectReference? _js;
+    private DotNetObjectReference<Reader>? _ref;
+
+    private ReaderTab? Tab => Tabs.Active;
+    private PdfDocumentVm? Doc => Tab?.Session?.Document;
+    private int CurPage => Tab?.CurrentPage ?? 1;
+    private double CurScale => Tab?.Scale ?? 1.0;
+    private string Zoom => CurScale.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+
+    // ── Reader page colour (view-only tint; remembered per document) ──
+    private string _pageBg = "#ffffff";
+    private bool _pageColorOpen;
+    private string? _pageBgPath;
+    private static readonly (string Name, string Hex)[] _pageBgPresets =
+    {
+        ("White", "#ffffff"), ("Sepia", "#f4ecd8"), ("Soft gray", "#e8e8e8"),
+        ("Mint", "#e3f0e3"), ("Pale blue", "#e6eef7"),
+    };
+
+    private void TogglePageColor() => _pageColorOpen = !_pageColorOpen;
+
+    private static bool SameColor(string? a, string? b) =>
+        string.Equals(a?.TrimStart('#'), b?.TrimStart('#'), StringComparison.OrdinalIgnoreCase);
+
+    private static string PageBgKey(string path) => "readerPageBg:" + path;
+
+    private async Task SetPageBg(string hex)
+    {
+        _pageBg = hex;
+        var path = Tab?.Path;
+        _pageBgPath = path;
+        if (!string.IsNullOrEmpty(path))
+        {
+            try { await Storage.SetAsync(PageBgKey(path!), hex); } catch { }
+        }
+    }
+
+    private async Task OnCustomPageBg(ChangeEventArgs e)
+    {
+        var hex = e.Value?.ToString();
+        if (!string.IsNullOrWhiteSpace(hex)) await SetPageBg(hex!);
+    }
+
+    // Load the saved tint for a document when it becomes active (default white).
+    private async Task LoadPageBgAsync(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) { _pageBg = "#ffffff"; _pageBgPath = null; return; }
+        _pageBgPath = path;
+        var bg = "#ffffff";
+        try { bg = await Storage.GetAsync(PageBgKey(path!)) ?? "#ffffff"; } catch { }
+        _pageBg = bg;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ── Markup mode (redact + add text; view-only until Save As to a new file) ──
+    private bool _markup;
+    private string _mkTool = "redact";
+    private string? _mkDocPath;
+    private string _mkColor = "#000000";
+    private static readonly (string Name, string Hex)[] _mkColorPresets =
+    {
+        ("Black", "#000000"),
+        ("White", "#ffffff"),
+    };
+    private bool IsCustomColor => !_mkColorPresets.Any(p => string.Equals(p.Hex, _mkColor, StringComparison.OrdinalIgnoreCase));
+    private void OnMkColor(ChangeEventArgs e) => _mkColor = e.Value?.ToString() ?? "#000000";
+
+    private string BoxFill(double alpha)
+    {
+        var h = _mkColor.TrimStart('#');
+        if (h.Length != 6) return $"rgba(10,10,10,{alpha.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        int r = Convert.ToInt32(h.Substring(0, 2), 16);
+        int g = Convert.ToInt32(h.Substring(2, 2), 16);
+        int b = Convert.ToInt32(h.Substring(4, 2), 16);
+        var a = alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return $"rgba({r},{g},{b},{a})";
+    }
+
+    private sealed class TextBox
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+        public double W { get; set; }
+        public double H { get; set; }
+        public string Text { get; set; } = "";
+        public string FontFamily { get; set; } = "Helvetica";
+        public bool Bold { get; set; }
+        public bool Italic { get; set; }
+        public double FontSizePt { get; set; } = 14;
+        public string ColorHex { get; set; } = "#111111";
+        public string Align { get; set; } = "left";
+        public double Rotation { get; set; }
+        public double LineHeight { get; set; } = 1.2;
+    }
+
+    private enum MkMode { None, RedactDraw, TextDraw, MoveText, ResizeText }
+    private MkMode _mkMode = MkMode.None;
+
+    private readonly Dictionary<int, List<NormBox>> _redactions = new();
+    private readonly Dictionary<int, List<TextBox>> _texts = new();
+    private TextBox? _selText;
+    private int _selTextPage = -1;
+
+    private int _mkDraftPage = -1;
+    private NormBox? _mkDraft;
+    private int _textDraftPage = -1;
+    private NormBox? _textDraft;
+    private double _mkStartX, _mkStartY;
+    private (double L, double T, double W, double H) _mkRect;
+
+    private TextBox? _dragText;
+    private double _dragOX, _dragOY, _dragOW, _dragOH;
+
+    private bool _mkSaving;
+    private string? _mkStatus;
+    private bool _mkError;
+    private string? _mkSavedPath;
+    private bool _mkTagged;
+    private string? _mkTaggedPath;
+
+    private int RedactionCount => _redactions.Values.Sum(v => v.Count);
+    private int TextCount => _texts.Values.Sum(v => v.Count);
+    private int MarkupCount => RedactionCount + TextCount;
+
+    private static string Pct(double f) =>
+        (f * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    private static string Deg(double d) => d.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    private static double Clamp01(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
+
+    private async Task CheckTaggedAsync()
+    {
+        var path = Tab?.Path;
+        if (path is null) { _mkTagged = false; _mkTaggedPath = null; return; }
+        if (path == _mkTaggedPath) return;
+        _mkTaggedPath = path;
+        var tagged = false;
+        try { tagged = await Task.Run(() => Redact.IsTagged(path)); } catch { }
+        _mkTagged = tagged;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMarkup()
+    {
+        _markup = !_markup;
+        _mkStatus = null; _mkSavedPath = null;
+        _mkMode = MkMode.None; _mkDraft = null; _textDraft = null; _selText = null;
+        if (_markup) _ = CheckTaggedAsync();
+    }
+
+    private void SetMkTool(string tool)
+    {
+        _mkTool = tool;
+        _selText = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void EnsureMarkupDoc()
+    {
+        var path = Tab?.Path;
+        if (path != _mkDocPath)
+        {
+            _mkDocPath = path;
+            _redactions.Clear();
+            _texts.Clear();
+            _selText = null;
+            _mkStatus = null; _mkSavedPath = null;
+        }
+    }
+
+    private async Task<bool> CacheLayerRect(int page)
+    {
+        try
+        {
+            var r = await JS.InvokeAsync<MkRect?>("chuvadiReaderMkRect", page);
+            if (r is null || r.width <= 0 || r.height <= 0) return false;
+            _mkRect = (r.left, r.top, r.width, r.height);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private async Task MkDown(PointerEventArgs e, int page)
+    {
+        if (!_markup || e.Button != 0) return;
+        EnsureMarkupDoc();
+        if (!await CacheLayerRect(page)) return;
+
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _mkStatus = null; _mkSavedPath = null;
+
+        if (_mkTool == "redact")
+        {
+            _mkMode = MkMode.RedactDraw;
+            _mkDraftPage = page;
+            _mkDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
+        }
+        else
+        {
+            _selText = null;
+            _mkMode = MkMode.TextDraw;
+            _textDraftPage = page;
+            _textDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
+        }
+    }
+
+    private void MkMove(PointerEventArgs e)
+    {
+        if (_mkMode == MkMode.None) return;
+        var cx = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        var cy = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+
+        switch (_mkMode)
+        {
+            case MkMode.RedactDraw:
+                _mkDraft = new NormBox(Math.Min(_mkStartX, cx), Math.Min(_mkStartY, cy),
+                                       Math.Abs(cx - _mkStartX), Math.Abs(cy - _mkStartY));
+                break;
+            case MkMode.TextDraw:
+                _textDraft = new NormBox(Math.Min(_mkStartX, cx), Math.Min(_mkStartY, cy),
+                                         Math.Abs(cx - _mkStartX), Math.Abs(cy - _mkStartY));
+                break;
+            case MkMode.MoveText when _dragText is { } d:
+                d.X = Clamp01(_dragOX + (cx - _mkStartX));
+                d.Y = Clamp01(_dragOY + (cy - _mkStartY));
+                if (d.X + d.W > 1) d.X = 1 - d.W;
+                if (d.Y + d.H > 1) d.Y = 1 - d.H;
+                break;
+            case MkMode.ResizeText when _dragText is { } d:
+                d.W = Math.Clamp(_dragOW + (cx - _mkStartX), 0.03, 1 - d.X);
+                d.H = Math.Clamp(_dragOH + (cy - _mkStartY), 0.02, 1 - d.Y);
+                break;
+        }
+    }
+
+    private void MkUp(PointerEventArgs e)
+    {
+        switch (_mkMode)
+        {
+            case MkMode.RedactDraw:
+                if (_mkDraft is { } rd && rd.W > 0.005 && rd.H > 0.005)
+                {
+                    if (!_redactions.TryGetValue(_mkDraftPage, out var list))
+                    {
+                        list = new List<NormBox>();
+                        _redactions[_mkDraftPage] = list;
+                    }
+                    list.Add(rd);
+                }
+                break;
+            case MkMode.TextDraw:
+                {
+                    var d = _textDraft ?? new NormBox(_mkStartX, _mkStartY, 0, 0);
+                    // Tiny drag = a click → default-sized box anchored at the click point.
+                    var w = d.W < 0.04 ? 0.34 : d.W;
+                    var h = d.H < 0.03 ? 0.06 : d.H;
+                    var x = Math.Min(d.X, 1 - w);
+                    var y = Math.Min(d.Y, 1 - h);
+                    var tb = new TextBox { X = Clamp01(x), Y = Clamp01(y), W = w, H = h };
+                    if (!_texts.TryGetValue(_textDraftPage, out var tlist))
+                    {
+                        tlist = new List<TextBox>();
+                        _texts[_textDraftPage] = tlist;
+                    }
+                    tlist.Add(tb);
+                    _selText = tb;
+                    _selTextPage = _textDraftPage;
+                }
+                break;
+        }
+
+        _mkMode = MkMode.None;
+        _mkDraft = null; _textDraft = null;
+        _mkDraftPage = -1; _textDraftPage = -1;
+        _dragText = null;
+    }
+
+    private void RemoveBox(int page, int index)
+    {
+        if (_redactions.TryGetValue(page, out var list) && index >= 0 && index < list.Count)
+        {
+            list.RemoveAt(index);
+            if (list.Count == 0) _redactions.Remove(page);
+        }
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void SelectText(int page, TextBox tb)
+    {
+        _selText = tb; _selTextPage = page;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private void RemoveSelectedText()
+    {
+        if (_selText is null) return;
+        if (_texts.TryGetValue(_selTextPage, out var list))
+        {
+            list.Remove(_selText);
+            if (list.Count == 0) _texts.Remove(_selTextPage);
+        }
+        _selText = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private async Task StartMove(PointerEventArgs e, int page, TextBox tb)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectText(page, tb);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragText = tb; _dragOX = tb.X; _dragOY = tb.Y;
+        _mkMode = MkMode.MoveText;
+    }
+
+    private async Task StartResize(PointerEventArgs e, int page, TextBox tb)
+    {
+        if (!await CacheLayerRect(page)) return;
+        SelectText(page, tb);
+        _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
+        _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
+        _dragText = tb; _dragOW = tb.W; _dragOH = tb.H;
+        _mkMode = MkMode.ResizeText;
+    }
+
+    private void SetFont(TextBox tb, ChangeEventArgs e) => tb.FontFamily = e.Value?.ToString() ?? "Helvetica";
+    private void SetTextColor(TextBox tb, ChangeEventArgs e) => tb.ColorHex = e.Value?.ToString() ?? "#111111";
+    private void SetSize(TextBox tb, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+            tb.FontSizePt = Math.Clamp(v, 4, 400);
+    }
+    private void SetRotation(TextBox tb, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+            tb.Rotation = v;
+    }
+
+    private static string TextStyle(TextBox tb)
+    {
+        var fam = tb.FontFamily switch
+        {
+            "Times" => "'Times New Roman',Times,serif",
+            "Courier" => "'Courier New',monospace",
+            _ => "'Helvetica Neue',Arial,sans-serif",
+        };
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        return $"font-family:{fam};font-size:{tb.FontSizePt.ToString(inv)}px;color:{tb.ColorHex};"
+             + $"text-align:{tb.Align};line-height:{tb.LineHeight.ToString(inv)};"
+             + $"font-weight:{(tb.Bold ? "700" : "400")};font-style:{(tb.Italic ? "italic" : "normal")}";
+    }
+
+    private void ClearMarkup()
+    {
+        _redactions.Clear();
+        _texts.Clear();
+        _selText = null;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private Dictionary<int, PageText> BuildTextsDict() =>
+        _texts
+            .Where(kv => kv.Value.Any(t => !string.IsNullOrEmpty(t.Text)))
+            .ToDictionary(
+                kv => kv.Key,
+                kv => new PageText(RotationFor(kv.Key),
+                    kv.Value.Where(t => !string.IsNullOrEmpty(t.Text))
+                        .Select(t => new TextAnno(t.X, t.Y, t.W, t.H, t.Text, t.FontFamily,
+                            t.Bold, t.Italic, t.FontSizePt, t.ColorHex, t.Align, t.Rotation, t.LineHeight))
+                        .ToList() as IReadOnlyList<TextAnno>));
+
+    private async Task SaveInPlace()
+    {
+        var active = Tabs.Active;
+        // Overlay-only guard: never overwrite when a redaction is present.
+        if (active?.Path is null || TextCount == 0 || RedactionCount > 0) return;
+
+        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            var src = active.Path;
+            var texts = BuildTextsDict();
+            var dir = System.IO.Path.GetDirectoryName(src) ?? "";
+            var temp = System.IO.Path.Combine(dir, "~" + System.IO.Path.GetFileNameWithoutExtension(src) + ".chuvadi-tmp.pdf");
+
+            // Build the edited file beside the original (no redactions here).
+            await Redact.FlattenToFileAsync(src, temp, new Dictionary<int, PageRedaction>(), _mkColor, texts);
+
+            // Release the open document, swap the file in, then reopen in place.
+            await Tabs.ReloadActiveAsync(async () =>
+            {
+                try
+                {
+                    if (System.IO.File.Exists(src)) System.IO.File.Replace(temp, src, null);
+                    else System.IO.File.Move(temp, src);
+                }
+                catch
+                {
+                    System.IO.File.Copy(temp, src, true);
+                    try { System.IO.File.Delete(temp); } catch { }
+                }
+                await Task.CompletedTask;
+            });
+
+            // Flattened into the file now — clear the editable overlays.
+            _texts.Clear();
+            _selText = null;
+            _mkStatus = $"Saved to {System.IO.Path.GetFileName(src)}";
+            _mkError = false;
+        }
+        catch (Exception ex)
+        {
+            _mkStatus = ex.Message;
+            _mkError = true;
+        }
+        finally
+        {
+            _mkSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveMarkup()
+    {
+        var active = Tabs.Active;
+        if (active?.Path is null || MarkupCount == 0) return;
+
+        var hasRed = RedactionCount > 0;
+        var hasTxt = TextCount > 0;
+        var suffix = hasRed && !hasTxt ? "-redacted" : "-edited";
+        var suggested = System.IO.Path.GetFileNameWithoutExtension(active.Path) + suffix + ".pdf";
+        var output = await Picker.PickSavePdfAsync(suggested);
+        if (string.IsNullOrWhiteSpace(output)) return;
+
+        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            var redactions = _redactions
+                .Where(kv => kv.Value.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => new PageRedaction(RotationFor(kv.Key), kv.Value.ToList()));
+
+            var texts = BuildTextsDict();
+
+            await Redact.FlattenToFileAsync(active.Path, output!, redactions, _mkColor, texts);
+            _mkSavedPath = output;
+            _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
+            _mkError = false;
+        }
+        catch (Exception ex)
+        {
+            _mkStatus = ex.Message;
+            _mkError = true;
+        }
+        finally
+        {
+            _mkSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OpenRedacted()
+    {
+        if (_mkSavedPath is null) return;
+        var name = System.IO.Path.GetFileName(_mkSavedPath);
+        var format = DocumentFormatExtensions.FromPath(_mkSavedPath);
+        await Recents.TouchAsync(new RecentItem(name, _mkSavedPath, format, DateTimeOffset.Now, false));
+        await Tabs.OpenAsync(_mkSavedPath, name, format);
+        _markup = false;
+        _mkStatus = null; _mkSavedPath = null;
+    }
+
+    private sealed class MkRect
+    {
+        public double left { get; set; }
+        public double top { get; set; }
+        public double width { get; set; }
+        public double height { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Tabs.Changed += OnTabsChanged;
+        OpenDoc.Requested += OnOpenRequestedLive;
+
+        // Rebuild the strip from the last session (no-op after the first time).
+        await Tabs.RestoreAsync();
+
+        // A pending request from the dashboard/recents opens (or focuses) a tab.
+        await OpenPendingAsync();
+
+        SyncActive();
+    }
+
+    // A file dropped on the window (or any open request) while the reader is already
+    // open: navigation to /reader is a no-op, so consume the pending open directly.
+    private void OnOpenRequestedLive() => _ = InvokeAsync(OpenPendingAsync);
+
+    private async Task OpenPendingAsync()
+    {
+        if (string.IsNullOrEmpty(OpenDoc.PendingPath))
+        {
+            return;
+        }
+
+        var path = OpenDoc.PendingPath!;
+        var name = OpenDoc.PendingName ?? System.IO.Path.GetFileName(path);
+        var format = DocumentFormatExtensions.FromPath(path);
+        _pendingJumpPage = OpenDoc.PendingPage;
+        OpenDoc.Clear();
+        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+        await Tabs.OpenAsync(path, name, format);
+        StateHasChanged();
+    }
+
+    private void OnTabsChanged()
+    {
+        if (Tabs.Tabs.Count == 0)
+        {
+            // Last document closed — leave the reader for the dashboard.
+            Nav.NavigateTo("/");
+            return;
+        }
+
+        SyncActive();
+        InvokeAsync(StateHasChanged);
+    }
+
+    // Detect when the active tab (or its loaded page count) changed, and rebuild the
+    // page list so the desk re-points to the new document and restores its scroll.
+    private void SyncActive()
+    {
+        var tab = Tabs.Active;
+        var id = tab?.Id;
+        var pageCount = tab?.Session?.Document.PageCount ?? 0;
+
+        if (id != _activeId)
+        {
+            _activeId = id;
+            _shownPageCount = pageCount;
+            _pageInput = (tab?.CurrentPage ?? 1).ToString();
+            _rendering.Clear();
+            _pages = pageCount > 0 ? Enumerable.Range(0, pageCount).ToList() : new();
+            _loadGen++;
+            _restoreScroll = pageCount > 0;
+            _pageColorOpen = false;
+            if (tab?.Path != _pageBgPath) _ = LoadPageBgAsync(tab?.Path);
+            if (tab?.Path != _mkDocPath)
+            {
+                _mkDocPath = tab?.Path;
+                _redactions.Clear();
+                _texts.Clear();
+                _selText = null;
+                _mkStatus = null; _mkSavedPath = null; _mkMode = MkMode.None; _mkDraft = null; _textDraft = null;
+                _mkTagged = false; _mkTaggedPath = null;
+                if (_markup) _ = CheckTaggedAsync();
+            }
+        }
+        else if (pageCount != _shownPageCount)
+        {
+            _shownPageCount = pageCount;
+            _pageInput = (tab?.CurrentPage ?? 1).ToString();
+            _rendering.Clear();
+            _pages = pageCount > 0 ? Enumerable.Range(0, pageCount).ToList() : new();
+            _loadGen++;
+            _restoreScroll = pageCount > 0;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null)
+        {
+            return;
+        }
+
+        if (tab.Session.Document.IsXfaForm)
+        {
+            return;   // no desk is rendered for XFA documents
+        }
+
+        if (_js is null)
+        {
+            try
+            {
+                _js = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/reader.js");
+                _ref = DotNetObjectReference.Create(this);
+            }
+            catch
+            {
+                return;
+            }
+        }
+
+        if (_observedGen != _loadGen)
+        {
+            _observedGen = _loadGen;
+            try { await _js.InvokeVoidAsync("init", _desk, _ref); }
+            catch { }
+
+            if (_tool != ReaderTool.None)
+            {
+                try { await _js.InvokeVoidAsync("setTool", _desk, ToolStr(_tool)); }
+                catch { }
+            }
+
+            if (!_initiallyFitted.Contains(tab.Id))
+            {
+                // First time this document is shown — open it fitted to the page.
+                _initiallyFitted.Add(tab.Id);
+                _restoreScroll = false;
+                tab.TwoPage = false;
+                tab.Continuous = false;
+                await ApplyFit(ReaderFitMode.Page);
+            }
+            else if (_restoreScroll)
+            {
+                _restoreScroll = false;
+                try { await _js.InvokeVoidAsync("setScrollTop", _desk, tab.ScrollTop); }
+                catch { }
+            }
+
+            if (_pendingJumpPage is { } jump)
+            {
+                _pendingJumpPage = null;
+                await GoTo(jump);
+            }
+        }
+    }
+
+    private async Task OpenViaPicker()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        var name = System.IO.Path.GetFileName(path);
+        var format = DocumentFormatExtensions.FromPath(path);
+        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+        await Tabs.OpenAsync(path, name, format);
+    }
+
+    private async Task SwitchTo(string id)
+    {
+        if (id == _activeId)
+        {
+            return;
+        }
+
+        await SaveActiveScrollAsync();
+        await Tabs.ActivateAsync(id);
+    }
+
+    private async Task CloseTab(string id)
+    {
+        if (id == _activeId)
+        {
+            await SaveActiveScrollAsync();
+        }
+
+        await Tabs.CloseAsync(id);
+    }
+
+    [JSInvokable]
+    public async Task ReorderTabTo(string dragId, int insertIndex)
+    {
+        if (string.IsNullOrEmpty(dragId))
+        {
+            return;
+        }
+
+        await Tabs.MoveToAsync(dragId, insertIndex);
+    }
+
+    [JSInvokable]
+    public void OnScroll(double top)
+    {
+        // Keep the active tab's scroll position fresh in memory as the user scrolls, so
+        // returning from the dashboard restores it even if teardown-time interop fails.
+        if (Tabs.Active is { } tab)
+        {
+            tab.ScrollTop = top;
+        }
+    }
+
+    // Lazy-render trigger from the IntersectionObserver.
+    private void EnsureRendered(int n)
+    {
+        var session = Tabs.Active?.Session;
+        if (session is null || session.TryGetRenderedSvg(n, out _) || !_rendering.Add(n))
+        {
+            return;
+        }
+
+        _ = RenderOneAsync(session, n);
+    }
+
+    private async Task RenderOneAsync(IPdfSession session, int n)
+    {
+        try
+        {
+            await session.RenderPageSvgAsync(n);
+        }
+        catch
+        {
+            // A failed page stays a placeholder.
+        }
+        finally
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [JSInvokable]
+    public Task RenderPage(int n)
+    {
+        EnsureRendered(n);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnPageVisible(int page)
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        page = Math.Clamp(page, 1, tab.Session.Document.PageCount);
+        if (page != tab.CurrentPage)
+        {
+            tab.CurrentPage = page;
+            _pageInput = page.ToString();
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public async Task CloseActiveTab()
+    {
+        await SaveActiveScrollAsync();
+        await Tabs.CloseActiveAsync();
+    }
+
+    [JSInvokable]
+    public async Task CloseOtherTabs()
+    {
+        await SaveActiveScrollAsync();
+        await Tabs.CloseOthersAsync();
+    }
+
+    [JSInvokable]
+    public async Task CloseAllTabs()
+    {
+        await Tabs.CloseAllAsync();
+        Nav.NavigateTo("/");
+    }
+
+    [JSInvokable]
+    public async Task CycleTab(int direction)
+    {
+        await SaveActiveScrollAsync();
+        await Tabs.CycleAsync(direction);
+    }
+
+    [JSInvokable]
+    public async Task ActivateTabIndex(int oneBased)
+    {
+        var list = Tabs.Tabs;
+        if (oneBased < 1 || oneBased > list.Count)
+        {
+            return;
+        }
+
+        var id = list[oneBased - 1].Id;
+        if (id == _activeId)
+        {
+            return;
+        }
+
+        await SaveActiveScrollAsync();
+        await Tabs.ActivateAsync(id);
+    }
+
+    [JSInvokable]
+    public void ZoomKey(int dir)
+    {
+        if (Tabs.Active is not { } t)
+        {
+            return;
+        }
+
+        t.Scale = dir > 0 ? Math.Min(8.0, t.Scale + 0.25)
+                : dir < 0 ? Math.Max(0.1, t.Scale - 0.25)
+                : 1.0;
+        t.FitMode = ReaderFitMode.Free;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public Task NavPage(int delta) => GoTo(CurPage + delta);
+
+    private async Task GoTo(int page)
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null)
+        {
+            return;
+        }
+
+        page = Math.Clamp(page, 1, tab.Session.Document.PageCount);
+        tab.CurrentPage = page;
+        _pageInput = page.ToString();
+
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("scrollToPage", _desk, page - 1); }
+            catch { }
+        }
+    }
+
+    private async Task OnJumpChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var p))
+        {
+            await GoTo(p);
+        }
+        else
+        {
+            _pageInput = CurPage.ToString();
+        }
+
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("focusDesk"); }
+            catch { }
+        }
+    }
+
+    private void ZoomIn()
+    {
+        if (Tabs.Active is { } t)
+        {
+            t.Scale = Math.Min(8.0, t.Scale + 0.25);
+            t.FitMode = ReaderFitMode.Free;
+        }
+    }
+
+    private void ZoomOut()
+    {
+        if (Tabs.Active is { } t)
+        {
+            t.Scale = Math.Max(0.1, t.Scale - 0.25);
+            t.FitMode = ReaderFitMode.Free;
+        }
+    }
+
+    // ── view system ──────────────────────────────────────────────────────────
+    private bool _hoverEnabled = true;
+    private bool _drawerOpen;
+    private bool _drawerPinned;
+    private bool _reading;
+    private ReaderTool _tool = ReaderTool.None;
+    private RotateScopeKind _rotScope = RotateScopeKind.Page;
+    private double _loupeRadius = 84;
+    private double _loupeMag = 2.2;
+    private static readonly int[] _zoomPresets = { 50, 75, 100, 125, 150, 200, 400 };
+
+    // Per-tab view undo (rotation + layout/fit only; zoom & scroll are not undone).
+    private readonly Dictionary<ReaderTab, Stack<ViewSnapshot>> _undo = new();
+
+    private sealed record ViewSnapshot(
+        Dictionary<int, int> Rotations, bool TwoPage, bool Continuous, bool CoverAlone,
+        ReaderFitMode FitMode, double Scale);
+
+    private enum RotateScopeKind { Page, Onward, Document }
+
+    private int PageStep => TwoPageOn ? 2 : 1;
+
+    private int ZoomPct => (int)Math.Round(CurScale * 100);
+    private bool TwoPageOn => Tab?.TwoPage == true;
+    private bool ContinuousOn => Tab?.Continuous == true;
+    private string LayoutClass
+    {
+        get
+        {
+            var cls = TwoPageOn ? (Tab?.CoverAlone == true ? "two cover" : "two") : "";
+            if (!ContinuousOn)
+            {
+                cls = (cls.Length > 0 ? cls + " " : "") + "snap";
+            }
+            return cls;
+        }
+    }
+
+    private int RotationFor(int pageIndex) =>
+        Tab is { } t && t.PageRotations.TryGetValue(pageIndex, out var r) ? r : 0;
+
+    private void TogglePin() => _drawerPinned = !_drawerPinned;
+
+    private async Task SetLoupe(double radius, double mag)
+    {
+        _loupeRadius = radius;
+        _loupeMag = mag;
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("configLoupe", radius, mag); }
+            catch { }
+        }
+    }
+
+    // Snapshot the undoable view-state of the active tab before a change.
+    private void PushUndo()
+    {
+        var tab = Tabs.Active;
+        if (tab is null)
+        {
+            return;
+        }
+
+        if (!_undo.TryGetValue(tab, out var stack))
+        {
+            stack = new Stack<ViewSnapshot>();
+            _undo[tab] = stack;
+        }
+
+        stack.Push(new ViewSnapshot(
+            new Dictionary<int, int>(tab.PageRotations), tab.TwoPage, tab.Continuous,
+            tab.CoverAlone, tab.FitMode, tab.Scale));
+
+        if (stack.Count > 50)
+        {
+            // keep the stack bounded
+            var keep = stack.ToArray()[..50];
+            stack.Clear();
+            for (var i = keep.Length - 1; i >= 0; i--)
+            {
+                stack.Push(keep[i]);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public void Undo()
+    {
+        var tab = Tabs.Active;
+        if (tab is null || !_undo.TryGetValue(tab, out var stack) || stack.Count == 0)
+        {
+            return;
+        }
+
+        var s = stack.Pop();
+        tab.PageRotations.Clear();
+        foreach (var kv in s.Rotations)
+        {
+            tab.PageRotations[kv.Key] = kv.Value;
+        }
+        tab.TwoPage = s.TwoPage;
+        tab.Continuous = s.Continuous;
+        tab.CoverAlone = s.CoverAlone;
+        tab.FitMode = s.FitMode;
+        tab.Scale = s.Scale;
+        StateHasChanged();
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private async Task ToggleReading()
+    {
+        _reading = !_reading;
+        await SetImmersive(_reading);
+    }
+
+    private async Task SetImmersive(bool on)
+    {
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("setImmersive", on); }
+            catch { }
+        }
+    }
+
+    // Esc: close the drawer first; otherwise leave full-screen / reading mode.
+    [JSInvokable]
+    public async Task OnEscape()
+    {
+        if (_drawerOpen)
+        {
+            _drawerOpen = false;
+            StateHasChanged();
+            return;
+        }
+
+        if (_reading)
+        {
+            _reading = false;
+            await SetImmersive(false);
+            StateHasChanged();
+        }
+    }
+
+    private void ZoomPreset(int pct)
+    {
+        if (Tabs.Active is { } t)
+        {
+            t.Scale = pct / 100.0;
+            t.FitMode = ReaderFitMode.Free;
+        }
+    }
+
+    private async Task FitWidth()
+    {
+        PushUndo();
+        if (Tabs.Active is { } t) { t.TwoPage = false; t.Continuous = true; }
+        StateHasChanged();
+        await Task.Delay(30);
+        await ApplyFit(ReaderFitMode.Width);
+    }
+
+    private async Task FitPage()
+    {
+        PushUndo();
+        if (Tabs.Active is { } t) { t.TwoPage = false; t.Continuous = false; }
+        StateHasChanged();
+        await Task.Delay(30);
+        await ApplyFit(ReaderFitMode.Page);
+    }
+
+    private async Task ApplyFit(ReaderFitMode mode)
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null || _js is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var s = await _js.InvokeAsync<double>("measureFit", _desk, mode == ReaderFitMode.Width ? "width" : "page");
+            if (s > 0)
+            {
+                tab.Scale = s;
+                tab.FitMode = mode;
+                StateHasChanged();
+            }
+        }
+        catch { }
+    }
+
+    private void ActualSize()
+    {
+        PushUndo();
+        if (Tabs.Active is { } t)
+        {
+            t.Scale = 1.0;
+            t.FitMode = ReaderFitMode.Free;
+        }
+    }
+
+    private async Task SetColumns(bool two)
+    {
+        var tab = Tabs.Active;
+        if (tab is null)
+        {
+            return;
+        }
+
+        PushUndo();
+        tab.TwoPage = two;
+        StateHasChanged();
+
+        if (tab.FitMode != ReaderFitMode.Free)
+        {
+            await Task.Delay(40);   // let the desk re-render with the new column class
+            await ApplyFit(tab.FitMode);
+        }
+    }
+
+    private async Task ToggleContinuous()
+    {
+        var tab = Tabs.Active;
+        if (tab is null)
+        {
+            return;
+        }
+
+        PushUndo();
+        tab.Continuous = !tab.Continuous;
+        StateHasChanged();
+
+        if (tab.FitMode != ReaderFitMode.Free)
+        {
+            await Task.Delay(40);
+            await ApplyFit(tab.FitMode);
+        }
+    }
+
+    private void ToggleCover()
+    {
+        PushUndo();
+        if (Tabs.Active is { } t)
+        {
+            t.CoverAlone = !t.CoverAlone;
+        }
+    }
+
+    private void RotateCurrent(int delta) => RotatePages(CurPage - 1, CurPage - 1, delta);
+
+    private void RotateScopeBy(int delta)
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null)
+        {
+            return;
+        }
+
+        var last = tab.Session.Document.PageCount - 1;
+        var (from, to) = _rotScope switch
+        {
+            RotateScopeKind.Document => (0, last),
+            RotateScopeKind.Onward => (CurPage - 1, last),
+            _ => (CurPage - 1, CurPage - 1),
+        };
+        RotatePages(from, to, delta);
+    }
+
+    private void RotatePages(int from, int to, int delta)
+    {
+        var tab = Tabs.Active;
+        if (tab is null)
+        {
+            return;
+        }
+
+        PushUndo();
+        for (var i = from; i <= to; i++)
+        {
+            var cur = tab.PageRotations.TryGetValue(i, out var r) ? r : 0;
+            var next = ((cur + delta) % 360 + 360) % 360;
+            if (next == 0)
+            {
+                tab.PageRotations.Remove(i);
+            }
+            else
+            {
+                tab.PageRotations[i] = next;
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task SetTool(ReaderTool tool)
+    {
+        _tool = _tool == tool ? ReaderTool.None : tool;
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("setTool", _desk, ToolStr(_tool)); }
+            catch { }
+        }
+        StateHasChanged();
+    }
+
+    private static string ToolStr(ReaderTool t) => t switch
+    {
+        ReaderTool.Hand => "hand",
+        ReaderTool.Marquee => "area",
+        ReaderTool.Loupe => "loupe",
+        _ => "none",
+    };
+
+    private void ToggleScrollLock()
+    {
+        if (Tabs.Active is { } t)
+        {
+            t.ScrollLocked = !t.ScrollLocked;
+        }
+    }
+
+    [JSInvokable]
+    public void OnZoomChanged(double scale)
+    {
+        if (Tabs.Active is { } t)
+        {
+            t.Scale = scale;
+            t.FitMode = ReaderFitMode.Free;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnDeskResize()
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null || tab.FitMode == ReaderFitMode.Free || _js is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var s = await _js.InvokeAsync<double>("measureFit", _desk, tab.FitMode == ReaderFitMode.Width ? "width" : "page");
+            if (s > 0)
+            {
+                tab.Scale = s;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch { }
+    }
+
+    private async Task SaveActiveScrollAsync()
+    {
+        var tab = Tabs.Active;
+        if (tab?.Session is null || _js is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var top = await _js.InvokeAsync<double>("getScrollTop", _desk);
+            Tabs.UpdateViewState(tab.Id, tab.CurrentPage, tab.Scale, top);
+        }
+        catch
+        {
+            // best-effort; scroll memory is a nicety
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Tabs.Changed -= OnTabsChanged;
+        OpenDoc.Requested -= OnOpenRequestedLive;
+
+        try
+        {
+            await SaveActiveScrollAsync();
+            await Tabs.SaveAsync();
+        }
+        catch
+        {
+            // leaving the page must never throw
+        }
+
+        try
+        {
+            if (_js is not null)
+            {
+                await _js.InvokeVoidAsync("dispose");
+                await _js.DisposeAsync();
+            }
+        }
+        catch
+        {
+            // disposing during teardown must never throw
+        }
+
+        _ref?.Dispose();
+    }
+}

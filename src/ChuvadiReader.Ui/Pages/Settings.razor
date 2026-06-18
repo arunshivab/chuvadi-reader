@@ -1,0 +1,138 @@
+@page "/settings"
+@inject ThemeService Theme
+@inject UserProfileService Profile
+@inject IAppStorage Storage
+@inject SaveFolderService SaveFolders
+@inject IFilePicker Picker
+
+<PageTitle>Chuvadi · Settings</PageTitle>
+
+<div style="min-height:100vh;background:var(--chvd-surface-mid);color:var(--chvd-ink);font-family:var(--chvd-sans-display);padding:24px">
+    <a href="/" style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-binding);text-decoration:none">&larr; dashboard</a>
+    <h1 style="font-family:var(--chvd-serif-display);font-weight:400;font-size:30px;margin:12px 0 18px">Settings</h1>
+
+    <div style="display:flex;flex-direction:column;gap:18px;max-width:420px">
+        <div>
+            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">theme</div>
+            <button @onclick="ToggleTheme"
+                    style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer">
+                @(Theme.Current == ChuvadiTheme.Light ? "Mono lobby (light)" : "Grid lobby (dark)") — switch
+            </button>
+        </div>
+
+        <div>
+            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">splash screen on launch</div>
+            <button @onclick="ToggleSplash"
+                    style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer">
+                @(_splash ? "On" : "Off") — @(_splash ? "show splash, then dashboard" : "open straight to the dashboard")
+            </button>
+            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
+                Off opens faster. Takes effect on the next launch.
+            </div>
+        </div>
+
+        <div>
+            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">page number controls</div>
+            <div style="display:flex;gap:8px">
+                <button @onclick='() => SetStepper("buttons")' style="@StepBtnStyle(_stepper == "buttons")">± buttons</button>
+                <button @onclick='() => SetStepper("chevrons")' style="@StepBtnStyle(_stepper == "chevrons")">Inline chevrons</button>
+            </div>
+            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
+                Style of the From / To steppers on the Split page.
+            </div>
+        </div>
+
+        <div>
+            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">where files are saved</div>
+            <div style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink);word-break:break-all;background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:var(--chvd-radius);padding:8px 10px;margin-bottom:8px">@SaveFolders.BaseFolder</div>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+                <button @onclick="ChangeFolder" style="@StepBtnStyle(false)">Change folder…</button>
+                <button @onclick="ResetFolder" style="@StepBtnStyle(false)">Reset to default</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                <button @onclick="ToggleMonth" style="@StepBtnStyle(_month)">@(_month ? "✓ " : "")Month subfolder · @DateTime.Now.ToString("yyyy-MM")</button>
+                <button @onclick="ToggleDate" style="@StepBtnStyle(_date)">@(_date ? "✓ " : "")Date subfolder · @DateTime.Now.ToString("yyyy-MM-dd")</button>
+            </div>
+            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
+                Bind, Lift, Scatter and other saves default here. With neither subfolder on, files land directly in the folder.
+            </div>
+        </div>
+
+        <div>
+            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">preferred name</div>
+            <input value="@_name" @oninput="OnNameInput" placeholder="@Profile.Name"
+                   style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 12px;background:var(--chvd-surface-hi);width:100%;box-sizing:border-box" />
+            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
+                Leave blank to use your computer's name, or clear for a time-only greeting. Stored locally, never sent anywhere.
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _name = string.Empty;
+    private bool _splash;
+    private string _stepper = "buttons";
+    private bool _date;
+    private bool _month;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Profile.HydrateAsync();
+        _splash = string.Equals(await Storage.GetAsync("splash"), "on", StringComparison.OrdinalIgnoreCase);
+        _stepper = string.Equals(await Storage.GetAsync("page-stepper"), "chevrons", StringComparison.OrdinalIgnoreCase)
+            ? "chevrons"
+            : "buttons";
+        _date = SaveFolders.DateFolders;
+        _month = SaveFolders.MonthFolders;
+    }
+
+    private async Task ChangeFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            await SaveFolders.SetBaseFolderAsync(folder);
+        }
+    }
+
+    private Task ResetFolder() => SaveFolders.SetBaseFolderAsync(null);
+
+    private async Task ToggleDate()
+    {
+        _date = !_date;
+        await SaveFolders.SetDateFoldersAsync(_date);
+    }
+
+    private async Task ToggleMonth()
+    {
+        _month = !_month;
+        await SaveFolders.SetMonthFoldersAsync(_month);
+    }
+
+    private async Task SetStepper(string value)
+    {
+        _stepper = value;
+        await Storage.SetAsync("page-stepper", value);
+    }
+
+    private static string StepBtnStyle(bool active)
+        => "font-size:13px;border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer;"
+         + (active
+            ? "color:var(--chvd-binding);border:var(--chvd-stroke) solid var(--chvd-binding);"
+            : "color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);");
+
+    private Task ToggleTheme() => Theme.ToggleAsync();
+
+    private async Task ToggleSplash()
+    {
+        _splash = !_splash;
+        await Storage.SetAsync("splash", _splash ? "on" : "off");
+    }
+
+    private async Task OnNameInput(ChangeEventArgs e)
+    {
+        _name = e.Value?.ToString() ?? string.Empty;
+        await Profile.SetPreferredNameAsync(_name);
+    }
+}

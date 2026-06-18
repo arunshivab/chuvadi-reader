@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+
+    <style>
+        /* First-paint background so there's no white flash before the app styles load.
+           Matches the window (light parchment); dark theme overrides once applied. */
+        html, body { margin: 0; background: #F2EAD6; }
+        html[data-theme="dark"], html[data-theme="dark"] body { background: #0e0a07; }
+    </style>
+
+    <link rel="preload" href="_content/ChuvadiReader.Ui/lipi-sans/fonts/LiPi-Sans-Latin.woff2" as="font" type="font/woff2" crossorigin />
+
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/fonts/google/fonts.css" />
+
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/lipi-sans/lipi-sans.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/tokens.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/app.css" />
+    <link rel="stylesheet" href="ChuvadiReader.Windows.styles.css" />
+</head>
+<body>
+    <div id="app"></div>
+
+    <div id="blazor-error-ui">
+        An error occurred. <a href="" class="reload">Reload</a>
+    </div>
+
+    <script src="theme.js"></script>
+    <script src="_framework/blazor.webview.js"></script>
+</body>
+</html>

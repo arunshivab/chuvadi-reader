@@ -1,0 +1,550 @@
+@page "/library"
+@inject LibraryService Lib
+@inject TagService Tags
+@inject CategoryService Categories
+@inject FolderSearchService Search
+@inject PressService Press
+@inject IFilePicker Picker
+@inject OpenDocumentService OpenDoc
+@inject RecentFilesService Recents
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Chuvadi · Library</PageTitle>
+
+<div class="libp">
+    <div class="libp-bar">
+        <a href="/" class="libp-back"><Icon Name="chevron-left" Size="14" /> dashboard</a>
+        <span class="libp-title">Library</span>
+        <span class="libp-folder">@Lib.FolderPath</span>
+        <span class="libp-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+    </div>
+
+    <div class="libp-search">
+        <Icon Name="search" Size="15" />
+        <input value="@_query" @oninput="e => _query = e.Value?.ToString() ?? string.Empty"
+               @onkeydown="OnSearchKey" placeholder="Search a word across every PDF in the folder…" />
+        @if (_searching)
+        {
+            <span class="libp-searching">searching…</span>
+        }
+        else if (_results is not null)
+        {
+            <button class="libp-clear" @onclick="ClearSearch">clear</button>
+        }
+        else
+        {
+            <button class="libp-go" @onclick="RunSearch">Search</button>
+        }
+    </div>
+
+    @if (_results is not null)
+    {
+        <div class="libp-results">
+            <div class="libp-results-head">@_results.Count match@(_results.Count == 1 ? "" : "es") for “@_searchedFor”</div>
+            @if (_results.Count == 0)
+            {
+                <div class="libempty">No pages contain that word.</div>
+            }
+            else
+            {
+                @foreach (var hit in _results)
+                {
+                    <button class="hit" @onclick="() => OpenAt(hit.Path, hit.Name, hit.Page)">
+                        <div class="hit-top"><span class="hit-name"><Icon Name="file-pdf" Size="13" /> @hit.Name</span><span class="hit-page">p@(hit.Page)</span></div>
+                        <div class="hit-snip">@hit.Snippet</div>
+                    </button>
+                }
+            }
+        </div>
+    }
+    else
+    {
+        <div class="libp-filter">
+            @foreach (var c in Categories.Categories)
+            {
+                <button class="tagchip @(_filter.Contains(c.Name) ? "on" : null)" @onclick="() => ToggleFilter(c.Name)">
+                    <span class="tagdot" style="background:@c.Color"></span>@c.Name
+                </button>
+            }
+            @foreach (var t in ManualTags.Where(t => !IsCategoryName(t)))
+            {
+                <button class="tagchip dashed @(_filter.Contains(t) ? "on" : null)" @onclick="() => ToggleFilter(t)">
+                    <span class="tagdot" style="background:@TagColor(t)"></span>@t
+                </button>
+            }
+            @if (_filter.Count > 0)
+            {
+                <button class="tag-clear" @onclick="() => _filter.Clear()">clear all</button>
+            }
+        </div>
+
+        <div class="libp-actions">
+            <div class="libp-views">
+                <button class="vbtn @(_view == LibView.Table ? "on" : null)" @onclick="() => _view = LibView.Table"><Icon Name="menu" Size="13" /> Table</button>
+                <button class="vbtn @(_view == LibView.Shelf ? "on" : null)" @onclick="() => _view = LibView.Shelf"><Icon Name="library" Size="13" /> Library</button>
+                @if (_view == LibView.Shelf)
+                {
+                    <span class="shelf-note">A–Z · thickness = pages</span>
+                }
+            </div>
+            <div class="libp-actions-right">
+                @if (_sel.Count > 0)
+                {
+                    <button class="libp-press" @onclick="ShowPress"><Icon Name="archive" Size="13" /> Press (@_sel.Count)</button>
+                    <button class="tag-clear" @onclick="() => _sel.Clear()">deselect</button>
+                }
+            </div>
+        </div>
+
+        @if (Filtered.Count == 0)
+        {
+            <div class="libempty">@(_filter.Count > 0 ? "Nothing matches these filters." : "No PDFs in Chuvadi Documents yet. Drop files into a category folder to see them here.")</div>
+        }
+        else if (_view == LibView.Table)
+        {
+            <div class="libtable">
+                <div class="libhead">
+                    <span></span><span>name</span><span>tags</span><span class="num">pages</span><span class="num">size</span><span class="num">updated</span>
+                </div>
+                @foreach (var e in Filtered)
+                {
+                    <div class="librow @(_sel.Contains(e.Path) ? "sel" : null)">
+                        <input type="checkbox" class="libcheck" checked="@_sel.Contains(e.Path)" @onchange="() => ToggleSel(e.Path)" />
+                        <button class="lib-name" @onclick="() => OpenEntry(e)">
+                            <span class="lib-name-row"><Icon Name="file-pdf" Size="14" /> @e.Name</span>
+                            <span class="lib-path" title="@e.Path">@e.Path</span>
+                        </button>
+                        <div class="lib-tags">
+                            @if (e.Category is not null)
+                            {
+                                <span class="tagchip sm cat" title="from folder"><span class="tagdot" style="background:@e.CategoryColor"></span>@e.Category</span>
+                            }
+                            @foreach (var t in Tags.GetTags(e.Path).Where(t => !string.Equals(t, e.Category, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                <span class="tagchip sm"><span class="tagdot" style="background:@TagColor(t)"></span>@t<button class="tagx" @onclick="() => Tags.RemoveTagAsync(e.Path, t)">×</button></span>
+                            }
+                            @if (_editingPath == e.Path)
+                            {
+                                <input class="tag-input" list="libp-all-tags" value="@_tagInput" autofocus
+                                       @oninput="ev => _tagInput = ev.Value?.ToString() ?? string.Empty"
+                                       @onkeydown="ev => OnTagKey(ev, e.Path)" @onblur="() => CommitTag(e.Path)" placeholder="tag…" />
+                            }
+                            else
+                            {
+                                <button class="tag-add" @onclick="() => StartTag(e.Path)"><Icon Name="plus" Size="11" /></button>
+                            }
+                        </div>
+                        <span class="num">@(e.Pages is null ? "…" : e.Pages < 0 ? "—" : e.Pages.ToString())</span>
+                        <span class="num">@Size(e.SizeBytes)</span>
+                        <span class="num">@Relative(e.Modified)</span>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="shelf-wrap">
+                @foreach (var grp in ShelfGroups())
+                {
+                    <div class="shelf-row">
+                        <div class="shelf-end">
+                            <span class="end-accent" style="background:@grp.Color"></span>
+                            <span class="end-name">@grp.Name</span>
+                        </div>
+                        <div class="shelf-col">
+                            <div class="shelf">
+                                @foreach (var e in grp.Books)
+                                {
+                                    <button class="book" style="@BookStyle(e, grp.Color)"
+                                            title="@($"{e.Name} · {(e.Pages is > 0 ? e.Pages + " pages · " : "")}{Size(e.SizeBytes)}")"
+                                            @onclick="() => OpenEntry(e)">
+                                        <span class="book-title"><span class="book-title-in">@e.Name</span></span>
+                                    </button>
+                                }
+                            </div>
+                            <div class="shelf-board"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        <datalist id="libp-all-tags">
+            @foreach (var t in ManualTags)
+            {
+                <option value="@t"></option>
+            }
+        </datalist>
+    }
+
+    @if (_showPress)
+    {
+        <div @onclick="ClosePress" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:center;justify-content:center">
+            <div @onclick:stopPropagation="true" style="width:500px;max-width:94%;max-height:88%;overflow:auto;background:var(--chvd-surface-mid);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:12px;padding:18px 20px;color:var(--chvd-ink);font-family:var(--chvd-sans-display)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+                    <span style="font-family:var(--chvd-serif-display);font-size:18px">Press @_sel.Count file@(_sel.Count == 1 ? "" : "s")</span>
+                    <button @onclick="ClosePress" aria-label="Close" style="background:none;border:none;color:var(--chvd-ink-muted);cursor:pointer"><Icon Name="x" Size="16" /></button>
+                </div>
+
+                <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);margin-bottom:7px">quality preset</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+                    @foreach (var p in _presets)
+                    {
+                        <button @onclick="() => _pressPreset = p" style="@Chip(_pressPreset == p)">@p.ToString()</button>
+                    }
+                </div>
+
+                @if (_pressPreset == PressPreset.Custom)
+                {
+                    <div style="background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                            <span style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted);width:96px">jpeg quality</span>
+                            <input type="range" min="10" max="95" step="1" @bind="_pressQuality" @bind:event="oninput" style="flex:1" />
+                            <span style="font-family:var(--chvd-mono);font-size:12px;width:28px;text-align:right">@_pressQuality</span>
+                        </div>
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:10px;cursor:pointer">
+                            <input type="checkbox" @bind="_pressRecompress" /> recompress images
+                        </label>
+                        <div style="display:flex;gap:14px">
+                            <label style="flex:1;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">min stream bytes
+                                <input type="number" @bind="_pressMinStream" style="width:100%;margin-top:3px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:4px 6px;font-family:var(--chvd-mono);font-size:12px" />
+                            </label>
+                            <label style="flex:1;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">min image pixels
+                                <input type="number" @bind="_pressMinPixels" style="width:100%;margin-top:3px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:4px 6px;font-family:var(--chvd-mono);font-size:12px" />
+                            </label>
+                        </div>
+                    </div>
+                }
+
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:@(_pressUseTarget ? "8px" : "14px");cursor:pointer">
+                    <input type="checkbox" @bind="_pressUseTarget" /> aim for a target size (per file)
+                </label>
+                @if (_pressUseTarget)
+                {
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                        <input type="number" step="0.1" min="0.1" @bind="_pressTargetMb" style="width:90px;background:var(--chvd-surface-hi);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:6px;color:var(--chvd-ink);padding:5px 8px;font-family:var(--chvd-mono);font-size:13px" />
+                        <span style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">MB — steps quality down until it fits</span>
+                    </div>
+                }
+
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                    <Icon Name="folder" Size="13" />
+                    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_pressFolder">@_pressFolder</span>
+                    <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                </div>
+
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                    <span style="font-family:var(--chvd-serif-body);font-size:12px;color:var(--chvd-ink-muted);flex:1">@(_pressStatus ?? "New …-pressed.pdf files; originals untouched.")</span>
+                    <button @onclick="RunPress" disabled="@_pressBusy" style="font-family:var(--chvd-mono);font-size:13px;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;background:var(--chvd-binding);color:var(--chvd-surface-lo);@(_pressBusy ? "opacity:0.6" : "")">@(_pressBusy ? "pressing…" : "Press →")</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "cat")]
+    public string? Cat { get; set; }
+
+    private static readonly string[] TagColors =
+        { "#3f9e8e", "#c98a3a", "#5b7fb0", "#b0577f", "#6b9e5b", "#8a6bb0", "#c25f43", "#b59a3c" };
+
+    private readonly HashSet<string> _filter = new(StringComparer.OrdinalIgnoreCase);
+    private string? _editingPath;
+    private string _tagInput = string.Empty;
+    private string _query = string.Empty;
+    private string _searchedFor = string.Empty;
+    private bool _searching;
+    private IReadOnlyList<SearchHit>? _results;
+
+    protected override void OnInitialized()
+    {
+        Lib.Changed += OnChanged;
+        Tags.Changed += OnChanged;
+        if (!string.IsNullOrWhiteSpace(Cat))
+        {
+            _filter.Add(Cat!);
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Tags.HydrateAsync();
+        await Lib.HydrateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private IReadOnlyList<string> ManualTags => Tags.AllTags();
+
+    private List<LibraryEntry> Filtered =>
+        _filter.Count == 0
+            ? Lib.Entries.ToList()
+            : Lib.Entries.Where(e =>
+                (e.Category is not null && _filter.Contains(e.Category)) ||
+                Tags.GetTags(e.Path).Any(t => _filter.Contains(t))).ToList();
+
+    private static string TagColor(string tag) => TagColors[TagService.ColorIndex(tag)];
+
+    private bool IsCategoryName(string tag)
+        => Categories.Categories.Any(c => string.Equals(c.Name, tag, StringComparison.OrdinalIgnoreCase));
+
+    private enum LibView { Table, Shelf }
+    private LibView _view = LibView.Table;
+    private readonly HashSet<string> _sel = new(StringComparer.OrdinalIgnoreCase);
+
+    private void ToggleSel(string path)
+    {
+        if (!_sel.Remove(path))
+        {
+            _sel.Add(path);
+        }
+    }
+
+    private IEnumerable<(string Name, string Color, List<LibraryEntry> Books)> ShelfGroups()
+    {
+        foreach (var c in Categories.Categories)
+        {
+            var books = Filtered
+                .Where(e => string.Equals(e.Category, c.Name, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (books.Count > 0)
+            {
+                yield return (c.Name, c.Color, books);
+            }
+        }
+
+        var uncategorised = Filtered
+            .Where(e => e.Category is null)
+            .OrderBy(e => e.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (uncategorised.Count > 0)
+        {
+            yield return ("Uncategorised", "#8a7c64", uncategorised);
+        }
+    }
+
+    private static string BookStyle(LibraryEntry e, string color)
+    {
+        // Minimum width fits the filename in two lines; thickness grows with pages.
+        var pages = e.Pages is > 0 ? e.Pages.Value : 1;
+        var width = Math.Clamp(34 + pages * 0.9, 34, 88);
+        var height = Math.Clamp(150 + pages * 0.5, 150, 190);
+        return $"width:{width:0}px;height:{height:0}px;background:{color}";
+    }
+
+    private static string Chip(bool on) =>
+        "font-family:var(--chvd-mono);font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;border:var(--chvd-stroke) solid " +
+        (on
+            ? "var(--chvd-binding);color:var(--chvd-binding);background:var(--chvd-binding-soft)"
+            : "var(--chvd-border);color:var(--chvd-ink);background:var(--chvd-surface-lo)");
+
+    private static readonly PressPreset[] _presets =
+        { PressPreset.Light, PressPreset.Balanced, PressPreset.Strong, PressPreset.Custom };
+    private bool _showPress;
+    private PressPreset _pressPreset = PressPreset.Balanced;
+    private int _pressQuality = 70;
+    private bool _pressRecompress = true;
+    private int _pressMinStream = 256;
+    private int _pressMinPixels = 10000;
+    private bool _pressUseTarget;
+    private double _pressTargetMb = 2;
+    private string _pressFolder = string.Empty;
+    private bool _pressBusy;
+    private string? _pressStatus;
+
+    private void ShowPress()
+    {
+        if (_sel.Count == 0)
+        {
+            return;
+        }
+
+        _showPress = true;
+        _pressStatus = null;
+        _pressFolder = Press.DefaultFolder;
+    }
+
+    private void ClosePress() => _showPress = false;
+
+    private async Task ChangePressFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            _pressFolder = folder;
+        }
+    }
+
+    private async Task RunPress()
+    {
+        if (_sel.Count == 0)
+        {
+            return;
+        }
+
+        _pressBusy = true;
+        _pressStatus = "pressing…";
+        StateHasChanged();
+        long before = 0, after = 0;
+        var n = 0;
+        try
+        {
+            foreach (var path in _sel.ToList())
+            {
+                PressResult r;
+                if (_pressUseTarget && _pressTargetMb > 0)
+                {
+                    r = await Press.PressToTargetAsync(path, _pressFolder, (long)(_pressTargetMb * 1024 * 1024));
+                }
+                else
+                {
+                    var opts = _pressPreset == PressPreset.Custom
+                        ? new PressOptions(_pressRecompress, _pressQuality, _pressMinStream, _pressMinPixels)
+                        : PressOptions.For(_pressPreset);
+                    r = await Press.PressAsync(path, _pressFolder, opts);
+                }
+
+                before += r.BeforeBytes;
+                after += r.AfterBytes;
+                n++;
+            }
+
+            var pct = before > 0 ? 100.0 * (before - after) / before : 0;
+            _pressStatus = $"Pressed {n} file{(n == 1 ? "" : "s")}: {Size(before)} → {Size(after)} ({pct:0.#}% smaller)";
+        }
+        catch (Exception ex)
+        {
+            _pressStatus = "Press failed: " + ex.Message;
+        }
+        finally
+        {
+            _pressBusy = false;
+        }
+    }
+
+    private void ToggleFilter(string key)
+    {
+        if (!_filter.Remove(key))
+        {
+            _filter.Add(key);
+        }
+    }
+
+    private void StartTag(string path)
+    {
+        _editingPath = path;
+        _tagInput = string.Empty;
+    }
+
+    private async Task OnTagKey(KeyboardEventArgs e, string path)
+    {
+        if (e.Key == "Enter")
+        {
+            var tag = _tagInput.Trim();
+            _tagInput = string.Empty;
+            if (tag.Length > 0)
+            {
+                await Tags.AddTagAsync(path, tag);
+            }
+        }
+        else if (e.Key == "Escape")
+        {
+            _editingPath = null;
+            _tagInput = string.Empty;
+        }
+    }
+
+    private async Task CommitTag(string path)
+    {
+        var tag = _tagInput.Trim();
+        _editingPath = null;
+        _tagInput = string.Empty;
+        if (tag.Length > 0)
+        {
+            await Tags.AddTagAsync(path, tag);
+        }
+    }
+
+    private async Task OnSearchKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await RunSearch();
+        }
+    }
+
+    private async Task RunSearch()
+    {
+        var q = _query.Trim();
+        if (q.Length < 2)
+        {
+            return;
+        }
+
+        _searching = true;
+        _searchedFor = q;
+        _results = null;
+        StateHasChanged();
+        _results = await Search.SearchAsync(q);
+        _searching = false;
+    }
+
+    private void ClearSearch()
+    {
+        _results = null;
+        _query = string.Empty;
+        _searchedFor = string.Empty;
+    }
+
+    private async Task OpenEntry(LibraryEntry e)
+    {
+        await Recents.TouchAsync(new RecentItem(e.Name, e.Path, DocumentFormatExtensions.FromPath(e.Path), DateTimeOffset.Now, false));
+        OpenDoc.Request(e.Path, e.Name);
+        Nav.NavigateTo("/reader");
+    }
+
+    private void OpenAt(string path, string name, int page)
+    {
+        OpenDoc.Request(path, name, page);
+        Nav.NavigateTo("/reader");
+    }
+
+    private static string Size(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double s = bytes;
+        var i = 0;
+        while (s >= 1024 && i < units.Length - 1)
+        {
+            s /= 1024;
+            i++;
+        }
+
+        return $"{s:0.#} {units[i]}";
+    }
+
+    private static string Relative(DateTimeOffset when)
+    {
+        var d = DateTimeOffset.Now - when;
+        if (d.TotalHours < 24)
+        {
+            return d.TotalMinutes < 60 ? $"{Math.Max(1, (int)d.TotalMinutes)}m" : $"{(int)d.TotalHours}h";
+        }
+
+        return d.TotalDays < 2 ? "yesterday" : $"{(int)d.TotalDays}d";
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Lib.Changed -= OnChanged;
+        Tags.Changed -= OnChanged;
+    }
+}

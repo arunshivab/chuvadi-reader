@@ -1,0 +1,48 @@
+@*
+    Adapter over LiPicons (vendored at src/LiPicons.Blazor). Call sites keep using
+    semantic names like <Icon Name="merge" />; this maps them to the real LiPicon
+    manifest keys and renders <LipiIcon>. Class="cv-icon" is passed through so all
+    existing colour/layout CSS (e.g. .act .cv-icon { color: var(--chvd-binding) })
+    keeps working — LiPicons render in currentColor, which those rules set.
+
+    Retune stroke weight globally by changing the default Variant
+    (Thin · Light · Regular · Bold · Fill · Duotone).
+*@
+<LipiIcon Name="@MapName(Name)" Size="@Size" Variant="Variant" Class="cv-icon" />
+
+@code {
+    [Parameter] public string Name { get; set; } = string.Empty;
+    [Parameter] public int Size { get; set; } = 18;
+    [Parameter] public LipiconVariant Variant { get; set; } = LipiconVariant.Regular;
+
+    private static string MapName(string name) => name switch
+    {
+        "settings"      => "settings",
+        "help"          => "help",
+        "search"        => "search",
+        "clock"         => "clock",
+        "lock"          => "lock",
+        "pin"           => "pin",
+        "upload"        => "upload",
+        "folder"        => "folder",
+        "folder-search" => "folder",
+        "plus"          => "plus",
+        "file-pdf"      => "file-pdf",
+        "file-docx"     => "file-word",
+        "file-xlsx"     => "file-excel",
+        "merge"         => "doc-merge",
+        "split"         => "doc-split",
+        "reader"        => "file-pdf",
+        "library"       => "library",
+        "compress"      => "collapse",
+        "redact"        => "redact",
+        "sign"          => "signature",
+        "ocr"           => "magnify-text",
+        "tools"         => "kit",
+        "minus"         => "minus",
+        "square"        => "square",
+        "restore"       => "copy",
+        "x"             => "close",
+        _               => name, // already a LiPicon manifest key
+    };
+}

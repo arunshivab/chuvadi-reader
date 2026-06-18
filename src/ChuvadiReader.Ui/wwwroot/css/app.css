@@ -1,0 +1,708 @@
+/* Chuvadi Reader — global base styles. Tokens live in tokens.css. */
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--chvd-surface-mid);
+    color: var(--chvd-ink);
+    font-family: var(--chvd-sans-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+#app, .cv-root { height: 100%; }
+
+a { color: var(--chvd-binding); }
+
+button { font-family: inherit; }
+
+.cv-icon { display: inline-block; vertical-align: middle; flex: none; }
+
+/* Brand wordmark lockup */
+.cv-brand {
+    font-family: var(--chvd-serif-display);
+    font-style: italic;
+    line-height: 1;
+    color: var(--chvd-ink);
+}
+.cv-brand-ta {
+    font-family: var(--chvd-tamil);
+    font-style: normal;
+    color: var(--chvd-binding);
+    margin: 0 1px;
+}
+
+/* Quiet, paper-appropriate scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--chvd-border); border-radius: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+#blazor-error-ui {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: none; padding: 10px 14px;
+    background: var(--chvd-error); color: #fff;
+    font-family: var(--chvd-mono); font-size: 12px;
+}
+
+/* Reader pages: the library's SVG carries its own fonts and glyph metrics.
+   Keep the app's typographic styling — tracking, ligatures, stylistic sets —
+   from cascading into the SVG's <text>, which would shift glyphs onto each
+   other. We reset only inherited shaping; the SVG sets its own font-family. */
+.rpage svg,
+.rpage svg * {
+    letter-spacing: normal;
+    word-spacing: normal;
+    font-feature-settings: normal;
+    font-variant: normal;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   App-shell layout (title bar · left rail · status bar)
+
+   These rules are GLOBAL, not scoped (MainLayout.razor.css), on purpose.
+   Blazor scoped CSS stamps a b-* attribute only onto plain HTML elements the
+   component renders itself, and rewrites each selector's rightmost element to
+   require that attribute. The rail tabs are <NavLink> and the glyphs are the
+   <Icon> component — their rendered <a>/<svg> never receive the host's scope
+   attribute, so scoped selectors like `.rail-tab` and `.tl .cv-icon` can never
+   match and the styling silently no-ops. Keeping the shell styles global makes
+   them match by class, which is correct for a single app-wide layout.
+   ────────────────────────────────────────────────────────────────────────── */
+.shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--chvd-surface-mid);
+    color: var(--chvd-ink);
+    font-family: var(--chvd-sans-display);
+}
+
+/* ── Title bar (always present) ─────────────────────────────────────── */
+.titlebar {
+    height: 46px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 14px;
+    background: var(--chvd-surface-hi);
+    border-bottom: var(--chvd-stroke) solid var(--chvd-border);
+}
+
+.tb-spacer { flex: 1; }
+.tb-controls { display: flex; align-items: center; gap: 8px; }
+
+.find-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 30px;
+    padding: 0 10px;
+    background: var(--chvd-surface-hi);
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: var(--chvd-radius);
+    color: var(--chvd-ink-muted);
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+}
+
+.kbd {
+    color: var(--chvd-ink);
+    background: var(--chvd-surface-lo);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: var(--chvd-mono);
+    font-size: 10px;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    background: var(--chvd-surface-hi);
+    color: var(--chvd-ink-soft);
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: var(--chvd-radius);
+    cursor: pointer;
+}
+
+.tb-sep { width: var(--chvd-stroke); height: 20px; background: var(--chvd-border); }
+
+.win-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 24px;
+    background: transparent;
+    border: none;
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+    border-radius: var(--chvd-radius);
+}
+.win-btn:hover { background: var(--chvd-surface-hi); color: var(--chvd-ink); }
+.win-close:hover { background: #c0492f; color: #fff; }
+
+/* mac-style traffic lights — reserved for the macOS build (left side). */
+.traffic { display: flex; align-items: center; gap: 10px; margin-left: 6px; }
+.tl { width: 17px; height: 17px; padding: 0; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; color: rgba(20, 12, 6, 0.6); }
+.tl .cv-icon { opacity: 0; transition: opacity 0.12s ease; }
+.traffic:hover .tl .cv-icon { opacity: 1; }
+.tl-close { background: #ff5f57; }
+.tl-min { background: #febc2e; }
+.tl-max { background: #28c840; }
+.tl:hover { filter: brightness(0.93); }
+
+/* ── Body: left rail + content ──────────────────────────────────────── */
+.shell-body { flex: 1; min-height: 0; display: flex; position: relative; }
+
+.rail {
+    width: 64px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 8px;
+    background: var(--chvd-surface-lo);
+    border-right: var(--chvd-stroke) solid var(--chvd-border);
+    transition: width 0.2s ease;
+    overflow: hidden;
+}
+.rail.expanded { width: 196px; }
+
+/* Collapse handle straddling the rail/content seam. Hidden until the rail (or
+   the handle itself) is hovered; slides with the rail width; the chevron points
+   left to collapse and flips 180deg to point right when the rail is collapsed. */
+.rail-handle {
+    position: absolute;
+    top: 50%;
+    left: 64px;
+    transform: translate(-50%, -50%);
+    width: 22px;
+    height: 22px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--chvd-surface-hi);
+    color: var(--chvd-ink-soft);
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 50%;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s ease, left 0.2s ease, background 0.12s ease, color 0.12s ease;
+    z-index: 6;
+}
+.shell-body.rail-open .rail-handle { left: 196px; }
+.rail:hover ~ .rail-handle,
+.rail-handle:hover { opacity: 1; }
+.rail-handle:hover {
+    background: var(--chvd-binding-soft);
+    color: var(--chvd-binding);
+    border-color: var(--chvd-binding);
+}
+.rail-handle .cv-icon { width: 14px; height: 14px; transition: transform 0.2s ease; }
+.shell-body.rail-closed .rail-handle .cv-icon { transform: rotate(180deg); }
+
+.rail-section {
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--chvd-ink-muted);
+    padding: 14px 16px 6px;
+}
+.rail:not(.expanded) .rail-section { text-align: center; padding: 12px 0 6px; }
+.rail:not(.expanded) .rail-section span { display: none; }
+.rail:not(.expanded) .rail-section::before { content: "·"; font-size: 16px; }
+
+.rail-divider { height: var(--chvd-stroke); background: var(--chvd-border); margin: 8px 6px; opacity: 0.7; }
+
+.rail-tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 14px;
+    height: 48px;
+    padding: 0 16px;
+    border-radius: var(--chvd-radius);
+    color: var(--chvd-ink-soft);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+/* Collapsed rail shows icons only, centered in the narrow column. */
+.rail:not(.expanded) .rail-tab { justify-content: center; padding: 0; }
+.rail-tab .cv-icon { flex: none; width: 24px; height: 24px; }
+.rail-label { font-family: var(--chvd-sans-display); font-size: 15px; font-weight: 450; }
+.rail:not(.expanded) .rail-label { display: none; }
+.rail-tab:hover { background: var(--chvd-surface-hi); color: var(--chvd-ink); }
+.rail-tab.active {
+    background: var(--chvd-binding-soft);
+    color: var(--chvd-binding);
+    font-weight: 500;
+    box-shadow: inset 3px 0 0 var(--chvd-binding);
+}
+.rail-tab.active .cv-icon { color: var(--chvd-binding); }
+.rail-spacer { flex: 1; }
+
+.content { flex: 1; min-width: 0; overflow: auto; }
+
+/* ── Status bar (always present) ────────────────────────────────────── */
+.statusbar {
+    height: 30px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    background: var(--chvd-surface-hi);
+    border-top: var(--chvd-stroke) solid var(--chvd-border);
+    font-family: var(--chvd-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--chvd-ink-muted);
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--chvd-olive); }
+.status-right { margin-left: auto; }
+
+/* ── tab drag-to-reorder: cursor + floating tooltip ───────────────────────────
+   These target body / a body-appended element, so they live in the global sheet
+   (component-scoped CSS only stamps elements the component itself renders). */
+body.rtab-dragging-active,
+body.rtab-dragging-active .rtab {
+    cursor: grabbing;
+    user-select: none;
+}
+
+.rtab-dragtip {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    max-width: 280px;
+    padding: 7px 10px;
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 8px;
+    background: var(--chvd-surface-hi);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+}
+
+.rtab-dragtip-name {
+    font-family: var(--chvd-mono);
+    font-size: 11.5px;
+    color: var(--chvd-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 260px;
+}
+
+.rtab-dragtip-hint {
+    margin-top: 2px;
+    font-family: var(--chvd-sans-display);
+    font-size: 11px;
+    color: var(--chvd-binding);
+}
+
+/* ── Merge / Split tool pages ────────────────────────────────────────────────
+   Shared by Merge.razor and Split.razor. Global (not scoped) so rules also reach
+   the <Icon> child-component SVGs inside buttons. */
+.tool {
+    min-height: 100%;
+    background: var(--chvd-surface-mid);
+    color: var(--chvd-ink);
+    font-family: var(--chvd-sans-display);
+    padding: 22px 26px 40px;
+    max-width: 760px;
+}
+
+.tool-head { margin-bottom: 18px; }
+
+.tool-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+    color: var(--chvd-binding);
+    text-decoration: none;
+}
+.tool-back:hover { text-decoration: underline; }
+
+.tool-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--chvd-serif-display);
+    font-weight: 400;
+    font-size: 28px;
+    margin: 12px 0 4px;
+    color: var(--chvd-ink);
+}
+.tool-title svg { color: var(--chvd-binding); }
+
+.tool-sub {
+    font-family: var(--chvd-serif-body);
+    color: var(--chvd-ink-soft);
+    margin: 0;
+}
+
+.tool-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 16px; }
+
+.tbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 8px;
+    background: var(--chvd-surface-hi);
+    color: var(--chvd-ink);
+    font-family: var(--chvd-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.12s ease, color 0.12s ease, background 0.12s ease;
+}
+.tbtn:hover:not(:disabled) { border-color: var(--chvd-binding); color: var(--chvd-binding); }
+.tbtn:disabled { opacity: 0.45; cursor: default; }
+
+.tbtn-go {
+    background: var(--chvd-binding);
+    border-color: var(--chvd-binding);
+    color: #fff;
+}
+.tbtn-go:hover:not(:disabled) { color: #fff; filter: brightness(1.06); }
+
+.tool-empty {
+    padding: 22px;
+    border: var(--chvd-stroke) dashed var(--chvd-border);
+    border-radius: 10px;
+    color: var(--chvd-ink-muted);
+    font-family: var(--chvd-mono);
+    font-size: 12px;
+    text-align: center;
+}
+
+.tool-run { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 20px; }
+
+.tool-status { font-family: var(--chvd-mono); font-size: 11.5px; }
+.tool-status.ok { color: var(--chvd-ink-soft); }
+.tool-status.err { color: var(--chvd-binding); }
+
+/* Merge list */
+.mlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+
+.mrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 8px;
+    background: var(--chvd-surface-hi);
+}
+.mrow svg { color: var(--chvd-binding); }
+.mrow-n {
+    width: 20px;
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+    color: var(--chvd-ink-muted);
+    text-align: right;
+}
+.mrow-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--chvd-mono);
+    font-size: 12px;
+}
+.mrow-tools { display: flex; gap: 3px; }
+
+.mico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+}
+.mico:hover:not(:disabled) { background: var(--chvd-surface-lo); color: var(--chvd-ink); }
+.mico:disabled { opacity: 0.3; cursor: default; }
+.mico-x:hover { background: var(--chvd-binding-soft); color: var(--chvd-binding); }
+
+/* Split source + modes */
+.ssource {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 8px;
+    background: var(--chvd-surface-hi);
+    margin-bottom: 16px;
+}
+.ssource svg { color: var(--chvd-binding); }
+.ssource-name { font-family: var(--chvd-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ssource-pages { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); }
+.slink {
+    margin-left: auto;
+    border: none;
+    background: transparent;
+    color: var(--chvd-binding);
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.smodes { display: flex; flex-direction: column; gap: 10px; }
+
+.smode {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    padding: 12px 14px;
+    border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 10px;
+    background: var(--chvd-surface-hi);
+    cursor: pointer;
+}
+.smode.on { border-color: var(--chvd-binding); box-shadow: inset 0 0 0 0.5px var(--chvd-binding); }
+.smode input { grid-row: 1 / span 2; align-self: center; accent-color: var(--chvd-binding); }
+.smode-t { font-family: var(--chvd-sans-display); font-size: 13.5px; color: var(--chvd-ink); }
+.smode-d { font-family: var(--chvd-serif-body); font-size: 12px; color: var(--chvd-ink-muted); }
+
+.srange { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-family: var(--chvd-mono); font-size: 12px; color: var(--chvd-ink-soft); }
+.snum {
+    width: 64px;
+    padding: 6px 8px;
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 6px;
+    background: var(--chvd-surface-lo);
+    color: var(--chvd-ink);
+    font-family: var(--chvd-mono);
+    font-size: 12px;
+}
+.srange-of { color: var(--chvd-ink-muted); }
+
+/* ── Split page-number steppers (A: ± buttons, B: inline chevrons) ─────────── */
+/* Hide the native number spinners; we provide our own controls. */
+.snum::-webkit-inner-spin-button,
+.snum::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.snum { appearance: textfield; -moz-appearance: textfield; }
+
+/* A — ± buttons flanking the field */
+.snum-grp { display: inline-flex; align-items: center; gap: 6px; }
+.snum-grp .snum { width: 48px; text-align: center; }
+
+.snum-step {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 34px;
+    flex: none;
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 7px;
+    background: var(--chvd-surface-hi);
+    color: var(--chvd-binding);
+    cursor: pointer;
+    transition: border-color 0.12s ease, background 0.12s ease;
+}
+.snum-step:hover { border-color: var(--chvd-binding); background: var(--chvd-binding-soft); }
+
+/* B — up/down chevrons tucked into the field's right edge */
+.snum-chevwrap { position: relative; display: inline-flex; }
+.snum-chevin { width: 64px; padding-right: 22px; }
+
+.snum-chevs {
+    position: absolute;
+    right: 4px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+}
+.snum-chev {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 13px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+}
+.snum-chev:hover { color: var(--chvd-binding); }
+
+/* ── Bench: icon + injected page-svg styling (global, since scoped CSS can't
+   reach <Icon> components or MarkupString-injected page SVGs) ─────────────── */
+.bt svg { color: var(--chvd-binding); }
+.bt-bind svg { color: var(--chvd-surface-lo); }
+.bench-empty svg { color: var(--chvd-binding); opacity: 0.7; }
+.bench-back svg, .bv svg { color: inherit; }
+/* size each rendered page thumbnail to its cell */
+.bthumb-rot svg,
+.bthumb-rot svg * { max-width: 100%; }
+.bthumb-rot svg { width: 100%; height: auto; display: block; }
+
+/* ── reader: JS-created overlays (appended to <body>, so styled globally) ─── */
+.rmarquee {
+    position: fixed;
+    z-index: 9998;
+    border: 1.5px dashed var(--chvd-binding);
+    background: var(--chvd-binding-soft);
+    pointer-events: none;
+}
+.rloupe {
+    position: fixed;
+    z-index: 9999;
+    width: 168px;
+    height: 168px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--chvd-border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), inset 0 0 0 2px rgba(255, 255, 255, 0.15);
+    background: #fff;
+    pointer-events: none;
+}
+.rloupe-in { position: absolute; top: 0; left: 0; }
+.rloupe-in svg { display: block; }
+
+/* ── full-screen / immersive: only the document, dark screen, Esc exits ───── */
+body.chvd-immersive .titlebar,
+body.chvd-immersive .rail,
+body.chvd-immersive .rail-handle,
+body.chvd-immersive .statusbar { display: none !important; }
+body.chvd-immersive .shell { background: #070a0c; }
+body.chvd-immersive .content { background: #070a0c; }
+
+/* ── document tabs in the title bar (browser-style) ──────────────────────── */
+.rtabs {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    margin: 0 8px;
+    padding: 0 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+.rtabs::-webkit-scrollbar { height: 0; }
+.rtab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 28px;
+    min-width: 116px;
+    max-width: 208px;
+    flex: 0 1 auto;
+    padding: 0 5px 0 11px;
+    border: 0.5px solid var(--chvd-border-soft);
+    border-radius: 8px;
+    background: var(--chvd-surface-lo);
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.rtab:hover { color: var(--chvd-ink-soft); background: var(--chvd-surface-hi); }
+.rtab.active {
+    background: var(--chvd-surface-hi);
+    color: var(--chvd-ink);
+    border-color: var(--chvd-binding);
+    box-shadow: inset 0 -2px 0 var(--chvd-binding);
+}
+.rtab-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: var(--chvd-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.01em;
+}
+.rtab-x {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 17px;
+    height: 17px;
+    flex: none;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.rtab:hover .rtab-x { opacity: 1; }
+.rtab-x:hover { background: var(--chvd-binding-soft); color: var(--chvd-binding); opacity: 1; }
+.rtab-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    flex: none;
+    border: 0.5px solid var(--chvd-border-soft);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--chvd-ink-muted);
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+}
+.rtab-add:hover { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+
+.rtabs-actions { position: relative; flex: none; display: flex; align-items: center; margin-right: 4px; }
+.rtabs-menu {
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 26px; flex: none;
+    border: 0.5px solid var(--chvd-border-soft); border-radius: 7px;
+    background: transparent; color: var(--chvd-ink-muted); cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+}
+.rtabs-menu:hover { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+.rtabs-menu-overlay { position: fixed; inset: 0; z-index: 90; }
+.rtabs-pop {
+    position: absolute; top: 32px; right: 0; z-index: 91; min-width: 232px;
+    background: var(--chvd-surface-hi); border: 0.5px solid var(--chvd-border);
+    border-radius: 10px; box-shadow: 0 14px 34px rgba(0,0,0,0.4); padding: 5px;
+}
+.rtabs-mi {
+    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+    width: 100%; padding: 8px 11px; border: none; background: transparent;
+    border-radius: 7px; color: var(--chvd-ink); cursor: pointer;
+    font-family: var(--chvd-sans-display); font-size: 13px; text-align: left;
+}
+.rtabs-mi:hover:not(:disabled) { background: var(--chvd-surface-lo); }
+.rtabs-mi:disabled { opacity: 0.4; cursor: default; }
+.rtabs-k { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); }
+.rtabs-msep { height: 0.5px; background: var(--chvd-border-soft); margin: 4px 6px; }
+
+/* drag-to-reorder visuals */
+.rtab-dragging { opacity: 0.45; cursor: grabbing; }
+.rtab-insert-before { box-shadow: inset 3px 0 0 var(--chvd-binding); }
+.rtab-insert-after { box-shadow: inset -3px 0 0 var(--chvd-binding); }

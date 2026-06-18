@@ -1,0 +1,1440 @@
+@page "/bench"
+@inject BenchService BenchSvc
+@inject IFilePicker Picker
+@inject SaveFolderService SaveFolders
+@inject OpenDocumentService OpenDoc
+@inject NavigationManager Nav
+@inject IAppStorage Storage
+@inject IJSRuntime JS
+@inject PressService Press
+@inject DocumentPropertiesService DocProps
+@implements IAsyncDisposable
+
+<PageTitle>Chuvadi · Bench</PageTitle>
+
+<div class="bench">
+    @if (_busy)
+    {
+        <div class="bench-busy">
+            <div class="bench-busy-card"><span class="bspin big"></span><span>@(_busyLabel ?? "Working…")</span></div>
+        </div>
+    }
+    <div class="bench-bar">
+        <a class="bench-back" href="/" title="Back to dashboard"><Icon Name="chevron-left" Size="15" /></a>
+        <span class="bench-name">Bench</span>
+        <span style="flex:1"></span>
+        <button class="bench-reset" @onclick="ConfirmReset" disabled="@(_busy || (!BenchSvc.HasSources && BenchSvc.IsEmpty))" title="Clear the bench"><Icon Name="rotate-ccw" Size="13" /> Reset</button>
+        <span class="bt-sep"></span>
+        <span class="bench-view">
+            <button class="bv @(_perRow == 1 ? "on" : null)" @onclick="() => SetPerRow(1)" title="One desk per row"><Icon Name="square" Size="15" /></button>
+            <button class="bv @(_perRow == 2 ? "on" : null)" @onclick="() => SetPerRow(2)" title="Two desks per row"><Icon Name="columns" Size="15" /></button>
+            <button class="bv @(_perRow == 3 ? "on" : null)" @onclick="() => SetPerRow(3)" title="Three desks per row"><Icon Name="grid-view" Size="15" /></button>
+        </span>
+        <span class="bt-sep"></span>
+        <button class="bt bt-fetch" @onclick="FetchFile" disabled="@(_busy || _fetching)"><Icon Name="folder" Size="15" /> Fetch File</button>
+        <button class="bt bt-bind" @onclick="BindAll" disabled="@(_busy || BenchSvc.IsEmpty)"><Icon Name="save" Size="15" /> Bind all</button>
+        <button class="bt" @onclick="AddDesk" disabled="@(_busy || !BenchSvc.CanAddDesk)" title="@(BenchSvc.CanAddDesk ? "Add a desk" : "30-desk limit reached")"><Icon Name="plus" Size="15" /> Add desk</button>
+    </div>
+
+    @if (_status is not null)
+    {
+        <div class="bench-status @(_error ? "err" : "ok")">
+            @_status
+            @if (_resultPath is not null && !_error)
+            {
+                <button class="bench-status-open" @onclick="OpenResult">Open</button>
+            }
+            <button class="bench-status-x" @onclick="() => _status = null" aria-label="Dismiss"><Icon Name="x" Size="13" /></button>
+        </div>
+    }
+
+    <div class="bench-main" @ref="_grid">
+        <aside class="bench-shelf">
+            <div class="shelf-head">Shelf</div>
+            @if (_fetching)
+            {
+                <div class="shelf-loading"><span class="bspin"></span> Opening file…</div>
+            }
+            @if (!BenchSvc.HasSources && !_fetching)
+            {
+                <div class="shelf-empty">
+                    <Icon Name="folder" Size="20" />
+                    <span>Fetch a PDF to start.</span>
+                    <button class="bt bt-fetch" @onclick="FetchFile" disabled="@_fetching"><Icon Name="folder" Size="14" /> Fetch a file</button>
+                </div>
+            }
+            else if (BenchSvc.HasSources)
+            {
+                @foreach (var s in BenchSvc.Sources)
+                {
+                    <div class="shelf-src">
+                        <div class="shelf-srch" data-shelf-all="@s.Index" title="Drag the whole file onto a desk">
+                            <button class="shelf-collapse" @onclick="() => ToggleCollapse(s.Index)" aria-label="@(s.Collapsed ? "Expand" : "Collapse")"><Icon Name="@(s.Collapsed ? "chevron-right" : "chevron-down")" Size="14" /></button>
+                            <span class="src-dot @SrcClass(s.Index)"></span>
+                            <span class="shelf-srcname" title="@s.FileName">@s.FileName</span>
+                            <span class="shelf-srcct">@s.PageCount</span>
+                            <button class="shelf-ic" @onclick="() => OpenProps(s.Path)" title="Properties"><Icon Name="info" Size="14" /></button>
+                            <button class="shelf-ic" @onclick="() => OpenPress(s.Path)" title="Press"><Icon Name="compress" Size="14" /></button>
+                        </div>
+                        @if (!s.Collapsed)
+                        {
+                            <div class="shelf-pgs">
+                                @for (var p = 0; p < s.PageCount; p++)
+                                {
+                                    var pi = p;
+                                    <div class="shelf-pg @SrcClass(s.Index)" data-shelf="@($"{s.Index}:{pi}")" title="Drag page @(pi + 1) onto a desk">
+                                        @if (BenchSvc.TryGetSourceThumb(s.Index, pi, out var svg))
+                                        {
+                                            <div class="thumb">@((MarkupString)svg)</div>
+                                        }
+                                        else
+                                        {
+                                            <span class="pgn">@(pi + 1)</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </aside>
+
+        <section class="bench-desks" style="grid-template-columns:@GridCols()">
+            @foreach (var desk in BenchSvc.Desks)
+            {
+                var deskId = desk.Id;
+                var sel = BenchSvc.SelectedInDesk(deskId);
+                <div class="desk @(_perRow == 3 ? "compact" : null)">
+                    <div class="desk-h">
+                        <input class="desk-name" value="@desk.Name"
+                               @onchange="@(e => RenameDesk(deskId, e.Value?.ToString()))"
+                               spellcheck="false" />
+                        @if (desk.Watermark is not null)
+                        {
+                            <span class="desk-wm" title="Watermark: @desk.Watermark.Text">WM</span>
+                        }
+                        @if (desk.HeaderFooter is not null)
+                        {
+                            <span class="desk-wm desk-hf" title="Header / footer set">HF</span>
+                        }
+                        <span class="desk-count">@desk.Pages.Count pg</span>
+                        <button class="desk-del" @onclick="() => RemoveDesk(deskId)" title="Delete desk" aria-label="Delete desk"><Icon Name="trash" Size="14" /></button>
+                    </div>
+
+                    <div class="desk-drop" data-desk="@deskId">
+                        @if (desk.IsEmpty)
+                        {
+                            <div class="desk-empty">Drag pages here</div>
+                        }
+                        else
+                        {
+                            @foreach (var page in desk.Pages)
+                            {
+                                var pg = page;
+                                <div class="bpage @SrcClass(pg.SourceIndex) @(BenchSvc.IsSelected(pg.Id) ? "sel" : null)" data-bench-id="@pg.Id">
+                                    <div class="bpage-body">
+                                        <div class="bthumb" style="transform:rotate(@(pg.Rotation)deg)">
+                                            @if (pg.IsBlank)
+                                            {
+                                                <div class="blankpg" style="@BlankStyle(pg)"></div>
+                                            }
+                                            else if (pg.IsImage)
+                                            {
+                                                <img class="bthumb-img" src="@ImageSrc(pg)" alt="(image)" />
+                                            }
+                                            else if (BenchSvc.TryGetThumb(pg, out var tsvg))
+                                            {
+                                                @((MarkupString)tsvg)
+                                            }
+                                            else
+                                            {
+                                                <span class="pgn">·</span>
+                                            }
+                                        </div>
+                                        @if (BenchSvc.IsSelected(pg.Id))
+                                        {
+                                            <span class="bcheck"><Icon Name="check" Size="11" /></span>
+                                        }
+                                        <div class="bpage-acts">
+                                            <button class="bpeek" data-peek="@pg.Id" title="Peek"><Icon Name="loupe" Size="12" /></button>
+                                            <button @onclick="() => TurnPage(pg.Id)" title="Rotate"><Icon Name="refresh" Size="12" /></button>
+                                            <button @onclick="() => RemovePage(pg.Id)" title="Remove"><Icon Name="x" Size="12" /></button>
+                                        </div>
+                                    </div>
+                                    <div class="bpage-num @(pg.IsBlank || pg.IsImage ? "lbl" : null)">@PageLabel(pg)</div>
+                                </div>
+                            }
+                        }
+                    </div>
+
+                    <div class="desk-foot">
+                        <div class="desk-foot-acts">
+                            <button class="bt sm" @onclick="() => FetchImageToDesk(deskId)" title="Fetch image"><Icon Name="file-image" Size="13" /><span class="btxt">Image</span></button>
+                            <button class="bt sm" @onclick="() => AddBlank(deskId)" title="Add blank page"><Icon Name="file" Size="13" /><span class="btxt">Blank</span></button>
+                        </div>
+                        <span class="desk-foot-sp"></span>
+                        <span class="desk-selinfo">@(sel > 0 ? $"{sel} sel" : "")</span>
+                        <div class="desk-foot-out">
+                            <button class="bt sm" @onclick="() => OpenWatermark(deskId)" title="Watermark"><Icon Name="watermark" Size="13" /><span class="btxt">Watermark</span></button>
+                            <button class="bt sm" @onclick="() => OpenHeaderFooter(deskId)" title="Header / footer"><Icon Name="text-box" Size="13" /><span class="btxt">Footer</span></button>
+                            <button class="bt sm" @onclick="() => OpenScatter(deskId)" disabled="@desk.IsEmpty" title="Scatter"><Icon Name="split" Size="13" /><span class="btxt">Scatter</span></button>
+                            <button class="bt sm" @onclick="() => OpenExport(deskId)" disabled="@desk.IsEmpty" title="Export"><Icon Name="download" Size="13" /><span class="btxt">Export</span></button>
+                            <button class="bt sm" @onclick="() => LiftDesk(deskId)" disabled="@(_busy || sel == 0)" title="Lift selected"><Icon Name="upload" Size="13" /><span class="btxt">Lift@(sel > 0 ? $" ({sel})" : "")</span></button>
+                            <button class="bt sm bt-bind" @onclick="() => BindDesk(deskId)" disabled="@(_busy || desk.IsEmpty)" title="Bind desk"><Icon Name="save" Size="13" /><span class="btxt">Bind</span></button>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (BenchSvc.CanAddDesk)
+            {
+                <button class="desk-add" @onclick="AddDesk" title="Add another desk">
+                    <Icon Name="plus" Size="22" />
+                    <span>Add desk</span>
+                </button>
+            }
+        </section>
+    </div>
+
+    @if (_wmDesk is { } wmId)
+    {
+        <div class="modal-scrim" @onclick="CloseWatermark">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Watermark · @(DeskName(wmId))</span>
+                    <button @onclick="CloseWatermark" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                <label class="modal-lbl">Text</label>
+                <input class="modal-input" @bind="_wmText" @bind:event="oninput" placeholder="e.g. DRAFT, CONFIDENTIAL" />
+
+                <label class="modal-lbl">Font</label>
+                <div class="seg">
+                    <select class="hf-fmt wm-fontsel" @bind="_wmFamily">
+                        <option value="Helvetica">Helvetica (Sans)</option>
+                        <option value="Times">Times (Serif)</option>
+                        <option value="Courier">Courier (Mono)</option>
+                    </select>
+                    <button class="@(_wmBold ? "on" : null)" @onclick="() => _wmBold = !_wmBold" style="font-weight:700">B</button>
+                    <button class="@(_wmItalic ? "on" : null)" @onclick="() => _wmItalic = !_wmItalic" style="font-style:italic">I</button>
+                    <span style="width:6px"></span>
+                    <label class="modal-lbl" style="margin:0 4px 0 0">Size</label>
+                    <select class="hf-fmt" @bind="_wmSize">
+                        @foreach (var s in new[] { 24, 28, 32, 36, 40, 48, 56, 64, 72, 96, 120, 144 })
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                    <input type="number" class="wm-angle" min="6" max="400" @bind="_wmSize" title="Custom size" />
+                </div>
+
+                <label class="modal-lbl">Colour</label>
+                <div class="wm-swatches">
+                    @foreach (var sw in WmSwatches)
+                    {
+                        <button class="wm-sw @(string.Equals(_wmColor, sw.Hex, StringComparison.OrdinalIgnoreCase) ? "on" : null)"
+                                style="background:@sw.Hex" title="@sw.Name" @onclick="() => _wmColor = sw.Hex"></button>
+                    }
+                    <span class="wm-sw-custom">
+                        <input type="color" class="wm-color" @bind="_wmColor" @bind:event="oninput" title="Custom colour" />
+                        <span>Custom</span>
+                    </span>
+                </div>
+
+                <label class="modal-lbl">Orientation</label>
+                <div class="seg">
+                    <button class="@(_wmRotation == 0 ? "on" : null)" @onclick="() => _wmRotation = 0">Horizontal</button>
+                    <button class="@(_wmRotation == 90 ? "on" : null)" @onclick="() => _wmRotation = 90">Vertical</button>
+                    <button class="@(_wmRotation == 45 ? "on" : null)" @onclick="() => _wmRotation = 45" title="Bottom-left to top-right">Diagonal ↗</button>
+                    <button class="@(_wmRotation == 315 ? "on" : null)" @onclick="() => _wmRotation = 315" title="Top-left to bottom-right">Diagonal ↘</button>
+                    <input type="number" class="wm-angle" min="0" max="359" value="@((int)_wmRotation)" title="Custom angle"
+                           @oninput="@(e => _wmRotation = double.TryParse(e.Value?.ToString(), out var v) ? ((v % 360) + 360) % 360 : _wmRotation)" />
+                </div>
+
+                <label class="modal-lbl">Opacity — @((int)(_wmOpacity * 100))%</label>
+                <input type="range" min="5" max="100" step="5" value="@((int)(_wmOpacity * 100))"
+                       @oninput="@(e => _wmOpacity = (double.TryParse(e.Value?.ToString(), out var v) ? v : 25) / 100.0)" style="width:100%" />
+
+                <label class="modal-lbl">Apply to</label>
+                <div class="seg">
+                    <button class="@(_wmAll ? "on" : null)" @onclick="() => _wmAll = true">All pages</button>
+                    <button class="@(!_wmAll ? "on" : null)" @onclick="() => _wmAll = false" disabled="@(BenchSvc.SelectedInDesk(wmId) == 0)">Selected (@BenchSvc.SelectedInDesk(wmId))</button>
+                </div>
+
+                <div class="wm-preview">
+                    <span style="font-family:@WmPreviewFont; font-weight:@(_wmBold ? "700" : "400"); font-style:@(_wmItalic ? "italic" : "normal"); color:@_wmColor; opacity:@_wmOpacity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture); transform:rotate(@((-_wmRotation).ToString("0", System.Globalization.CultureInfo.InvariantCulture))deg)">@(string.IsNullOrWhiteSpace(_wmText) ? "preview" : _wmText)</span>
+                </div>
+                <div class="modal-foot">
+                    @if (DeskHasWatermark(wmId))
+                    {
+                        <button class="ghost" @onclick="() => ClearWatermark(wmId)">Remove watermark</button>
+                    }
+                    <span style="flex:1"></span>
+                    <button class="primary" @onclick="() => ApplyWatermark(wmId)">Set watermark</button>
+                </div>
+                <p class="modal-note">Applied to this desk's pages when you Bind or Lift.</p>
+            </div>
+        </div>
+    }
+
+    @if (_hfDesk is { } hfId)
+    {
+        <div class="modal-scrim" @onclick="CloseHeaderFooter">
+            <div class="modal modal-wide" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Header &amp; footer · @(DeskName(hfId))</span>
+                    <button @onclick="CloseHeaderFooter" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+
+                <div class="hf-topline">
+                    <div class="hf-fmtbar">
+                        <label class="modal-lbl">Page</label>
+                        <select class="hf-fmt" @bind="_hfPageFmt" @bind:after="RebuildBands">
+                            <option value="">1, 2, 3</option>
+                            <option value="roman">i, ii, iii</option>
+                            <option value="ROMAN">I, II, III</option>
+                            <option value="alpha">a, b, c</option>
+                            <option value="ALPHA">A, B, C</option>
+                        </select>
+                        <label class="modal-lbl">Date</label>
+                        <select class="hf-fmt" @bind="_hfDateFmt" @bind:after="RebuildBands">
+                            <option value="yyyy-MM-dd">2026-06-17</option>
+                            <option value="dd MMM yyyy">17 Jun 2026</option>
+                            <option value="MMMM d, yyyy">June 17, 2026</option>
+                            <option value="dd/MM/yyyy">17/06/2026</option>
+                            <option value="MM/dd/yyyy">06/17/2026</option>
+                        </select>
+                        <label class="modal-lbl">Time</label>
+                        <select class="hf-fmt" @bind="_hfTimeFmt" @bind:after="RebuildBands">
+                            <option value="HH:mm">14:30</option>
+                            <option value="hh:mm tt">02:30 PM</option>
+                        </select>
+                    </div>
+                    <div class="hf-mode">
+                        <span class="hf-sw-label @(_hfQuick ? "on" : null)" @onclick="() => SetMode(true)">Quick</span>
+                        <button type="button" class="hf-switch @(_hfQuick ? null : "right")" role="switch"
+                                aria-checked="@(!_hfQuick)" @onclick="() => SetMode(!_hfQuick)" title="Switch mode">
+                            <span class="hf-switch-knob"></span>
+                        </button>
+                        <span class="hf-sw-label @(!_hfQuick ? "on" : null)" @onclick="() => SetMode(false)">Custom</span>
+                    </div>
+                </div>
+
+                <div class="hf-row2">
+                    @if (_hfQuick)
+                    {
+                        <span class="hf-mode-hint">Pick one field per slot.</span>
+                    }
+                    else
+                    {
+                        <div class="hf-chips">
+                            <button class="chip" @onclick="() => InsertToken(PageToken())">Page #</button>
+                            <button class="chip" @onclick="InsertPageOf">Page X of Y</button>
+                            <button class="chip" @onclick='() => InsertToken("{total}")'>Total</button>
+                            <button class="chip" @onclick='() => InsertToken("{filename}")'>Filename</button>
+                            <button class="chip" @onclick='() => InsertToken("{filepath}")'>Full path</button>
+                            <button class="chip" @onclick="InsertDate">Date</button>
+                            <button class="chip" @onclick="InsertTime">Time</button>
+                            <button class="chip" @onclick="InsertDateTime">Date+Time</button>
+                        </div>
+                    }
+                </div>
+
+                @* ── Header band ── *@
+                <div class="hf-band">
+                    <label class="hf-toggle"><input type="checkbox" @bind="_hfHeaderOn" /> Header</label>
+                    @if (_hfQuick)
+                    {
+                        <div class="hf-grid @(_hfHeaderOn ? null : "off")">
+                            @RenderSlot("H", "L")
+                            @RenderSlot("H", "C")
+                            @RenderSlot("H", "R")
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="hf-grid @(_hfHeaderOn ? null : "off")">
+                            <input class="modal-input" placeholder="Left" @bind="_hfHL" @bind:event="oninput" @onfocus='() => _hfFocused = "HL"' disabled="@(!_hfHeaderOn)" />
+                            <input class="modal-input" placeholder="Centre" @bind="_hfHC" @bind:event="oninput" @onfocus='() => _hfFocused = "HC"' disabled="@(!_hfHeaderOn)" />
+                            <input class="modal-input" placeholder="Right" @bind="_hfHR" @bind:event="oninput" @onfocus='() => _hfFocused = "HR"' disabled="@(!_hfHeaderOn)" />
+                        </div>
+                    }
+                </div>
+
+                @* ── Footer band ── *@
+                <div class="hf-band">
+                    <label class="hf-toggle"><input type="checkbox" @bind="_hfFooterOn" /> Footer</label>
+                    @if (_hfQuick)
+                    {
+                        <div class="hf-grid @(_hfFooterOn ? null : "off")">
+                            @RenderSlot("F", "L")
+                            @RenderSlot("F", "C")
+                            @RenderSlot("F", "R")
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="hf-grid @(_hfFooterOn ? null : "off")">
+                            <input class="modal-input" placeholder="Left" @bind="_hfFL" @bind:event="oninput" @onfocus='() => _hfFocused = "FL"' disabled="@(!_hfFooterOn)" />
+                            <input class="modal-input" placeholder="Centre" @bind="_hfFC" @bind:event="oninput" @onfocus='() => _hfFocused = "FC"' disabled="@(!_hfFooterOn)" />
+                            <input class="modal-input" placeholder="Right" @bind="_hfFR" @bind:event="oninput" @onfocus='() => _hfFocused = "FR"' disabled="@(!_hfFooterOn)" />
+                        </div>
+                    }
+                </div>
+
+                <div class="wm-row">
+                    <div style="flex:1">
+                        <label class="modal-lbl">Size — @((int)_hfSize)</label>
+                        <input type="range" min="6" max="18" step="1" value="@((int)_hfSize)"
+                               @oninput="@(e => _hfSize = double.TryParse(e.Value?.ToString(), out var v) ? v : 9)" style="width:100%" />
+                    </div>
+                    <div>
+                        <label class="modal-lbl">Colour</label>
+                        <input type="color" class="wm-color" @bind="_hfColor" @bind:event="oninput" />
+                    </div>
+                </div>
+
+                <label class="modal-lbl">Page fit</label>
+                <select class="hf-fmt hf-fit" @bind="_hfFit">
+                    <option value="overlay">Overlay on content</option>
+                    <option value="reserve">Shrink page to make room</option>
+                    <option value="reserveIfIntruding">Shrink only if overlapping</option>
+                </select>
+
+                <div class="hf-bgline @(_hfFit == "overlay" ? "off" : null)">
+                    <label class="hf-toggle" style="margin:0"><input type="checkbox" @bind="_hfBgOn" disabled="@(_hfFit == "overlay")" /> Band background</label>
+                    <input type="color" class="wm-color" @bind="_hfBg" @bind:event="oninput" disabled="@(!_hfBgOn || _hfFit == "overlay")" />
+                    @if (_hfFit == "overlay")
+                    {
+                        <span class="hf-mode-hint">needs a "Shrink" fit to show</span>
+                    }
+                </div>
+
+                <label class="modal-lbl">Pages</label>
+                <div class="seg">
+                    <button class="@(_hfAll ? "on" : null)" @onclick="() => _hfAll = true">All pages</button>
+                    <button class="@(!_hfAll ? "on" : null)" @onclick="() => _hfAll = false">Range</button>
+                    @if (!_hfAll)
+                    {
+                        <span class="hf-range">
+                            from <input type="number" min="1" class="wm-angle" @bind="_hfFrom" />
+                            to <input type="number" min="0" class="wm-angle" @bind="_hfTo" placeholder="last" />
+                        </span>
+                    }
+                </div>
+
+                <div class="hf-preview">
+                    @if (_hfHeaderOn && (HasText(_hfHL) || HasText(_hfHC) || HasText(_hfHR)))
+                    {
+                        <div class="hf-prow"><span>@HfSample(_hfHL)</span><span>@HfSample(_hfHC)</span><span>@HfSample(_hfHR)</span></div>
+                    }
+                    <div class="hf-prow hf-pbody">page body…</div>
+                    @if (_hfFooterOn && (HasText(_hfFL) || HasText(_hfFC) || HasText(_hfFR)))
+                    {
+                        <div class="hf-prow"><span>@HfSample(_hfFL)</span><span>@HfSample(_hfFC)</span><span>@HfSample(_hfFR)</span></div>
+                    }
+                </div>
+
+                <div class="modal-foot">
+                    @if (DeskHasHeaderFooter(hfId) && (HasText(_hfHL) || HasText(_hfHC) || HasText(_hfHR)))
+                    {
+                        <button class="ghost" @onclick="ClearHeaderBand">Remove header</button>
+                    }
+                    @if (DeskHasHeaderFooter(hfId) && (HasText(_hfFL) || HasText(_hfFC) || HasText(_hfFR)))
+                    {
+                        <button class="ghost" @onclick="ClearFooterBand">Remove footer</button>
+                    }
+                    <span style="flex:1"></span>
+                    <button class="primary" @onclick="() => ApplyHeaderFooterEdit(hfId)">Set header / footer</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_scatterDesk is { } scId)
+    {
+        <div class="modal-scrim" @onclick="CloseScatter">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Scatter · @(DeskName(scId))</span>
+                    <button @onclick="CloseScatter" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                <p class="modal-body">Write every page of this desk as its own single-page PDF into:</p>
+                <div class="folder-row">
+                    <span class="folder-path" title="@_scatterFolder">@_scatterFolder</span>
+                    <button class="link" @onclick="ChangeScatterFolder">change…</button>
+                </div>
+                <div class="modal-foot">
+                    <span style="flex:1"></span>
+                    <button class="primary" @onclick="() => RunScatter(scId)" disabled="@_busy">@(_busy ? "scattering…" : "Scatter →")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_expDesk is { } exId)
+    {
+        <div class="modal-scrim" @onclick="CloseExport">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Export · @(DeskName(exId))</span>
+                    <button @onclick="CloseExport" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                <label class="modal-lbl">Format</label>
+                <div class="seg">
+                    @foreach (var f in _formats)
+                    {
+                        <button class="@(_expFormat == f ? "on" : null)" @onclick="() => _expFormat = f">@f.ToString().ToUpperInvariant()</button>
+                    }
+                </div>
+                <label class="modal-lbl">Pages</label>
+                <div class="seg">
+                    <button class="@(_expSelectedOnly ? "on" : null)" @onclick="() => _expSelectedOnly = true" disabled="@(BenchSvc.SelectedInDesk(exId) == 0)">Selected (@BenchSvc.SelectedInDesk(exId))</button>
+                    <button class="@(!_expSelectedOnly ? "on" : null)" @onclick="() => _expSelectedOnly = false">All</button>
+                </div>
+                @if (_expFormat != ChuvadiReader.Core.Documents.ExportFormat.Svg)
+                {
+                    <label class="modal-lbl">Resolution</label>
+                    <div class="seg">
+                        @foreach (var d in _dpis)
+                        {
+                            <button class="@(_expDpi == d ? "on" : null)" @onclick="() => _expDpi = d">@d dpi</button>
+                        }
+                    </div>
+                }
+                <div class="folder-row">
+                    <span class="folder-path" title="@_expFolder">@_expFolder</span>
+                    <button class="link" @onclick="ChangeExportFolder">change…</button>
+                </div>
+                <div class="modal-foot">
+                    <span style="flex:1"></span>
+                    <button class="primary" @onclick="() => RunExport(exId)" disabled="@_expBusy">@(_expBusy ? "exporting…" : "Export →")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_pressSrc is not null)
+    {
+        <div class="modal-scrim" @onclick="ClosePress">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Press · @System.IO.Path.GetFileName(_pressSrc)</span>
+                    <button @onclick="ClosePress" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                <label class="modal-lbl">Strength</label>
+                <div class="seg">
+                    <button class="@(_pressPreset == PressPreset.Light ? "on" : null)" @onclick="() => _pressPreset = PressPreset.Light">Light</button>
+                    <button class="@(_pressPreset == PressPreset.Balanced ? "on" : null)" @onclick="() => _pressPreset = PressPreset.Balanced">Balanced</button>
+                    <button class="@(_pressPreset == PressPreset.Strong ? "on" : null)" @onclick="() => _pressPreset = PressPreset.Strong">Strong</button>
+                </div>
+                <p class="modal-note">@PresetHint(_pressPreset)</p>
+                <div class="folder-row">
+                    <span class="folder-path" title="@_pressFolder">@_pressFolder</span>
+                    <button class="link" @onclick="ChangePressFolder">change…</button>
+                </div>
+                @if (_pressResult is { } r)
+                {
+                    <div class="press-result">Saved <b>@r.SavedPercent.ToString("0.#")%</b> · @Fmt(r.BeforeBytes) → @Fmt(r.AfterBytes)</div>
+                }
+                <div class="modal-foot">
+                    @if (_pressResult is not null)
+                    {
+                        <button class="ghost" @onclick="OpenPressResult">Open</button>
+                    }
+                    <span style="flex:1"></span>
+                    <button class="primary" @onclick="RunPress" disabled="@_pressBusy">@(_pressBusy ? "pressing…" : "Press →")</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (_propsSrc is not null)
+    {
+        <div class="modal-scrim" @onclick="CloseProps">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Properties · @System.IO.Path.GetFileName(_propsSrc)</span>
+                    <button @onclick="CloseProps" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                @if (_propsBusy)
+                {
+                    <p class="modal-body">Reading…</p>
+                }
+                else if (_props is { } p)
+                {
+                    <div class="prop-rows">
+                        @foreach (var (label, val) in PropRows(p))
+                        {
+                            <div class="prop-row"><span class="prop-k">@label</span><span class="prop-v">@val</span></div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="modal-body">Couldn't read properties.</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (_showReset)
+    {
+        <div class="modal-scrim" @onclick="() => _showReset = false">
+            <div class="modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Clear the bench?</span>
+                    <button @onclick="() => _showReset = false" aria-label="Close"><Icon Name="x" Size="16" /></button>
+                </div>
+                <p class="modal-body">This removes every source and desk. Bound files already saved are untouched.</p>
+                <div class="modal-foot">
+                    <span style="flex:1"></span>
+                    <button class="ghost" @onclick="() => _showReset = false">Cancel</button>
+                    <button class="primary danger" @onclick="DoReset">Clear bench</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ElementReference _grid;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<Bench>? _ref;
+    private bool _dirty = true;
+
+    private bool _busy;
+    private string? _busyLabel;
+    private bool _error;
+    private string? _status;
+    private string? _resultPath;
+
+    private Guid? _deskMenu;
+    private int _perRow = 1;
+    private bool _fetching;
+    private readonly Dictionary<Guid, string> _imgCache = new();
+
+    private static readonly ChuvadiReader.Core.Documents.ExportFormat[] _formats =
+        { ChuvadiReader.Core.Documents.ExportFormat.Svg, ChuvadiReader.Core.Documents.ExportFormat.Png,
+          ChuvadiReader.Core.Documents.ExportFormat.Jpg, ChuvadiReader.Core.Documents.ExportFormat.Bmp };
+    private static readonly int[] _dpis = { 96, 150, 220, 300 };
+
+    protected override async Task OnInitializedAsync()
+    {
+        BenchSvc.EnsureDesk();
+        BenchSvc.Changed += OnBenchChanged;
+        try
+        {
+            var saved = await Storage.GetAsync("bench.perRow");
+            if (int.TryParse(saved, out var n) && n is >= 1 and <= 3)
+            {
+                _perRow = n;
+            }
+        }
+        catch { /* default to 1 */ }
+    }
+
+    private void OnBenchChanged()
+    {
+        _dirty = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/bench.js");
+            _ref ??= DotNetObjectReference.Create(this);
+            if (_dirty)
+            {
+                _dirty = false;
+                await _module.InvokeVoidAsync("init", _grid, _ref, true);
+            }
+        }
+        catch (JSException)
+        {
+            // Drag/lazy-thumb conveniences unavailable; static layout still renders.
+        }
+    }
+
+    [JSInvokable]
+    public async Task RenderThumb(string pageId)
+    {
+        if (!Guid.TryParse(pageId, out var id)) return;
+        var page = BenchSvc.Desks.SelectMany(d => d.Pages).FirstOrDefault(p => p.Id == id);
+        if (page is null || page.IsBlank || page.IsImage) return;
+        if (BenchSvc.TryGetThumb(page, out _)) { StateHasChanged(); return; }
+        await BenchSvc.RenderThumbAsync(page);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task RenderShelfThumb(int sourceIndex, int pageIndex)
+    {
+        if (BenchSvc.TryGetSourceThumb(sourceIndex, pageIndex, out _)) { StateHasChanged(); return; }
+        await BenchSvc.RenderSourceThumbAsync(sourceIndex, pageIndex);
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void DropShelfPage(int sourceIndex, int pageIndex, string deskId, int index)
+    {
+        if (Guid.TryParse(deskId, out var d))
+        {
+            BenchSvc.AddPageToDesk(d, sourceIndex, pageIndex, index);
+        }
+    }
+
+    [JSInvokable]
+    public void DropDeskPage(string pageId, string deskId, int index)
+    {
+        if (Guid.TryParse(pageId, out var pg) && Guid.TryParse(deskId, out var d))
+        {
+            BenchSvc.MovePage(pg, d, index);
+        }
+    }
+
+    [JSInvokable]
+    public void CloseTransient()
+    {
+        var any = _deskMenu is not null || _wmDesk is not null || _hfDesk is not null || _scatterDesk is not null
+                  || _expDesk is not null || _pressSrc is not null || _propsSrc is not null || _showReset;
+        if (!any) return;
+        _deskMenu = null;
+        _wmDesk = null;
+        _hfDesk = null;
+        _scatterDesk = null;
+        _expDesk = null;
+        _pressSrc = null;
+        _propsSrc = null;
+        _showReset = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void DropSourceAll(int sourceIndex, string deskId, int index)
+    {
+        if (Guid.TryParse(deskId, out var d))
+        {
+            BenchSvc.AddSourceAllToDesk(d, sourceIndex, index);
+        }
+    }
+
+    [JSInvokable]
+    public void SelectBenchPage(string pageId, bool shift)
+    {
+        if (!Guid.TryParse(pageId, out var id)) return;
+        if (shift) BenchSvc.SelectRangeTo(id);
+        else BenchSvc.ToggleSelect(id);
+    }
+
+    private async Task FetchFile()
+    {
+        var paths = await Picker.PickDocumentsAsync();
+        if (paths.Count == 0) return;
+        _status = null;
+        _resultPath = null;
+        _fetching = true;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            foreach (var path in paths)
+            {
+                await BenchSvc.AddSourceAsync(path, System.IO.Path.GetFileName(path));
+            }
+        }
+        finally
+        {
+            _fetching = false;
+        }
+    }
+
+    private async Task FetchImageToDesk(Guid deskId)
+    {
+        _deskMenu = null;
+        var paths = await Picker.PickImagesAsync();
+        if (paths.Count == 0) return;
+        foreach (var path in paths)
+        {
+            BenchSvc.AddImageToDesk(deskId, path);
+        }
+    }
+
+    private async Task SetPerRow(int n)
+    {
+        if (_perRow == n) return;
+        _perRow = n;
+        try { await Storage.SetAsync("bench.perRow", n.ToString()); }
+        catch { /* non-fatal */ }
+    }
+
+    private string GridCols() => _perRow switch
+    {
+        2 => "repeat(2, minmax(0, 1fr))",
+        3 => "repeat(3, minmax(0, 1fr))",
+        _ => "minmax(0, 1fr)",
+    };
+
+    private void ToggleCollapse(int sourceIndex) => BenchSvc.ToggleSourceCollapsed(sourceIndex);
+
+    private static string PageLabel(BenchPage p)
+        => p.IsBlank ? "(blank)" : p.IsImage ? "(image)" : (p.OriginalIndex + 1).ToString();
+
+    private string ImageSrc(BenchPage p)
+    {
+        if (_imgCache.TryGetValue(p.Id, out var uri)) return uri;
+        uri = BenchSvc.ImageDataUri(p);
+        _imgCache[p.Id] = uri;
+        return uri;
+    }
+
+    private static string SrcClass(int sourceIndex) => sourceIndex < 0 ? "src-x" : $"src-{sourceIndex % 8}";
+
+    private static string BlankStyle(BenchPage p)
+        => string.IsNullOrWhiteSpace(p.BackgroundHex) ? "background:#fff" : $"background:{p.BackgroundHex}";
+
+    private void AddDesk()
+    {
+        _deskMenu = null;
+        BenchSvc.AddDesk();
+    }
+
+    private void RemoveDesk(Guid deskId)
+    {
+        _deskMenu = null;
+        BenchSvc.RemoveDesk(deskId);
+    }
+
+    private void RenameDesk(Guid deskId, string? name) => BenchSvc.RenameDesk(deskId, name ?? "");
+
+    private string DeskName(Guid deskId) => BenchSvc.FindDesk(deskId)?.Name ?? "Desk";
+
+    private bool DeskHasWatermark(Guid deskId) => BenchSvc.FindDesk(deskId)?.Watermark is not null;
+
+    private void AddBlank(Guid deskId)
+    {
+        _deskMenu = null;
+        BenchSvc.AddBlankToDesk(deskId);
+    }
+
+    private void TurnPage(Guid pageId) => BenchSvc.TurnPage(pageId);
+
+    private void RemovePage(Guid pageId) => BenchSvc.RemovePage(pageId);
+
+    private async Task BindDesk(Guid deskId)
+    {
+        var path = await Picker.PickSavePdfAsync(BenchSvc.SuggestName(deskId) + ".pdf");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        await RunSave(() => BenchSvc.BindDeskAsync(deskId, path!), path!, "Bound", "Binding desk…");
+    }
+
+    private async Task LiftDesk(Guid deskId)
+    {
+        var path = await Picker.PickSavePdfAsync(BenchSvc.SuggestName(deskId) + "-lift.pdf");
+        if (string.IsNullOrWhiteSpace(path)) return;
+        await RunSave(() => BenchSvc.LiftDeskAsync(deskId, path!), path!, "Lifted", "Lifting pages…");
+    }
+
+    private async Task BindAll()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        _busy = true; _busyLabel = "Binding all desks…"; _status = null; _error = false; StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            var n = await BenchSvc.BindAllAsync(folder!);
+            _status = n == 0 ? "Nothing to bind." : $"Bound {n} desk{(n == 1 ? "" : "s")} into {folder}";
+            _resultPath = null;
+        }
+        catch (Exception ex) { _status = ex.Message; _error = true; }
+        finally { _busy = false; _busyLabel = null; StateHasChanged(); }
+    }
+
+    private async Task RunSave(Func<Task> action, string path, string verb, string? busyLabel = null)
+    {
+        _busy = true; _busyLabel = busyLabel ?? "Working…"; _status = null; _error = false; StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            await action();
+            _status = $"{verb} → {System.IO.Path.GetFileName(path)}";
+            _resultPath = path;
+        }
+        catch (Exception ex) { _status = ex.Message; _error = true; }
+        finally { _busy = false; _busyLabel = null; StateHasChanged(); }
+    }
+
+    private void OpenResult()
+    {
+        if (_resultPath is not null)
+        {
+            OpenDoc.Request(_resultPath);
+            Nav.NavigateTo("/reader");
+        }
+    }
+
+    private Guid? _wmDesk;
+    private string _wmText = "";
+    private string _wmFamily = "Helvetica";
+    private bool _wmBold;
+    private bool _wmItalic;
+    private double _wmSize = 48;
+    private string _wmColor = "#808080";
+    private double _wmRotation = 45;
+    private double _wmOpacity = 0.25;
+    private bool _wmAll = true;
+
+    private static readonly (string Name, string Hex)[] WmSwatches =
+    {
+        ("Grey", "#808080"), ("Red", "#C0392B"), ("Blue", "#2C6FB5"), ("Green", "#2E7D32"),
+        ("Orange", "#E08A1E"), ("Yellow", "#E6C200"), ("Black", "#000000"), ("White", "#FFFFFF"),
+    };
+
+    private string WmPreviewFont => _wmFamily switch
+    {
+        "Times" => "Georgia, 'Times New Roman', serif",
+        "Courier" => "'Courier New', monospace",
+        _ => "system-ui, sans-serif",
+    };
+
+    private void OpenWatermark(Guid deskId)
+    {
+        _deskMenu = null;
+        var wm = BenchSvc.FindDesk(deskId)?.Watermark;
+        _wmText = wm?.Text ?? "";
+        _wmFamily = wm?.FontFamily ?? "Helvetica";
+        _wmBold = wm?.Bold ?? false;
+        _wmItalic = wm?.Italic ?? false;
+        _wmSize = wm?.FontSize ?? 48;
+        _wmColor = wm?.ColorHex ?? "#808080";
+        _wmRotation = wm?.RotationDegrees ?? 45;
+        _wmOpacity = wm?.Opacity ?? 0.25;
+        _wmAll = wm?.AllPages ?? true;
+        _wmDesk = deskId;
+    }
+
+    private void CloseWatermark() => _wmDesk = null;
+
+    private void ApplyWatermark(Guid deskId)
+    {
+        BenchSvc.SetDeskWatermark(deskId, _wmText, _wmFamily, _wmBold, _wmItalic, _wmSize, _wmColor, _wmOpacity, _wmRotation, _wmAll);
+        _wmDesk = null;
+    }
+
+    private void ClearWatermark(Guid deskId)
+    {
+        BenchSvc.SetDeskWatermark(deskId, "", _wmFamily, _wmBold, _wmItalic, _wmSize, _wmColor, _wmOpacity, _wmRotation, _wmAll);
+        _wmDesk = null;
+    }
+
+    // ── header / footer editor ───────────────────────────────────────────────
+    private Guid? _hfDesk;
+    private string _hfFocused = "FC";
+    private bool _hfQuick = true;
+    private bool _hfHeaderOn;
+    private string _hfHL = "", _hfHC = "", _hfHR = "";
+    private bool _hfFooterOn = true;
+    private string _hfFL = "", _hfFC = "", _hfFR = "";
+    private string _qHL = "none", _qHC = "none", _qHR = "none";
+    private string _qFL = "none", _qFC = "none", _qFR = "none";
+    private double _hfSize = 9;
+    private string _hfColor = "#333333";
+    private bool _hfBgOn;
+    private string _hfBg = "#EEEEEE";
+    private string _hfFit = "overlay";
+    private double _hfMargin = 36;
+    private double _hfHeight = 28;
+    private bool _hfAll = true;
+    private int _hfFrom = 1;
+    private int _hfTo;
+    private string _hfPageFmt = "";
+    private string _hfDateFmt = "yyyy-MM-dd";
+    private string _hfTimeFmt = "HH:mm";
+
+    private static readonly (string Key, string Label)[] HfFields =
+    {
+        ("none", "— none —"), ("page", "Page #"), ("pageof", "Page X of Y"), ("total", "Total"),
+        ("filename", "Filename"), ("filepath", "File path"), ("date", "Date"), ("time", "Time"),
+        ("datetime", "Date+Time"), ("custom", "Custom text…"),
+    };
+    private static bool IsRealField(string k) => k is not "none" and not "custom";
+
+    private string PageToken() => string.IsNullOrEmpty(_hfPageFmt) ? "{page}" : $"{{page:{_hfPageFmt}}}";
+
+    private void InsertPageOf() => InsertToken($"Page {PageToken()} of {{total}}");
+    private void InsertDate() => InsertToken($"{{date:{_hfDateFmt}}}");
+    private void InsertTime() => InsertToken($"{{time:{_hfTimeFmt}}}");
+    private void InsertDateTime() => InsertToken($"{{datetime:{_hfDateFmt} {_hfTimeFmt}}}");
+
+    private static bool HasText(string? s) => !string.IsNullOrWhiteSpace(s);
+
+    private bool DeskHasHeaderFooter(Guid deskId) => BenchSvc.FindDesk(deskId)?.HeaderFooter is not null;
+
+    private void InsertToken(string token)
+    {
+        switch (_hfFocused)
+        {
+            case "HL": _hfHL += token; break;
+            case "HC": _hfHC += token; break;
+            case "HR": _hfHR += token; break;
+            case "FL": _hfFL += token; break;
+            case "FR": _hfFR += token; break;
+            default: _hfFC += token; break;
+        }
+    }
+
+    // ── Quick-mode slot helpers ──
+    private bool BandOn(string band) => band == "H" ? _hfHeaderOn : _hfFooterOn;
+
+    private string GetKey(string band, string slot) => (band, slot) switch
+    {
+        ("H", "L") => _qHL, ("H", "C") => _qHC, ("H", "R") => _qHR,
+        ("F", "L") => _qFL, ("F", "C") => _qFC, _ => _qFR,
+    };
+    private void SetKey(string band, string slot, string v)
+    {
+        switch ((band, slot))
+        {
+            case ("H", "L"): _qHL = v; break;
+            case ("H", "C"): _qHC = v; break;
+            case ("H", "R"): _qHR = v; break;
+            case ("F", "L"): _qFL = v; break;
+            case ("F", "C"): _qFC = v; break;
+            default: _qFR = v; break;
+        }
+    }
+    private string GetBand(string band, string slot) => (band, slot) switch
+    {
+        ("H", "L") => _hfHL, ("H", "C") => _hfHC, ("H", "R") => _hfHR,
+        ("F", "L") => _hfFL, ("F", "C") => _hfFC, _ => _hfFR,
+    };
+    private void SetBand(string band, string slot, string v)
+    {
+        switch ((band, slot))
+        {
+            case ("H", "L"): _hfHL = v; break;
+            case ("H", "C"): _hfHC = v; break;
+            case ("H", "R"): _hfHR = v; break;
+            case ("F", "L"): _hfFL = v; break;
+            case ("F", "C"): _hfFC = v; break;
+            default: _hfFR = v; break;
+        }
+    }
+
+    private IEnumerable<(string Key, string Label)> QuickOptions(string band, string slot)
+    {
+        var mine = GetKey(band, slot);
+        var others = new[] { "L", "C", "R" }.Where(s => s != slot).Select(s => GetKey(band, s)).ToHashSet();
+        return HfFields.Where(f => !IsRealField(f.Key) || f.Key == mine || !others.Contains(f.Key));
+    }
+
+    private string TokenFor(string key) => key switch
+    {
+        "page" => PageToken(),
+        "pageof" => $"Page {PageToken()} of {{total}}",
+        "total" => "{total}",
+        "filename" => "{filename}",
+        "filepath" => "{filepath}",
+        "date" => $"{{date:{_hfDateFmt}}}",
+        "time" => $"{{time:{_hfTimeFmt}}}",
+        "datetime" => $"{{datetime:{_hfDateFmt} {_hfTimeFmt}}}",
+        _ => "",
+    };
+
+    private void OnSlot(string band, string slot, ChangeEventArgs e)
+    {
+        var key = e.Value?.ToString() ?? "none";
+        SetKey(band, slot, key);
+        if (key == "custom")
+        {
+            var cur = GetBand(band, slot);
+            if (cur.StartsWith("{") || cur.StartsWith("Page {")) SetBand(band, slot, "");
+        }
+        else
+        {
+            SetBand(band, slot, TokenFor(key));
+        }
+    }
+
+    private void RebuildBands()
+    {
+        if (!_hfQuick) return; // in Custom mode the boxes are user-owned
+        foreach (var band in new[] { "H", "F" })
+            foreach (var slot in new[] { "L", "C", "R" })
+            {
+                var key = GetKey(band, slot);
+                if (key != "custom" && key != "none") SetBand(band, slot, TokenFor(key));
+            }
+    }
+
+    private static string ReverseKey(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "none";
+        if (s == "{total}") return "total";
+        if (s == "{filename}") return "filename";
+        if (s == "{filepath}") return "filepath";
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\{page(?::[^}]+)?\}$")) return "page";
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^Page \{page(?::[^}]+)?\} of \{total\}$")) return "pageof";
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\{date:[^}]+\}$")) return "date";
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\{time:[^}]+\}$")) return "time";
+        if (System.Text.RegularExpressions.Regex.IsMatch(s, @"^\{datetime:[^}]+\}$")) return "datetime";
+        return "custom";
+    }
+
+    private void SetMode(bool quick)
+    {
+        if (_hfQuick == quick) return;
+        if (quick)
+        {
+            foreach (var band in new[] { "H", "F" })
+                foreach (var slot in new[] { "L", "C", "R" })
+                    SetKey(band, slot, ReverseKey(GetBand(band, slot)));
+        }
+        _hfQuick = quick;
+    }
+
+    private RenderFragment RenderSlot(string band, string slot) =>@<div class="hf-slot">
+        <select class="modal-input" disabled="@(!BandOn(band))" value="@GetKey(band, slot)" @onchange="e => OnSlot(band, slot, e)">
+            @foreach (var opt in QuickOptions(band, slot))
+            {
+                <option value="@opt.Key" selected="@(GetKey(band, slot) == opt.Key)">@opt.Label</option>
+            }
+        </select>
+        @if (GetKey(band, slot) == "custom")
+        {
+            <input class="modal-input hf-slot-custom" placeholder="text" value="@GetBand(band, slot)"
+                   @oninput="e => SetBand(band, slot, e.Value?.ToString() ?? string.Empty)" disabled="@(!BandOn(band))" />
+        }
+    </div>;
+
+    private string HfSample(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var now = DateTimeOffset.Now;
+        var name = (_hfDesk is { } id ? DeskName(id) : "document") + ".pdf";
+        const int samplePage = 3, sampleTotal = 9; // illustrative values for the preview
+        return System.Text.RegularExpressions.Regex.Replace(
+            s, @"\{(page|total|filename|filepath|date|time|datetime)(?::([^}]+))?\}",
+            m =>
+            {
+                var tok = m.Groups[1].Value;
+                var fmt = m.Groups[2].Success ? m.Groups[2].Value : null;
+                try
+                {
+                    return tok switch
+                    {
+                        "page" => FormatPageSample(samplePage, fmt),
+                        "total" => sampleTotal.ToString(),
+                        "filename" => name,
+                        "filepath" => name,
+                        "date" => now.ToString(fmt ?? "yyyy-MM-dd"),
+                        "time" => now.ToString(fmt ?? "HH:mm"),
+                        "datetime" => now.ToString(fmt ?? "yyyy-MM-dd HH:mm"),
+                        _ => m.Value,
+                    };
+                }
+                catch { return m.Value; }
+            });
+    }
+
+    private static string FormatPageSample(int n, string? fmt) => fmt switch
+    {
+        "roman" => ToRoman(n).ToLowerInvariant(),
+        "ROMAN" => ToRoman(n),
+        "alpha" => ToAlpha(n).ToLowerInvariant(),
+        "ALPHA" => ToAlpha(n),
+        _ => n.ToString(),
+    };
+
+    private static string ToRoman(int n)
+    {
+        if (n <= 0) return n.ToString();
+        int[] v = { 1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1 };
+        string[] r = { "M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I" };
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < v.Length && n > 0; i++)
+            while (n >= v[i]) { sb.Append(r[i]); n -= v[i]; }
+        return sb.ToString();
+    }
+
+    private static string ToAlpha(int n) // bijective base-26: 1->A, 26->Z, 27->AA
+    {
+        if (n <= 0) return n.ToString();
+        var sb = new System.Text.StringBuilder();
+        while (n > 0) { n--; sb.Insert(0, (char)('A' + n % 26)); n /= 26; }
+        return sb.ToString();
+    }
+
+    private void OpenHeaderFooter(Guid deskId)
+    {
+        _deskMenu = null;
+        var hf = BenchSvc.FindDesk(deskId)?.HeaderFooter;
+        _hfQuick = hf?.QuickMode ?? true;
+        _hfHeaderOn = hf?.HeaderEnabled ?? false;
+        _hfHL = hf?.HeaderLeft ?? ""; _hfHC = hf?.HeaderCenter ?? ""; _hfHR = hf?.HeaderRight ?? "";
+        _hfFooterOn = hf?.FooterEnabled ?? true;
+        _hfFL = hf?.FooterLeft ?? ""; _hfFC = hf?.FooterCenter ?? "Page {page} of {total}"; _hfFR = hf?.FooterRight ?? "";
+        _hfSize = hf?.FontSize ?? 9;
+        _hfColor = hf?.ColorHex ?? "#333333";
+        _hfBgOn = hf?.BackgroundEnabled ?? false;
+        _hfBg = hf?.BackgroundHex ?? "#EEEEEE";
+        _hfFit = hf?.Fit ?? "overlay";
+        _hfMargin = hf?.MarginX ?? 36;
+        _hfHeight = hf?.BandHeight ?? 28;
+        _hfAll = hf?.AllPages ?? true;
+        _hfFrom = hf?.FromPage ?? 1;
+        _hfTo = hf?.ToPage ?? 0;
+        _hfPageFmt = hf?.PageFmt ?? "";
+        _hfDateFmt = hf?.DateFmt ?? "yyyy-MM-dd";
+        _hfTimeFmt = hf?.TimeFmt ?? "HH:mm";
+        foreach (var band in new[] { "H", "F" })
+            foreach (var slot in new[] { "L", "C", "R" })
+                SetKey(band, slot, ReverseKey(GetBand(band, slot)));
+        _hfFocused = "FC";
+        _hfDesk = deskId;
+    }
+
+    private void CloseHeaderFooter() => _hfDesk = null;
+
+    private DeskHeaderFooter BuildHfConfig() => new()
+    {
+        QuickMode = _hfQuick,
+        HeaderEnabled = _hfHeaderOn,
+        HeaderLeft = _hfHL, HeaderCenter = _hfHC, HeaderRight = _hfHR,
+        FooterEnabled = _hfFooterOn,
+        FooterLeft = _hfFL, FooterCenter = _hfFC, FooterRight = _hfFR,
+        FontSize = _hfSize, ColorHex = _hfColor,
+        BackgroundEnabled = _hfBgOn, BackgroundHex = _hfBg,
+        MarginX = _hfMargin, BandHeight = _hfHeight,
+        AllPages = _hfAll, FromPage = _hfFrom, ToPage = _hfTo,
+        PageFmt = _hfPageFmt, DateFmt = _hfDateFmt, TimeFmt = _hfTimeFmt,
+        Fit = _hfFit,
+    };
+
+    private void ApplyHeaderFooterEdit(Guid deskId)
+    {
+        BenchSvc.SetDeskHeaderFooter(deskId, BuildHfConfig());
+        _hfDesk = null;
+    }
+
+    private void ClearHeaderBand()
+    {
+        _hfHeaderOn = false; _hfHL = _hfHC = _hfHR = "";
+        _qHL = _qHC = _qHR = "none";
+        if (_hfDesk is { } id) BenchSvc.SetDeskHeaderFooter(id, BuildHfConfig());
+    }
+
+    private void ClearFooterBand()
+    {
+        _hfFooterOn = false; _hfFL = _hfFC = _hfFR = "";
+        _qFL = _qFC = _qFR = "none";
+        if (_hfDesk is { } id) BenchSvc.SetDeskHeaderFooter(id, BuildHfConfig());
+    }
+
+    private Guid? _scatterDesk;
+    private string _scatterFolder = string.Empty;
+
+    private void OpenScatter(Guid deskId)
+    {
+        _deskMenu = null;
+        _scatterFolder = SaveFolders.SubFolder("Scattered");
+        _scatterDesk = deskId;
+    }
+
+    private void CloseScatter() => _scatterDesk = null;
+
+    private async Task ChangeScatterFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(folder)) _scatterFolder = folder!;
+    }
+
+    private async Task RunScatter(Guid deskId)
+    {
+        _busy = true; StateHasChanged();
+        try
+        {
+            var n = await BenchSvc.ScatterDeskAsync(deskId, _scatterFolder);
+            _scatterDesk = null;
+            _status = $"Scattered {n} page{(n == 1 ? "" : "s")} into {_scatterFolder}";
+            _error = false; _resultPath = null;
+        }
+        catch (Exception ex) { _status = ex.Message; _error = true; }
+        finally { _busy = false; _busyLabel = null; StateHasChanged(); }
+    }
+
+    private Guid? _expDesk;
+    private ChuvadiReader.Core.Documents.ExportFormat _expFormat = ChuvadiReader.Core.Documents.ExportFormat.Png;
+    private int _expDpi = 150;
+    private bool _expSelectedOnly;
+    private bool _expBusy;
+    private string _expFolder = string.Empty;
+
+    private void OpenExport(Guid deskId)
+    {
+        _deskMenu = null;
+        _expFolder = SaveFolders.SubFolder("Export");
+        _expSelectedOnly = BenchSvc.SelectedInDesk(deskId) > 0;
+        _expDesk = deskId;
+    }
+
+    private void CloseExport() => _expDesk = null;
+
+    private async Task ChangeExportFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(folder)) _expFolder = folder!;
+    }
+
+    private async Task RunExport(Guid deskId)
+    {
+        _expBusy = true; StateHasChanged();
+        try
+        {
+            var n = await BenchSvc.ExportDeskAsync(deskId, _expFolder, _expFormat, _expDpi, _expSelectedOnly);
+            _expDesk = null;
+            _status = $"Exported {n} image{(n == 1 ? "" : "s")} into {_expFolder}";
+            _error = false; _resultPath = null;
+        }
+        catch (Exception ex) { _status = ex.Message; _error = true; }
+        finally { _expBusy = false; StateHasChanged(); }
+    }
+
+    private string? _pressSrc;
+    private PressPreset _pressPreset = PressPreset.Balanced;
+    private string _pressFolder = string.Empty;
+    private bool _pressBusy;
+    private PressResult? _pressResult;
+
+    private void OpenPress(string path)
+    {
+        _pressFolder = Press.DefaultFolder;
+        _pressResult = null;
+        _pressSrc = path;
+    }
+
+    private void ClosePress() => _pressSrc = null;
+
+    private async Task ChangePressFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (!string.IsNullOrWhiteSpace(folder)) _pressFolder = folder!;
+    }
+
+    private async Task RunPress()
+    {
+        if (_pressSrc is null) return;
+        _pressBusy = true; StateHasChanged();
+        try
+        {
+            _pressResult = await Press.PressAsync(_pressSrc, _pressFolder, PressOptions.For(_pressPreset));
+        }
+        catch (Exception ex) { _status = ex.Message; _error = true; _pressSrc = null; }
+        finally { _pressBusy = false; StateHasChanged(); }
+    }
+
+    private void OpenPressResult()
+    {
+        if (_pressResult is not null)
+        {
+            OpenDoc.Request(_pressResult.OutputPath);
+            Nav.NavigateTo("/reader");
+        }
+    }
+
+    private static string PresetHint(PressPreset p) => p switch
+    {
+        PressPreset.Light => "Lossless — compress streams and drop dead objects, images untouched.",
+        PressPreset.Strong => "Smallest — aggressively recompress images at lower quality.",
+        _ => "Balanced — recompress large images at good quality.",
+    };
+
+    private string? _propsSrc;
+    private bool _propsBusy;
+    private ChuvadiReader.Core.Documents.DocProperties? _props;
+
+    private async Task OpenProps(string path)
+    {
+        _propsSrc = path;
+        _propsBusy = true;
+        _props = null;
+        StateHasChanged();
+        try { _props = await DocProps.ReadAsync(path); }
+        catch { _props = null; }
+        finally { _propsBusy = false; StateHasChanged(); }
+    }
+
+    private void CloseProps() => _propsSrc = null;
+
+    private IEnumerable<(string Label, string Value)> PropRows(ChuvadiReader.Core.Documents.DocProperties p)
+    {
+        var rows = new (string, string?)[]
+        {
+            ("File", p.FileName),
+            ("Title", p.Title),
+            ("Author", p.Author),
+            ("Subject", p.Subject),
+            ("Keywords", p.Keywords),
+            ("Pages", p.PageCount.ToString()),
+            ("Page size", p.PageSize),
+            ("Size", Fmt(p.SizeBytes)),
+            ("Created", p.Created),
+            ("Modified", p.Modified),
+            ("Producer", p.Producer),
+            ("Creator", p.Creator),
+            ("Encrypted", p.Encrypted ? (p.Encryption ?? "yes") : null),
+            ("Linearized", p.Linearized ? "yes (fast web view)" : null),
+            ("XFA form", p.IsXfa ? "yes" : null),
+        };
+
+        foreach (var (label, value) in rows)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                yield return (label, value!);
+            }
+        }
+    }
+
+    private static string Fmt(long bytes)
+    {
+        if (bytes <= 0) return "0 B";
+        string[] units = { "B", "KB", "MB", "GB" };
+        double v = bytes;
+        var i = 0;
+        while (v >= 1024 && i < units.Length - 1) { v /= 1024; i++; }
+        return $"{v:0.#} {units[i]}";
+    }
+
+    private bool _showReset;
+
+    private void ConfirmReset() => _showReset = true;
+
+    private void DoReset()
+    {
+        _showReset = false;
+        _status = null;
+        _resultPath = null;
+        _imgCache.Clear();
+        BenchSvc.Reset();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        BenchSvc.Changed -= OnBenchChanged;
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("dispose");
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+        _ref?.Dispose();
+    }
+}

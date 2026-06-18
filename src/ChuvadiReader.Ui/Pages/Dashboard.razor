@@ -1,0 +1,237 @@
+@page "/"
+@implements IDisposable
+@inject NavigationManager Nav
+@inject RecentFilesService Recents
+@inject PinnedService Pins
+@inject WatchedFolderService Watched
+@inject UserProfileService Profile
+@inject IFilePicker Picker
+@inject OpenDocumentService OpenDoc
+@inject LibraryService Lib
+@inject CategoryService Categories
+
+<PageTitle>Chuvadi · Dashboard</PageTitle>
+
+<div class="dash">
+
+    <section class="greet">
+        <div class="eyebrow"><Icon Name="clock" Size="12" /> @DateTime.Now.ToString("dddd").ToLowerInvariant() · @DateTime.Now.ToString("HH:mm") · workspace ready</div>
+        <h1 class="greet-line">@Greeting@(NameSuffix) <span class="ta">வணக்கம்.</span></h1>
+        <div class="greet-blurb">@Recents.Items.Count documents in your library · @Recents.EncryptedCount encrypted · nothing leaves this device.</div>
+    </section>
+
+    <div class="grid">
+
+        <button class="tile drop" @onclick="OpenFile">
+            <Icon Name="upload" Size="28" />
+            <div class="drop-title">Drop a document, or click to fetch</div>
+            <div class="chips"><span class="chip">pdf</span><span class="chip">docx</span><span class="chip">xlsx</span></div>
+        </button>
+
+        <div class="tile">
+            <div class="tile-eye"><Icon Name="folder-search" Size="13" /> watched folder</div>
+            <div class="path">@Watched.FolderPath</div>
+            <div class="sub">@Watched.DocumentCount documents found · scanned @Relative(Watched.LastScanned)</div>
+            <div class="mini-actions">
+                <button class="mini accent">change</button>
+                <button class="mini"><Icon Name="plus" Size="11" /> add folder</button>
+            </div>
+        </div>
+
+        <div class="tile span-all">
+            <div class="tile-eye"><Icon Name="tools" Size="13" /> tools</div>
+            <div class="tools">
+                <button class="act" @onclick='() => Nav.NavigateTo("/reader")'><Icon Name="file-pdf" Size="19" /><span>Reader</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/bench")'><Icon Name="library" Size="19" /><span>Bench</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/library")'><Icon Name="library" Size="19" /><span>Library</span></button>
+                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="compress" Size="19" /><span>Compress</span></button>
+                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="redact" Size="19" /><span>Redact</span></button>
+                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="sign" Size="19" /><span>Sign</span></button>
+                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="ocr" Size="19" /><span>OCR</span></button>
+            </div>
+        </div>
+
+        <div class="tile span-all smap">
+            <div class="tile-eye"><Icon Name="grid-view" Size="13" /> storage map <span class="lib-folder">@Categories.BaseFolder</span> <span class="lib-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span></div>
+
+            <div class="smap-grid">
+                @foreach (var c in Categories.Categories)
+                {
+                    var stat = StatFor(c.Name);
+                    <button class="scat" @onclick="() => OpenCategory(c.Name)">
+                        <div class="scat-top"><span class="scat-dot" style="background:@c.Color"></span><span class="scat-name">@c.Name</span></div>
+                        <div class="scat-meta">@stat.Count doc@(stat.Count == 1 ? "" : "s") · @Size(stat.Bytes)</div>
+                        <div class="scat-bar"><div class="scat-fill" style="width:@stat.Pct%;background:@c.Color"></div></div>
+                    </button>
+                }
+            </div>
+
+            <button class="smap-open" @onclick='() => Nav.NavigateTo("/library")'>Open library <Icon Name="chevron-right" Size="13" /></button>
+        </div>
+
+        <div class="tile">
+            <div class="tile-eye"><Icon Name="pin" Size="13" /> pinned</div>
+            @foreach (var p in Pins.Items)
+            {
+                <div class="row">
+                    <span class="@(p.IsFolder ? "ic-folder" : "ic-pdf")"><Icon Name="@(p.IsFolder ? "folder" : (p.Format ?? DocumentFormat.Pdf).IconName())" Size="17" /></span>
+                    <div class="row-name">@p.Name</div>
+                    <span class="ic-pin"><Icon Name="pin" Size="12" /></span>
+                </div>
+            }
+        </div>
+
+        <div class="tile">
+            <div class="tile-eye"><Icon Name="clock" Size="13" /> recent</div>
+            @foreach (var r in Recents.Items.Take(4))
+            {
+                <button class="row" @onclick="() => Open(r)">
+                    <span class="ic-pdf"><Icon Name="@r.Format.IconName()" Size="16" /></span>
+                    <div class="row-name">@r.FileName</div>
+                    <span class="meta">
+                        @if (r.IsEncrypted)
+                        {
+                            <span class="enc"><Icon Name="lock" Size="10" /></span>
+                        }
+                        @Relative(r.LastOpened)
+                    </span>
+                </button>
+            }
+        </div>
+
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Recents.Changed += OnChanged;
+        Pins.Changed += OnChanged;
+        Watched.Changed += OnChanged;
+        Lib.Changed += OnChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Profile.HydrateAsync();
+        await Recents.HydrateAsync();
+        await Pins.HydrateAsync();
+        await Watched.HydrateAsync();
+        await Lib.HydrateAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private (int Count, long Bytes, int Pct) StatFor(string category)
+    {
+        long bytes = 0;
+        var count = 0;
+        foreach (var e in Lib.Entries)
+        {
+            if (string.Equals(e.Category, category, StringComparison.OrdinalIgnoreCase))
+            {
+                count++;
+                bytes += e.SizeBytes;
+            }
+        }
+
+        long max = 0;
+        foreach (var c in Categories.Categories)
+        {
+            long b = Lib.Entries
+                .Where(e => string.Equals(e.Category, c.Name, StringComparison.OrdinalIgnoreCase))
+                .Sum(e => e.SizeBytes);
+            if (b > max)
+            {
+                max = b;
+            }
+        }
+
+        var pct = max > 0 ? (int)Math.Round(100.0 * bytes / max) : 0;
+        return (count, bytes, count > 0 ? Math.Max(pct, 6) : 0);
+    }
+
+    private void OpenCategory(string category)
+        => Nav.NavigateTo($"/library?cat={Uri.EscapeDataString(category)}");
+
+    private static string Size(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB" };
+        double s = bytes;
+        var i = 0;
+        while (s >= 1024 && i < units.Length - 1)
+        {
+            s /= 1024;
+            i++;
+        }
+
+        return $"{s:0.#} {units[i]}";
+    }
+
+    private string Greeting
+    {
+        get
+        {
+            var h = DateTime.Now.Hour;
+            var part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+            return $"good {part}";
+        }
+    }
+
+    private string NameSuffix => string.IsNullOrWhiteSpace(Profile.Name) ? "." : $", {Profile.Name!.ToLowerInvariant()}.";
+
+    private async Task OpenFile()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        var name = System.IO.Path.GetFileName(path);
+        await Recents.TouchAsync(new RecentItem(name, path, DocumentFormatExtensions.FromPath(path), DateTimeOffset.Now, false));
+        OpenDoc.Request(path, name);
+        Nav.NavigateTo("/reader");
+    }
+
+    private void Open(RecentItem r)
+    {
+        OpenDoc.Request(r.Path, r.FileName);
+        Nav.NavigateTo("/reader");
+    }
+
+    private static string Relative(DateTimeOffset? when)
+    {
+        if (when is null)
+        {
+            return "never";
+        }
+
+        var d = DateTimeOffset.Now - when.Value;
+        if (d.TotalMinutes < 60)
+        {
+            return $"{Math.Max(1, (int)d.TotalMinutes)}m";
+        }
+
+        if (d.TotalHours < 24)
+        {
+            return $"{(int)d.TotalHours}h";
+        }
+
+        return d.TotalDays < 2 ? "yesterday" : $"{(int)d.TotalDays}d";
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Recents.Changed -= OnChanged;
+        Pins.Changed -= OnChanged;
+        Watched.Changed -= OnChanged;
+        Lib.Changed -= OnChanged;
+    }
+}

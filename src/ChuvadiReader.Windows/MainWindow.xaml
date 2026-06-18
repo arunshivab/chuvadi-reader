@@ -1,0 +1,16 @@
+<Window x:Class="ChuvadiReader.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
+        Title="Chuvadi" Width="1100" Height="720"
+        Icon="chuvadi.ico"
+        WindowStartupLocation="CenterScreen" Background="#F2EAD6">
+
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6" CornerRadius="0"
+                            GlassFrameThickness="0" UseAeroCaptionButtons="False" />
+    </shell:WindowChrome.WindowChrome>
+
+    <blazor:BlazorWebView x:Name="Web" HostPage="wwwroot/index.html" />
+</Window>

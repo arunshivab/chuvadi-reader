@@ -1,0 +1,17 @@
+@*
+    Root component. Lives in the shared UI library so every host (WPF now,
+    MAUI later) embeds the exact same <App /> with no changes.
+*@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div style="padding:2rem;font-family:var(--chvd-mono);color:var(--chvd-ink)">
+                Not here. <a href="/">Back to dashboard</a>.
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

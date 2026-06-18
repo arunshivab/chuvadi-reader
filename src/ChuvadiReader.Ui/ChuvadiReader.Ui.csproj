@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+    <!-- The Blazor framework itself — the one allowed Microsoft package. -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
+    <!-- Your icon system, consumed as a packaged distribution (manifest embedded in its dll). -->
+    <PackageReference Include="LiPicons.Blazor" Version="1.1.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,35 @@
+<Window x:Class="ChuvadiReader.Windows.SplashWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True"
+        WindowStartupLocation="CenterScreen" Width="460" Height="300">
+
+    <Border Background="#E9DFC8" CornerRadius="14" BorderBrush="#40000000" BorderThickness="1">
+        <Grid Margin="0">
+            <!-- corner registration marks -->
+            <Path Data="M0,14 L0,0 L14,0" Stroke="#8A3A1C" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Top"    Margin="14"/>
+            <Path Data="M0,0 L14,0 L14,14" Stroke="#8A3A1C" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Top"    Margin="14"/>
+            <Path Data="M0,0 L0,14 L14,14" Stroke="#8A3A1C" StrokeThickness="2" HorizontalAlignment="Left"  VerticalAlignment="Bottom" Margin="14"/>
+            <Path Data="M14,0 L14,14 L0,14" Stroke="#8A3A1C" StrokeThickness="2" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="14"/>
+
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <TextBlock HorizontalAlignment="Center" FontSize="52" FontStyle="Italic" Foreground="#1A1310"
+                           FontFamily="Instrument Serif, Georgia">
+                    <Run Text="C"/><Run Text="ச" FontStyle="Normal" Foreground="#8A3A1C" FontFamily="Tiro Tamil, Nirmala UI"/><Run Text="huvadi"/>
+                </TextBlock>
+                <TextBlock HorizontalAlignment="Center" Margin="0,12,0,0" FontSize="11" Foreground="#8C7C64"
+                           FontFamily="IBM Plex Mono, Consolas" Text="pdf · docx · xlsx workspace"/>
+                <StackPanel Margin="0,30,0,0" Width="230" HorizontalAlignment="Center">
+                    <TextBlock FontSize="11" Foreground="#5C5042" FontFamily="IBM Plex Mono, Consolas" Text="initializing workspace"/>
+                    <ProgressBar IsIndeterminate="True" Height="6" Margin="0,8,0,0"
+                                 Foreground="#8A3A1C" Background="Transparent" BorderBrush="#731A1310" BorderThickness="1"/>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,16"
+                       FontSize="10" Foreground="#807060" FontFamily="IBM Plex Mono, Consolas"
+                       Text="v1.0 · runs local · no telemetry"/>
+        </Grid>
+    </Border>
+</Window>

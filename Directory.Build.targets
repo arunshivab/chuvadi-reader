@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Force-touch (Chuvadi Reader build convenience).
+
+    Problem it solves: when a delta zip is extracted, every file carries the
+    timestamp baked into the archive — which is often OLDER than the previous
+    build's outputs. The incremental compiler then decides those files are
+    "unchanged" and skips them, so dropped-in fixes silently don't appear and a
+    full `dotnet clean` + bin/obj wipe is needed every time.
+
+    What this does: at the very start of every build, stamps each project's own
+    source and web assets with the current time, so the compiler always sees
+    them as fresh. A plain `dotnet run` now picks up extracted deltas without a
+    manual clean. (Because the UI assembly is rebuilt, its module id changes too,
+    so the WebView2 asset cache folder rotates and no stale css/js is served.)
+
+    Cost: each build recompiles the touched projects — the same work a clean did,
+    minus the manual step. Applies to every project in the solution via the
+    automatic Directory.Build.targets import.
+  -->
+  <Target Name="ChvdForceTouchAssets" BeforeTargets="BeforeBuild;BeforeCompile">
+    <ItemGroup>
+      <ChvdTouchFiles Include="$(MSBuildProjectDirectory)/**/*.cs;
+                               $(MSBuildProjectDirectory)/**/*.razor;
+                               $(MSBuildProjectDirectory)/**/*.razor.css;
+                               $(MSBuildProjectDirectory)/**/*.css;
+                               $(MSBuildProjectDirectory)/**/*.js;
+                               $(MSBuildProjectDirectory)/**/*.html;
+                               $(MSBuildProjectDirectory)/**/*.xaml"
+                      Exclude="$(MSBuildProjectDirectory)/obj/**;$(MSBuildProjectDirectory)/bin/**" />
+    </ItemGroup>
+    <Touch Files="@(ChvdTouchFiles)"
+           AlwaysCreate="false"
+           Condition="'@(ChvdTouchFiles)' != ''" />
+  </Target>
+</Project>

@@ -1,0 +1,273 @@
+@page "/split"
+@inject IFilePicker Picker
+@inject PdfToolsService Tools
+@inject TabsService Tabs
+@inject OpenDocumentService OpenDoc
+@inject NavigationManager Nav
+@inject IAppStorage Storage
+
+<PageTitle>Chuvadi · Split</PageTitle>
+
+<div class="tool">
+    <header class="tool-head">
+        <a class="tool-back" href="/"><Icon Name="chevron-left" Size="14" /> dashboard</a>
+        <h1 class="tool-title"><Icon Name="split" Size="22" /> Split</h1>
+        <p class="tool-sub">Break a PDF into separate files, or pull out a page range.</p>
+    </header>
+
+    @if (_sourcePath is null)
+    {
+        <div class="tool-actions">
+            @if (Tabs.Active is { Session: not null } cur)
+            {
+                <button class="tbtn" @onclick="UseCurrent"><Icon Name="file-pdf" Size="15" /> Use current: @cur.FileName</button>
+            }
+            <button class="tbtn" @onclick="ChooseFile"><Icon Name="upload" Size="15" /> Choose file…</button>
+        </div>
+        <div class="tool-empty">Choose a PDF to split.</div>
+    }
+    else
+    {
+        <div class="ssource">
+            <Icon Name="file-pdf" Size="16" />
+            <span class="ssource-name" title="@_sourcePath">@_sourceName</span>
+            <span class="ssource-pages">@_pageCount pages</span>
+            <button class="slink" @onclick="ClearSource">change</button>
+        </div>
+
+        <div class="smodes">
+            <label class="smode @(_mode == 0 ? "on" : null)">
+                <input type="radio" name="splitmode" checked="@(_mode == 0)" @onchange="@(() => SetMode(0))" />
+                <span class="smode-t">Every page → separate files</span>
+                <span class="smode-d">Writes one PDF per page into a folder you choose.</span>
+            </label>
+            <label class="smode @(_mode == 1 ? "on" : null)">
+                <input type="radio" name="splitmode" checked="@(_mode == 1)" @onchange="@(() => SetMode(1))" />
+                <span class="smode-t">Extract a page range</span>
+                <span class="smode-d">Saves a single PDF containing the pages you pick.</span>
+            </label>
+        </div>
+
+        @if (_mode == 1)
+        {
+            <div class="srange">
+                <span>Pages</span>
+                @if (_stepper == StepperStyle.Chevrons)
+                {
+                    <span class="snum-chevwrap">
+                        <input class="snum snum-chevin" type="number" min="1" max="@_pageCount" @bind="_from" />
+                        <span class="snum-chevs">
+                            <button class="snum-chev" @onclick="() => StepFrom(1)" aria-label="increase from"><Icon Name="chevron-up" Size="11" /></button>
+                            <button class="snum-chev" @onclick="() => StepFrom(-1)" aria-label="decrease from"><Icon Name="chevron-down" Size="11" /></button>
+                        </span>
+                    </span>
+                    <span>to</span>
+                    <span class="snum-chevwrap">
+                        <input class="snum snum-chevin" type="number" min="1" max="@_pageCount" @bind="_to" />
+                        <span class="snum-chevs">
+                            <button class="snum-chev" @onclick="() => StepTo(1)" aria-label="increase to"><Icon Name="chevron-up" Size="11" /></button>
+                            <button class="snum-chev" @onclick="() => StepTo(-1)" aria-label="decrease to"><Icon Name="chevron-down" Size="11" /></button>
+                        </span>
+                    </span>
+                }
+                else
+                {
+                    <span class="snum-grp">
+                        <button class="snum-step" @onclick="() => StepFrom(-1)" aria-label="decrease from"><Icon Name="minus" Size="13" /></button>
+                        <input class="snum" type="number" min="1" max="@_pageCount" @bind="_from" />
+                        <button class="snum-step" @onclick="() => StepFrom(1)" aria-label="increase from"><Icon Name="plus" Size="13" /></button>
+                    </span>
+                    <span>to</span>
+                    <span class="snum-grp">
+                        <button class="snum-step" @onclick="() => StepTo(-1)" aria-label="decrease to"><Icon Name="minus" Size="13" /></button>
+                        <input class="snum" type="number" min="1" max="@_pageCount" @bind="_to" />
+                        <button class="snum-step" @onclick="() => StepTo(1)" aria-label="increase to"><Icon Name="plus" Size="13" /></button>
+                    </span>
+                }
+                <span class="srange-of">of @_pageCount</span>
+            </div>
+        }
+
+        <div class="tool-run">
+            <button class="tbtn tbtn-go" @onclick="RunSplit" disabled="@_busy">
+                @(_busy ? "Working…" : (_mode == 0 ? "Split to folder" : "Extract range"))
+            </button>
+            @if (_resultPath is not null && !_error)
+            {
+                <button class="tbtn" @onclick="OpenResult"><Icon Name="file-pdf" Size="14" /> Open result</button>
+            }
+            @if (_status is not null)
+            {
+                <span class="tool-status @(_error ? "err" : "ok")">@_status</span>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private enum StepperStyle { Buttons, Chevrons }
+
+    private string? _sourcePath;
+    private string? _sourceName;
+    private int _pageCount;
+    private int _mode;            // 0 = every page, 1 = range
+    private int _from = 1;
+    private int _to = 1;
+    private StepperStyle _stepper = StepperStyle.Buttons;
+    private bool _busy;
+    private bool _error;
+    private string? _status;
+    private string? _resultPath;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var pref = await Storage.GetAsync("page-stepper");
+        _stepper = string.Equals(pref, "chevrons", StringComparison.OrdinalIgnoreCase)
+            ? StepperStyle.Chevrons
+            : StepperStyle.Buttons;
+    }
+
+    private void StepFrom(int delta) => _from = Math.Clamp(_from + delta, 1, Math.Max(1, _pageCount));
+
+    private void StepTo(int delta) => _to = Math.Clamp(_to + delta, 1, Math.Max(1, _pageCount));
+
+    private void UseCurrent()
+    {
+        var t = Tabs.Active;
+        if (t?.Session is null)
+        {
+            return;
+        }
+
+        _sourcePath = t.Path;
+        _sourceName = t.FileName;
+        _pageCount = t.Session.Document.PageCount;
+        _from = 1;
+        _to = _pageCount;
+        ResetStatus();
+    }
+
+    private async Task ChooseFile()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        _sourcePath = path;
+        _sourceName = System.IO.Path.GetFileName(path);
+        try
+        {
+            _pageCount = await Tools.GetPageCountAsync(path);
+        }
+        catch (Exception ex)
+        {
+            _sourcePath = null;
+            _error = true;
+            _status = $"Couldn't open that PDF: {ex.Message}";
+            return;
+        }
+
+        _from = 1;
+        _to = _pageCount;
+        ResetStatus();
+    }
+
+    private void ClearSource()
+    {
+        _sourcePath = null;
+        _sourceName = null;
+        _pageCount = 0;
+        ResetStatus();
+    }
+
+    private void SetMode(int mode)
+    {
+        _mode = mode;
+        ResetStatus();
+    }
+
+    private async Task RunSplit()
+    {
+        if (_sourcePath is null)
+        {
+            return;
+        }
+
+        if (_mode == 0)
+        {
+            var dir = await Picker.PickFolderAsync();
+            if (string.IsNullOrEmpty(dir))
+            {
+                return;
+            }
+
+            _busy = true;
+            ResetStatus();
+            StateHasChanged();
+            try
+            {
+                var n = await Tools.SplitToFolderAsync(_sourcePath, dir);
+                _status = $"Wrote {n} files to {dir}.";
+            }
+            catch (Exception ex)
+            {
+                _error = true;
+                _status = $"Split failed: {ex.Message}";
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
+        else
+        {
+            var from = Math.Clamp(_from, 1, _pageCount);
+            var to = Math.Clamp(_to, from, _pageCount);
+            var suggested = $"{System.IO.Path.GetFileNameWithoutExtension(_sourcePath)}_p{from}-{to}.pdf";
+            var outPath = await Picker.PickSavePdfAsync(suggested);
+            if (string.IsNullOrEmpty(outPath))
+            {
+                return;
+            }
+
+            _busy = true;
+            ResetStatus();
+            StateHasChanged();
+            try
+            {
+                await Tools.ExtractRangeAsync(_sourcePath, outPath, from - 1, to - from + 1);
+                _resultPath = outPath;
+                _status = $"Saved pages {from}–{to} to {System.IO.Path.GetFileName(outPath)}.";
+            }
+            catch (Exception ex)
+            {
+                _error = true;
+                _status = $"Extract failed: {ex.Message}";
+            }
+            finally
+            {
+                _busy = false;
+            }
+        }
+    }
+
+    private void OpenResult()
+    {
+        if (_resultPath is null)
+        {
+            return;
+        }
+
+        OpenDoc.Request(_resultPath, System.IO.Path.GetFileName(_resultPath));
+        Nav.NavigateTo("/reader");
+    }
+
+    private void ResetStatus()
+    {
+        _status = null;
+        _resultPath = null;
+        _error = false;
+    }
+}
