@@ -1,0 +1,479 @@
+@page "/redact"
+@implements IAsyncDisposable
+@inject IPdfReader PdfReader
+@inject IFilePicker Picker
+@inject RedactService RedactSvc
+@inject RedactRequestService Handoff
+@inject OpenDocumentService OpenDoc
+@inject RecentFilesService Recents
+@inject NavigationManager Nav
+@inject IEntitlements Entitlements
+@inject IJSRuntime JS
+
+<div class="redact-root">
+    @* ── Top bar ─────────────────────────────────────────────────────────── *@
+    <div class="rd-top">
+        <div class="rd-title">
+            <Icon Name="redact" Size="18" />
+            <span class="rd-title-t">Redact</span>
+            @if (_session is not null)
+            {
+                <span class="rd-doc" title="@_name">@_name</span>
+            }
+        </div>
+
+        @if (_session is not null)
+        {
+            <div class="rd-nav">
+                <button class="ricon" @onclick="() => GoTo(_curPage - 1)" disabled="@(_curPage <= 1)" aria-label="Previous page"><Icon Name="chevron-left" Size="16" /></button>
+                <span class="rd-pagenav">
+                    <input class="rd-pagebox" value="@_pageInput" @onchange="OnJumpChange" inputmode="numeric" aria-label="Page number" />
+                    <span class="rd-pagetotal">/ @_session.Document.PageCount</span>
+                </span>
+                <button class="ricon" @onclick="() => GoTo(_curPage + 1)" disabled="@(_curPage >= _session.Document.PageCount)" aria-label="Next page"><Icon Name="chevron-right" Size="16" /></button>
+                <span class="rd-sep"></span>
+                <button class="ricon" @onclick="ZoomOut" disabled="@(_zoom <= 0.3)" aria-label="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
+                <span class="rd-zoom">@((_zoom * 100).ToString("0"))%</span>
+                <button class="ricon" @onclick="ZoomIn" disabled="@(_zoom >= 4.0)" aria-label="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
+                <span class="rd-sep"></span>
+                <button class="vbtn" @onclick="Fetch" title="Open another document"><Icon Name="folder-search" Size="16" /> Fetch…</button>
+            </div>
+        }
+    </div>
+
+    @* ── Redaction rail ──────────────────────────────────────────────────── *@
+    @if (_session is not null)
+    {
+        <div class="rd-rail">
+            <span class="rd-hint">Drag on a page to draw a redaction box.</span>
+            <span class="rd-colour">
+                <span class="rd-colour-lbl">Colour</span>
+                @foreach (var (cname, chex) in _colorPresets)
+                {
+                    <button class="rd-swatch @(string.Equals(_color, chex, StringComparison.OrdinalIgnoreCase) ? "on" : null)"
+                            style="background:@chex" title="@cname" @onclick="() => _color = chex"></button>
+                }
+                <label class="rd-swatch custom @(IsCustomColor ? "on" : null)" title="Custom" style="background:@(IsCustomColor ? _color : "transparent")">
+                    <input type="color" value="@_color" @onchange="OnCustomColor" />
+                    @if (!IsCustomColor)
+                    {
+                        <Icon Name="edit" Size="11" />
+                    }
+                </label>
+            </span>
+
+            <span class="rd-spacer"></span>
+
+            @if (_tagged && RedactionCount > 0)
+            {
+                <span class="rd-warn"><Icon Name="warning" Size="13" /> Tagged PDF — redaction can't be removed yet; save will be blocked.</span>
+            }
+            @if (_status is not null)
+            {
+                <span class="rd-status @(_statusErr ? "err" : null)">@_status</span>
+                @if (_savedPath is not null)
+                {
+                    <button class="rd-open" @onclick="OpenInReader">Open in Reader</button>
+                }
+            }
+            <span class="rd-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s")</span>
+            <button class="rd-btn" @onclick="ClearAll" disabled="@(RedactionCount == 0 || _saving)">Clear</button>
+            <button class="rd-btn primary" @onclick="Save" disabled="@(RedactionCount == 0 || _saving)" title="Redaction always saves to a new file">@(_saving ? "Saving…" : "Save redacted PDF →")</button>
+        </div>
+    }
+
+    @* ── Canvas / states ─────────────────────────────────────────────────── *@
+    @if (_session is null && !_loading && _error is null)
+    {
+        <div class="rd-empty">
+            <Icon Name="redact" Size="40" />
+            <div class="rd-empty-t">Send a document here to redact it</div>
+            <div class="rd-empty-sub">Redaction permanently removes the content under each box and always writes a new file.</div>
+            <button class="rd-empty-btn" @onclick="Fetch">Fetch a document…</button>
+        </div>
+    }
+    else if (_loading)
+    {
+        <div class="rd-empty">
+            <div class="rd-load-icon"><Icon Name="redact" Size="40" /></div>
+            <div class="rd-empty-t">Opening @_name…</div>
+        </div>
+    }
+    else if (_error is not null)
+    {
+        <div class="rd-empty">
+            <Icon Name="warning" Size="40" />
+            <div class="rd-empty-t">@_error</div>
+            <button class="rd-empty-btn" @onclick="Fetch">Fetch a document…</button>
+        </div>
+    }
+    else if (_session is not null)
+    {
+        var session = _session;
+        <div class="rd-desk" style="--rpage-zoom:@_zoom" tabindex="-1" @ref="_desk">
+            @foreach (var n in _pages)
+            {
+                <div class="rpage-wrap" data-page="@n" @key="n">
+                    <div class="rpage">
+                        @if (session.TryGetRenderedSvg(n, out var svg))
+                        {
+                            <PageSvg Svg="@svg" Rotation="0" />
+                        }
+                        else
+                        {
+                            <div class="rpage-load">page @(n + 1)</div>
+                        }
+                        <div class="mk-layer drawmode" data-page="@n"
+                             @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
+                            @if (_redactions.TryGetValue(n, out var boxes))
+                            {
+                                @for (var i = 0; i < boxes.Count; i++)
+                                {
+                                    var bi = i;
+                                    var b = boxes[bi];
+                                    <div class="mk-box" style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);background:@BoxFill(0.82)">
+                                        <button class="mk-box-x" @onclick="() => RemoveBox(n, bi)" @onpointerdown:stopPropagation="true" title="Remove">&times;</button>
+                                    </div>
+                                }
+                            }
+                            @if (_draft is { } dr && _draftPage == n)
+                            {
+                                <div class="mk-box draft" style="left:@Pct(dr.X);top:@Pct(dr.Y);width:@Pct(dr.W);height:@Pct(dr.H);background:@BoxFill(0.45)"></div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IPdfSession? _session;
+    private string? _path;
+    private string? _name;
+    private bool _loading;
+    private string? _error;
+
+    private List<int> _pages = new();
+    private ElementReference _desk;
+    private IJSObjectReference? _js;
+    private DotNetObjectReference<Redact>? _ref;
+    private bool _observed;
+
+    private int _curPage = 1;
+    private string _pageInput = "1";
+    private double _zoom = 1.0;
+
+    private readonly Dictionary<int, List<NormBox>> _redactions = new();
+    private readonly HashSet<int> _rendering = new();
+
+    private string _color = "#000000";
+    private static readonly (string Name, string Hex)[] _colorPresets =
+        new[] { ("Black", "#000000"), ("White", "#FFFFFF") };
+    private bool IsCustomColor => !_colorPresets.Any(p => string.Equals(p.Hex, _color, StringComparison.OrdinalIgnoreCase));
+    private void OnCustomColor(ChangeEventArgs e) => _color = e.Value?.ToString() ?? "#000000";
+
+    private enum DrawState { None, Draw }
+    private DrawState _drawState = DrawState.None;
+    private int _draftPage = -1;
+    private NormBox? _draft;
+    private double _startX, _startY;
+    private (double L, double T, double W, double H) _layerRect;
+
+    private bool _saving;
+    private string? _status;
+    private bool _statusErr;
+    private string? _savedPath;
+    private bool _tagged;
+
+    private int RedactionCount => _redactions.Values.Sum(v => v.Count);
+
+    private static string Pct(double f) =>
+        (f * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
+    private static double Clamp01(double v) => v < 0 ? 0 : v > 1 ? 1 : v;
+
+    private string BoxFill(double alpha)
+    {
+        var h = _color.TrimStart('#');
+        if (h.Length != 6) return $"rgba(10,10,10,{alpha.ToString(System.Globalization.CultureInfo.InvariantCulture)})";
+        int r = Convert.ToInt32(h.Substring(0, 2), 16);
+        int g = Convert.ToInt32(h.Substring(2, 2), 16);
+        int b = Convert.ToInt32(h.Substring(4, 2), 16);
+        var a = alpha.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return $"rgba({r},{g},{b},{a})";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Entitlement guard: Redact may be Enterprise-gated later. Today CanRedact is true.
+        if (!Entitlements.CanRedact)
+        {
+            Nav.NavigateTo("/", replace: true);
+            return;
+        }
+
+        // Receive a document sent from the Reader, if any.
+        if (!string.IsNullOrEmpty(Handoff.PendingPath))
+        {
+            var path = Handoff.PendingPath!;
+            var name = Handoff.PendingName ?? System.IO.Path.GetFileName(path);
+            Handoff.Clear();
+            await OpenAsync(path, name);
+        }
+    }
+
+    private async Task Fetch()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path)) return;
+        await OpenAsync(path, System.IO.Path.GetFileName(path));
+    }
+
+    private async Task OpenAsync(string path, string name)
+    {
+        _loading = true; _error = null; _status = null; _savedPath = null; _statusErr = false;
+        _session?.Dispose();
+        _session = null;
+        _redactions.Clear();
+        _rendering.Clear();
+        _observed = false;
+        StateHasChanged();
+
+        try
+        {
+            var session = await PdfReader.OpenAsync(path, name, null, default, transparentBackground: true);
+            _session = session;
+            _path = path;
+            _name = name;
+            _pages = session.Document.PageCount > 0
+                ? Enumerable.Range(0, session.Document.PageCount).ToList()
+                : new();
+            _curPage = 1; _pageInput = "1";
+            _tagged = await Task.Run(() => RedactSvc.IsTagged(path));
+
+            var format = DocumentFormatExtensions.FromPath(path);
+            await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, session.Document.IsEncrypted));
+        }
+        catch (Exception ex)
+        {
+            _error = $"Couldn't open {name}: {ex.Message}";
+            _session = null;
+        }
+        finally
+        {
+            _loading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_session is null) return;
+
+        if (_js is null)
+        {
+            try
+            {
+                _js = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/redact.js");
+                _ref = DotNetObjectReference.Create(this);
+            }
+            catch { return; }
+        }
+
+        if (!_observed && _pages.Count > 0)
+        {
+            _observed = true;
+            try
+            {
+                await _js.InvokeVoidAsync("init", _desk, _ref);
+            }
+            catch { }
+        }
+        else if (_js is not null && _pages.Count > 0)
+        {
+            // Re-observe in case the page list changed (new document opened).
+            try { await _js.InvokeVoidAsync("observe"); } catch { }
+        }
+    }
+
+    // ── Lazy render ─────────────────────────────────────────────────────────
+    [JSInvokable]
+    public Task RenderPage(int n)
+    {
+        EnsureRendered(n);
+        return Task.CompletedTask;
+    }
+
+    [JSInvokable]
+    public Task OnPageVisible(int page)
+    {
+        if (page >= 1 && page != _curPage)
+        {
+            _curPage = page;
+            _pageInput = page.ToString();
+            InvokeAsync(StateHasChanged);
+        }
+        return Task.CompletedTask;
+    }
+
+    private void EnsureRendered(int n)
+    {
+        var session = _session;
+        if (session is null || session.TryGetRenderedSvg(n, out _) || !_rendering.Add(n)) return;
+        _ = RenderOneAsync(session, n);
+    }
+
+    private async Task RenderOneAsync(IPdfSession session, int n)
+    {
+        try { await session.RenderPageSvgAsync(n); }
+        catch { }
+        finally { await InvokeAsync(StateHasChanged); }
+    }
+
+    // ── Navigation / zoom ───────────────────────────────────────────────────
+    private async Task GoTo(int page)
+    {
+        if (_session is null) return;
+        page = Math.Clamp(page, 1, _session.Document.PageCount);
+        _curPage = page; _pageInput = page.ToString();
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("scrollToPage", page - 1); } catch { }
+        }
+    }
+
+    private async Task OnJumpChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var p)) await GoTo(p);
+        else _pageInput = _curPage.ToString();
+    }
+
+    private void ZoomIn() => _zoom = Math.Min(4.0, Math.Round((_zoom + 0.1) * 10) / 10);
+    private void ZoomOut() => _zoom = Math.Max(0.3, Math.Round((_zoom - 0.1) * 10) / 10);
+
+    // ── Redaction drawing ───────────────────────────────────────────────────
+    private async Task<bool> CacheLayerRect(int page)
+    {
+        try
+        {
+            var r = await JS.InvokeAsync<MkRect?>("chuvadiRedactMkRect", page);
+            if (r is null) return false;
+            _layerRect = (r.left, r.top, r.width, r.height);
+            return _layerRect.W > 0 && _layerRect.H > 0;
+        }
+        catch { return false; }
+    }
+
+    private async Task MkDown(PointerEventArgs e, int page)
+    {
+        if (_session is null || e.Button != 0) return;
+        if (!await CacheLayerRect(page)) return;
+
+        _startX = Clamp01((e.ClientX - _layerRect.L) / _layerRect.W);
+        _startY = Clamp01((e.ClientY - _layerRect.T) / _layerRect.H);
+        _status = null; _savedPath = null;
+        _drawState = DrawState.Draw;
+        _draftPage = page;
+        _draft = new NormBox(_startX, _startY, 0, 0);
+    }
+
+    private void MkMove(PointerEventArgs e)
+    {
+        if (_drawState != DrawState.Draw) return;
+        var cx = Clamp01((e.ClientX - _layerRect.L) / _layerRect.W);
+        var cy = Clamp01((e.ClientY - _layerRect.T) / _layerRect.H);
+        _draft = new NormBox(Math.Min(_startX, cx), Math.Min(_startY, cy),
+                             Math.Abs(cx - _startX), Math.Abs(cy - _startY));
+    }
+
+    private void MkUp(PointerEventArgs e)
+    {
+        if (_drawState == DrawState.Draw && _draft is { } rd && rd.W > 0.005 && rd.H > 0.005)
+        {
+            if (!_redactions.TryGetValue(_draftPage, out var list))
+            {
+                list = new List<NormBox>();
+                _redactions[_draftPage] = list;
+            }
+            list.Add(rd);
+        }
+        _drawState = DrawState.None;
+        _draft = null;
+        _draftPage = -1;
+    }
+
+    private void RemoveBox(int page, int index)
+    {
+        if (_redactions.TryGetValue(page, out var list) && index >= 0 && index < list.Count)
+        {
+            list.RemoveAt(index);
+            if (list.Count == 0) _redactions.Remove(page);
+        }
+        _status = null; _savedPath = null;
+    }
+
+    private void ClearAll()
+    {
+        _redactions.Clear();
+        _status = null; _savedPath = null;
+    }
+
+    // ── Save ────────────────────────────────────────────────────────────────
+    private async Task Save()
+    {
+        if (_path is null || RedactionCount == 0) return;
+
+        var suggested = System.IO.Path.GetFileNameWithoutExtension(_path) + "-redacted.pdf";
+        var output = await Picker.PickSavePdfAsync(suggested);
+        if (string.IsNullOrWhiteSpace(output)) return;
+
+        _saving = true; _status = null; _savedPath = null; _statusErr = false;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            var pages = _redactions
+                .Where(kv => kv.Value.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => new PageRedaction(0, kv.Value.ToList()));
+
+            await RedactSvc.RedactToFileAsync(_path, output!, pages, _color);
+            _savedPath = output;
+            _status = $"Saved → {System.IO.Path.GetFileName(output)}";
+            _statusErr = false;
+        }
+        catch (Exception ex)
+        {
+            _status = ex.Message;
+            _statusErr = true;
+        }
+        finally
+        {
+            _saving = false;
+            StateHasChanged();
+        }
+    }
+
+    private void OpenInReader()
+    {
+        if (_savedPath is null) return;
+        OpenDoc.Request(_savedPath, System.IO.Path.GetFileName(_savedPath));
+        Nav.NavigateTo("/reader");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_js is not null) await _js.InvokeVoidAsync("dispose"); } catch { }
+        try { if (_js is not null) await _js.DisposeAsync(); } catch { }
+        _ref?.Dispose();
+        _session?.Dispose();
+    }
+
+    private sealed class MkRect
+    {
+        public double left { get; set; }
+        public double top { get; set; }
+        public double width { get; set; }
+        public double height { get; set; }
+    }
+}

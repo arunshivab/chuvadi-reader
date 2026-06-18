@@ -229,6 +229,28 @@ A tagged-PDF redaction-block test is intentionally **not** included yet: it need
 and authored PDFs are untagged. Add it with a small committed fixture (or a library tagging API)
 when convenient.
 
+## 5c. Redact destination (shipped) + Redact features (next)
+
+**Shipped (relocation delta).** Redaction is now its own top-level sidebar destination (`/redact`,
+peer of Reader/Bench) rather than a Reader markup tool. It opens its own session via `IPdfReader`,
+renders pages **lazily** (IntersectionObserver — redaction docs are routinely 500+ pages), and
+reuses `RedactService` for the save. Two entry routes: a Fetch… picker inside Redact, and a
+**Send to Redact** action in the Reader. The inline Redact tool was removed from the Reader's markup
+toolbar (markup is now overlay-only: Text/Image/Shapes). A capability seam — `IEntitlements.CanRedact`
+(`DefaultEntitlements` returns true) — gates the rail item, the route, and the Send button, so Redact
+can later become Enterprise-only by swapping one implementation. It is plumbing, not enforcement.
+
+> Cleanup note: a few now-unreachable redaction members remain inert in `Reader.razor`
+> (`_redactions`, `RedactionCount`→0, `BoxFill`, `RemoveBox`, `CheckTaggedAsync`) to keep the v40
+> overlay save-path untouched. Safe to delete in a later tidy pass with the tests guarding it.
+
+**Next (Redact features delta).** Build on the destination:
+- **Find-text-and-redact** — *headline item.* Type a name/account number, redact every occurrence
+  across all pages. The destination already leaves a seam for a redaction-marks model to receive
+  matches, and the page-jump/lazy-render supports landing on far pages.
+- Whole-page redaction; a redaction-marks list/panel (review before applying); redact-by-area
+  repeated across pages.
+
 ## 6. How this list is maintained
 
 When an item ships, move it out of this file and add a line to the version history in

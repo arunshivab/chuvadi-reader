@@ -10,6 +10,7 @@
 @inject IFilePicker Picker
 @inject RecentFilesService Recents
 @inject OpenDocumentService OpenDoc
+@inject IEntitlements Entitlements
 
 @*
     The persistent app shell: a window title bar (always present, with drag,
@@ -72,6 +73,10 @@
             <NavLink class="rail-tab" href="/" Match="NavLinkMatch.All" title="Home"><Icon Name="home" Size="24" /><span class="rail-label">Home</span></NavLink>
             <NavLink class="rail-tab" href="/reader" title="Reader"><Icon Name="reader" Size="24" /><span class="rail-label">Reader</span></NavLink>
             <NavLink class="rail-tab" href="/bench" title="Bench"><Icon Name="grid-view" Size="24" /><span class="rail-label">Bench</span></NavLink>
+            @if (Entitlements.CanRedact)
+            {
+                <NavLink class="rail-tab" href="/redact" title="Redact"><Icon Name="redact" Size="24" /><span class="rail-label">Redact</span></NavLink>
+            }
             <NavLink class="rail-tab" href="/library" title="Library"><Icon Name="library" Size="24" /><span class="rail-label">Library</span></NavLink>
             <div class="rail-spacer"></div>
             <div class="rail-divider"></div>
