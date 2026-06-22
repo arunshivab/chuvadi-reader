@@ -82,3 +82,16 @@ window.chuvadiRedactMkRect = function (page) {
     const r = el.getBoundingClientRect();
     return { left: r.left, top: r.top, width: r.width, height: r.height };
 };
+
+// Auto-paste source: the current on-page text selection, falling back to the clipboard.
+// Used to pre-fill the Find box when it's focused and empty.
+export async function selectedText() {
+    try {
+        const sel = window.getSelection ? String(window.getSelection()).trim() : '';
+        if (sel) return sel;
+    } catch (e) { }
+    // No clipboard fallback: navigator.clipboard.readText() triggers a WebView2
+    // "allow clipboard" permission prompt, which Adobe/WPS never do. Auto-paste
+    // is limited to the current on-page selection.
+    return '';
+}

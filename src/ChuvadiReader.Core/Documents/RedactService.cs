@@ -3,6 +3,7 @@ using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Graphics;
 using Chuvadi.Pdf.Operations;
 using Chuvadi.Pdf.Redaction;
+using Chuvadi.Pdf.Rendering.DisplayList;
 using Chuvadi.Pdf.Text;
 
 namespace ChuvadiReader.Core.Documents;
@@ -130,7 +131,7 @@ public sealed class RedactService
             if (hasRedactions)
             {
                 using var doc = PdfDocument.Open(new MemoryStream(current, writable: false));
-                var opts = new RedactionOptions { OverlayColor = ParseColor(overlayHex) };
+                var opts = new RedactionOptions { DrawOverlay = true, OverlayColor = ParseColor(overlayHex) };
 
                 foreach (var (pageIndex, page) in redactions)
                 {
@@ -140,9 +141,12 @@ public sealed class RedactService
                     var rects = new List<RectangleF>();
                     foreach (var box in page.Boxes)
                     {
-                        var bounds = MapToPdf(box, rot, pdfPage.Width, pdfPage.Height);
-                        rects.Add(bounds);
-                        opts.Rectangles.Add(new RedactionRect(pageIndex, bounds));
+                        // chuvadi-pdf 3.14.1: RedactionRect.Bounds is BOTTOM-LEFT / y-up — the same
+                        // frame the verify guard uses to compare against TextExtractor fragments — so
+                        // the apply rect and the verify rect are now one and the same.
+                        var r = MapToPdf(box, rot, pdfPage.Width, pdfPage.Height);
+                        opts.Rectangles.Add(new RedactionRect(pageIndex, r));
+                        rects.Add(r);
                     }
                     mappedRects[pageIndex] = rects;
                 }
@@ -212,7 +216,7 @@ public sealed class RedactService
         double w = pdfPage.Width, h = pdfPage.Height;
         var rot = NormalizeRotation(pdfPage.Rotate + viewRotation);
 
-        // Box rect in content space (bottom-left origin), mapped through page rotation.
+        // Box rect in y-up content space — used as the rotation centre for the stamp transform.
         var rect = MapToPdf(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
 
         var overlay = PdfDocumentBuilder.Create();
@@ -221,7 +225,10 @@ public sealed class RedactService
         var color = SafeColor(item.ColorHex);
         var align = ParseAlign(item.Align);
         var lineHeight = item.LineHeight <= 0 ? 1.2 : item.LineHeight;
-        double yTop = rect.Y + rect.Height; // DrawTextBlock takes the top edge (y-up page)
+        // DrawTextBlock uses the same TOP-LEFT / y-down frame as the other authoring primitives:
+        // its y is the block's TOP edge measured from the page top. Passing the y-up top edge
+        // (rect.Y + rect.Height) vertically MIRRORS the text, so convert to the top-down top edge.
+        double yTop = h - (rect.Y + rect.Height);
 
         pb.DrawTextBlock(item.Text, rect.X, yTop, rect.Width, rect.Height, font, item.FontSizePt, color, align, lineHeight);
 
@@ -336,6 +343,187 @@ public sealed class RedactService
         {
             return false;
         }
+    }
+
+    // ── Find &amp; redact ──────────────────────────────────────────────────────
+
+    /// <summary>One text match: the page it is on (0-based), its box(es) in normalised
+    /// top-left page fractions (ready for the overlay layer and for redaction), and a short
+    /// context snippet for the matches list.</summary>
+    public sealed record RedactSearchMatch(int PageIndex, IReadOnlyList<NormBox> Boxes, string Snippet);
+
+    /// <summary>Built-in regex preset groups (financial / medical / general PII), sourced from
+    /// the library's <see cref="CommonPatterns"/>. A seam for a future library-side expansion —
+    /// see ROADMAP "Ask B". Custom user regex is passed separately.</summary>
+    public static IReadOnlyDictionary<string, IReadOnlyList<string>> PatternPresets { get; } =
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Financial"] = new[] { CommonPatterns.CreditCard, CommonPatterns.UsSsn, CommonPatterns.UsZip },
+            ["Medical"] = new[] { CommonPatterns.Icd10Prefix, CommonPatterns.UkNhsNumber },
+            ["PII"] = new[] { CommonPatterns.Email, CommonPatterns.UsPhone, CommonPatterns.IsoDate },
+        };
+
+    /// <summary>Plain-text search across the document, mirroring the standard find options.
+    /// Page range is 0-based and inclusive; pass null for the whole document.</summary>
+    public async Task<IReadOnlyList<RedactSearchMatch>> SearchAsync(
+        string sourcePath, string query,
+        bool caseSensitive, bool wholeWord,
+        int? pageStart = null, int? pageEnd = null,
+        CancellationToken ct = default)
+    {
+        var results = new List<RedactSearchMatch>();
+        if (string.IsNullOrEmpty(query)) return results;
+
+        using var doc = PdfDocument.Open(sourcePath);
+        var opts = new SearchOptions
+        {
+            CaseSensitive = caseSensitive,
+            WholeWord = wholeWord,
+            PageRangeStart = pageStart,
+            PageRangeEnd = pageEnd,
+        };
+
+        var pageTextCache = new Dictionary<int, string>();
+        TextExtractor? extractor = null;
+
+        await foreach (var m in DocumentSearch.SearchAsync(doc, query, opts, ct).WithCancellation(ct))
+        {
+            if (m.PageNumber < 0 || m.PageNumber >= doc.PageCount) continue;
+            var page = doc.Pages[m.PageNumber];
+            double w = page.Width, h = page.Height;
+            if (w <= 0 || h <= 0) continue;
+
+            var boxes = new List<NormBox>(m.BoundingBoxes.Count);
+            foreach (var r in m.BoundingBoxes)
+            {
+                // Search boxes are in PDF user space (bottom-left origin, y UP). Convert to the
+                // app's normalised top-left / y-DOWN fractions used by the overlay layer and by
+                // MapToPdf for redaction.
+                double nx = r.X / w;
+                double ny = (h - (r.Y + r.Height)) / h;
+                boxes.Add(new NormBox(nx, ny, r.Width / w, r.Height / h));
+            }
+            if (boxes.Count == 0) continue;
+
+            // Build a short context snippet around the match offset.
+            if (!pageTextCache.TryGetValue(m.PageNumber, out var text))
+            {
+                extractor ??= new TextExtractor(doc.Objects, ExtractionStrategy.Layout);
+                try { text = extractor.ExtractText(page) ?? string.Empty; }
+                catch { text = string.Empty; }
+                pageTextCache[m.PageNumber] = text;
+            }
+            results.Add(new RedactSearchMatch(m.PageNumber, boxes, MakeSnippet(text, m.CharacterOffset, m.Length, query)));
+        }
+
+        return results;
+    }
+
+    private static string MakeSnippet(string text, int offset, int length, string fallback)
+    {
+        if (string.IsNullOrEmpty(text) || offset < 0 || offset >= text.Length) return fallback;
+        int len = Math.Max(1, Math.Min(length, text.Length - offset));
+        const int ctx = 24;
+        int start = Math.Max(0, offset - ctx);
+        int end = Math.Min(text.Length, offset + len + ctx);
+        var snippet = text.Substring(start, end - start).Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return (start > 0 ? "… " : "") + snippet + (end < text.Length ? " …" : "");
+    }
+
+    /// <summary>Builds <see cref="PatternRule"/>s for a set of regex strings, applied to the
+    /// whole document (or a 0-based inclusive page range).</summary>
+    public static IReadOnlyList<PatternRule> BuildPatternRules(
+        IEnumerable<string> regexes, int? pageStart = null, int? pageEnd = null)
+    {
+        int[] pages = Array.Empty<int>();
+        if (pageStart is { } s && pageEnd is { } e && e >= s)
+            pages = Enumerable.Range(s, e - s + 1).ToArray();
+
+        var rules = new List<PatternRule>();
+        foreach (var rx in regexes.Where(r => !string.IsNullOrWhiteSpace(r)))
+        {
+            try { rules.Add(new PatternRule(rx, pages)); }
+            catch { /* skip an invalid custom regex */ }
+        }
+        return rules;
+    }
+
+    /// <summary>Unified redaction apply for the Redact destination: explicit boxes (manual draws
+    /// + accepted find matches) PLUS regex patterns, in ONE pass. <paramref name="glyphOnly"/>
+    /// removes content with no visible overlay (transparent); otherwise the overlay colour is
+    /// drawn. Output is verified for true removal of the explicit boxes (the tagged-PDF guard);
+    /// pattern hits inherit the same library limitation. Source is only read.</summary>
+    public async Task ApplyAsync(
+        string sourcePath, string outputPath,
+        IReadOnlyDictionary<int, IReadOnlyList<NormBox>> boxesByPage,
+        IReadOnlyList<PatternRule> patterns,
+        bool glyphOnly, string overlayHex, double padding,
+        CancellationToken ct = default)
+    {
+        bool hasBoxes = boxesByPage.Any(kv => kv.Value.Count > 0);
+        bool hasPatterns = patterns.Count > 0;
+        if (!hasBoxes && !hasPatterns)
+            throw new InvalidOperationException("Nothing to redact — no boxes and no patterns.");
+
+        await Task.Run(() =>
+        {
+            byte[] current = File.ReadAllBytes(sourcePath);
+            using var doc = PdfDocument.Open(new MemoryStream(current, writable: false));
+
+            var opts = new RedactionOptions
+            {
+                // 3.14.1: DrawOverlay=false gives a true glyph-only (boxless) redaction — the old
+                // OverlayColor=Transparent signal was ignored. Keep a real colour for the box case.
+                DrawOverlay = !glyphOnly,
+                OverlayColor = ParseColor(overlayHex),
+                PatternPadding = padding,
+            };
+            foreach (var rule in patterns) opts.Patterns.Add(rule);
+
+            var mappedRects = new Dictionary<int, List<RectangleF>>();
+            foreach (var (pageIndex, boxes) in boxesByPage)
+            {
+                if (boxes.Count == 0 || pageIndex < 0 || pageIndex >= doc.PageCount) continue;
+                var pdfPage = doc.Pages[pageIndex];
+                var rot = NormalizeRotation(pdfPage.Rotate); // destination renders unrotated
+                var verifyRects = new List<RectangleF>();
+                foreach (var box in boxes)
+                {
+                    var padded = Pad(box, padding, pdfPage.Width, pdfPage.Height);
+                    // 3.14.1: RedactionRect.Bounds is BOTTOM-LEFT / y-up, which is the same frame the
+                    // verify guard uses against TextExtractor fragments — so apply == verify rect.
+                    var r = MapToPdf(padded, rot, pdfPage.Width, pdfPage.Height);
+                    opts.Rectangles.Add(new RedactionRect(pageIndex, r));
+                    verifyRects.Add(r);
+                }
+                mappedRects[pageIndex] = verifyRects;
+            }
+
+            using var ms = new MemoryStream();
+            Redactor.Apply(ms, doc, opts);
+            current = ms.ToArray();
+
+            // Verify the explicit boxes actually cleared (blocks tagged-PDF leaks).
+            if (mappedRects.Count > 0 && CountSurvivingText(current, mappedRects) > 0)
+            {
+                throw new RedactionNotRemovedException(
+                    "Redaction could not fully remove text from this file — it was NOT saved. " +
+                    "This PDF is tagged, and the underlying library can't yet strip text from " +
+                    "tagged content. A library-side fix is needed before redaction is secure here.");
+            }
+
+            File.WriteAllBytes(outputPath, current);
+        }, ct);
+    }
+
+    /// <summary>Expands a normalised box by <paramref name="padPoints"/> on every side.</summary>
+    private static NormBox Pad(NormBox b, double padPoints, double w, double h)
+    {
+        if (padPoints <= 0 || w <= 0 || h <= 0) return b;
+        double px = padPoints / w, py = padPoints / h;
+        double x = Math.Max(0, b.X - px), y = Math.Max(0, b.Y - py);
+        double right = Math.Min(1, b.X + b.W + px), bottom = Math.Min(1, b.Y + b.H + py);
+        return new NormBox(x, y, right - x, bottom - y);
     }
 
     private static string ResolveFont(string? family, bool bold, bool italic)

@@ -13,6 +13,9 @@ public interface IFilePicker
     /// <summary>Shows a save dialog for a PDF; returns the chosen path, or null if cancelled.</summary>
     Task<string?> PickSavePdfAsync(string suggestedName, CancellationToken ct = default);
 
+    /// <summary>Shows a save dialog for a PNG image; returns the chosen path, or null if cancelled.</summary>
+    Task<string?> PickSaveImageAsync(string suggestedName, CancellationToken ct = default);
+
     /// <summary>Shows a folder-picker; returns the chosen folder, or null if cancelled.</summary>
     Task<string?> PickFolderAsync(CancellationToken ct = default);
 

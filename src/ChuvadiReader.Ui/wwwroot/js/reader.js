@@ -111,6 +111,7 @@ export function init(deskEl, dotnetRef) {
             else if (k === '=' || k === '+') { e.preventDefault(); invoke('ZoomKey', 1); }
             else if (k === '-' || k === '_') { e.preventDefault(); invoke('ZoomKey', -1); }
             else if (k === '0') { e.preventDefault(); invoke('ZoomKey', 0); }
+            else if (k === 'f') { e.preventDefault(); invoke('OpenFind'); }   // app find, not WebView2's native find
             return;
         }
         if (e.altKey || e.metaKey) return;
@@ -270,7 +271,7 @@ function setupViewTools(deskEl) {
                 panning = { x: e.clientX, y: e.clientY, sl: deskRef.scrollLeft, st: deskRef.scrollTop };
                 try { deskRef.setPointerCapture(e.pointerId); } catch (_) { }
                 e.preventDefault();
-            } else if (currentTool === 'area') {
+            } else if (currentTool === 'area' || currentTool === 'snapshot') {
                 marq = { x0: e.clientX, y0: e.clientY };
                 ensureMarqEl();
                 positionMarq(e.clientX, e.clientY, e.clientX, e.clientY);
@@ -294,8 +295,12 @@ function setupViewTools(deskEl) {
             if (marq) {
                 const x0 = Math.min(marq.x0, e.clientX), x1 = Math.max(marq.x0, e.clientX);
                 const y0 = Math.min(marq.y0, e.clientY), y1 = Math.max(marq.y0, e.clientY);
+                const tool = currentTool;
                 marq = null; removeMarqEl();
-                if (x1 - x0 > 12 && y1 - y0 > 12) zoomToRect(x0, y0, x1 - x0, y1 - y0);
+                if (x1 - x0 > 12 && y1 - y0 > 12) {
+                    if (tool === 'snapshot') captureSnapshotRect(x0, y0, x1, y1);
+                    else zoomToRect(x0, y0, x1 - x0, y1 - y0);
+                }
             }
         },
         leave: () => { if (currentTool === 'loupe') hideLoupe(); },
@@ -476,6 +481,7 @@ export function setTool(deskEl, tool) {
     if (!deskEl) return;
     deskEl.classList.toggle('tool-hand', currentTool === 'hand');
     deskEl.classList.toggle('tool-area', currentTool === 'area');
+    deskEl.classList.toggle('tool-snapshot', currentTool === 'snapshot');
     deskEl.classList.toggle('tool-loupe', currentTool === 'loupe');
     if (currentTool !== 'loupe') hideLoupe();
 }
@@ -527,6 +533,70 @@ function positionMarq(x0, y0, x1, y1) {
     marqEl.style.height = Math.abs(y1 - y0) + 'px';
 }
 function removeMarqEl() { if (marqEl) { marqEl.remove(); marqEl = null; } }
+
+// Snapshot: rasterise the marquee'd region of the page under the selection to a PNG at 150 DPI
+// and hand the base64 back to .NET (which offers Save / Copy / Send to desk).
+async function captureSnapshotRect(x0, y0, x1, y1) {
+    const left = Math.min(x0, x1), top = Math.min(y0, y1);
+    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+    if (w < 8 || h < 8) return;
+
+    const cx = left + w / 2, cy = top + h / 2;
+    const hit = document.elementFromPoint(cx, cy);
+    const page = hit && hit.closest ? hit.closest('.rpage') : null;
+    const wrap = page && page.closest ? page.closest('[data-page]') : null;
+    const svg = page ? page.querySelector('svg') : null;
+    if (!svg || !wrap) { invoke('SnapshotFailed', 'Point the marquee at a page to snapshot.'); return; }
+
+    const pageIndex = parseInt(wrap.dataset.page || '0', 10);
+    const r = svg.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+
+    // Region as a fraction of the page, clamped to the page bounds.
+    let fx = (left - r.left) / r.width;
+    let fy = (top - r.top) / r.height;
+    let fw = w / r.width, fh = h / r.height;
+    fx = Math.max(0, Math.min(1, fx)); fy = Math.max(0, Math.min(1, fy));
+    fw = Math.min(fw, 1 - fx); fh = Math.min(fh, 1 - fy);
+    if (fw <= 0 || fh <= 0) return;
+
+    // Page size in points (from the SVG viewBox) → pixels at 150 DPI.
+    const vb = svg.viewBox && svg.viewBox.baseVal;
+    const ptW = (vb && vb.width) ? vb.width : r.width;
+    const ptH = (vb && vb.height) ? vb.height : r.height;
+    const scale = 150 / 72;
+    const fullW = Math.max(1, Math.round(ptW * scale));
+    const fullH = Math.max(1, Math.round(ptH * scale));
+
+    const xml = new XMLSerializer().serializeToString(svg);
+    const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+
+    const dataUrl = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const full = document.createElement('canvas');
+                full.width = fullW; full.height = fullH;
+                const fctx = full.getContext('2d');
+                fctx.fillStyle = '#ffffff'; fctx.fillRect(0, 0, fullW, fullH);
+                fctx.drawImage(img, 0, 0, fullW, fullH);
+
+                const cw = Math.max(1, Math.round(fw * fullW));
+                const ch = Math.max(1, Math.round(fh * fullH));
+                const crop = document.createElement('canvas');
+                crop.width = cw; crop.height = ch;
+                crop.getContext('2d').drawImage(
+                    full, Math.round(fx * fullW), Math.round(fy * fullH), cw, ch, 0, 0, cw, ch);
+                resolve(crop.toDataURL('image/png'));
+            } catch (err) { resolve(null); }
+        };
+        img.onerror = () => resolve(null);
+        img.src = svgUrl;
+    });
+
+    if (!dataUrl) { invoke('SnapshotFailed', 'Could not capture this region.'); return; }
+    invoke2('SnapshotCaptured', dataUrl.substring(dataUrl.indexOf(',') + 1), pageIndex);
+}
 
 function ensureLoupe() {
     if (!loupeEl) {
@@ -587,6 +657,15 @@ export function setScrollTop(deskEl, top) {
     // Suppress the spy briefly so restoring position doesn't fire spurious page updates.
     suppressUntil = performance.now() + 400;
     deskEl.scrollTop = top || 0;
+}
+
+// Current on-page text selection, for auto-filling the Find box (selection only; no clipboard
+// read, which would trigger a WebView2 permission prompt).
+export function selectedText() {
+    try {
+        const sel = window.getSelection ? window.getSelection().toString() : '';
+        return (sel || '').trim();
+    } catch (e) { return ''; }
 }
 
 export function dispose() {
@@ -777,4 +856,38 @@ export function disableImageDrops() {
     document.removeEventListener('dragover', imageDrops.onDragOver, true);
     document.removeEventListener('drop', imageDrops.onDrop, true);
     imageDrops = null;
+}
+
+// ── Signature: render typed text to a transparent, tightly-cropped PNG ────────
+// Returns a base64 PNG data URL (or null). The signature is placed as a normal
+// image overlay, so it rides the (working) image stamp path, not text stamping.
+export function renderSignature(text, cssFont, color) {
+    text = (text || '').trim();
+    if (!text) return null;
+    try {
+        const SCALE = 4;          // supersample for a crisp result
+        const PAD = 28;           // breathing room around the glyphs
+        const meas = document.createElement('canvas').getContext('2d');
+        meas.font = cssFont;
+        const m = meas.measureText(text);
+        const asc = (m.actualBoundingBoxAscent || 52);
+        const desc = (m.actualBoundingBoxDescent || 22);
+        const left = (m.actualBoundingBoxLeft || 0);
+        const right = (m.actualBoundingBoxRight || m.width || meas.measureText(text).width);
+        const w = Math.max(8, Math.ceil(left + right)) + PAD * 2;
+        const h = Math.max(8, Math.ceil(asc + desc)) + PAD * 2;
+        const c = document.createElement('canvas');
+        c.width = Math.round(w * SCALE);
+        c.height = Math.round(h * SCALE);
+        const ctx = c.getContext('2d');
+        ctx.scale(SCALE, SCALE);
+        ctx.font = cssFont;
+        ctx.fillStyle = color || '#0b3d91';
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'left';
+        ctx.fillText(text, PAD + left, PAD + asc);
+        return c.toDataURL('image/png');
+    } catch (_) {
+        return null;
+    }
 }

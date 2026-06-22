@@ -1,0 +1,105 @@
+@namespace ChuvadiReader.Ui.Components
+@using ChuvadiReader.Core.Reader
+
+@if (ShowWatermark || ShowHeader || ShowFooter)
+{
+    <div class="stamp-preview">
+        @if (ShowWatermark)
+        {
+            <div class="stamp-wm" style="@WmStyle">@Watermark!.Text</div>
+        }
+        @if (ShowHeader)
+        {
+            <div class="stamp-band stamp-header" style="@BandStyle(true)">
+                <span class="stamp-l">@Resolve(HeaderFooter!.HeaderLeft)</span>
+                <span class="stamp-c">@Resolve(HeaderFooter!.HeaderCenter)</span>
+                <span class="stamp-r">@Resolve(HeaderFooter!.HeaderRight)</span>
+            </div>
+        }
+        @if (ShowFooter)
+        {
+            <div class="stamp-band stamp-footer" style="@BandStyle(false)">
+                <span class="stamp-l">@Resolve(HeaderFooter!.FooterLeft)</span>
+                <span class="stamp-c">@Resolve(HeaderFooter!.FooterCenter)</span>
+                <span class="stamp-r">@Resolve(HeaderFooter!.FooterRight)</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public DeskWatermark? Watermark { get; set; }
+    [Parameter] public DeskHeaderFooter? HeaderFooter { get; set; }
+    [Parameter] public int PageNumber { get; set; } = 1;     // 1-based
+    [Parameter] public int TotalPages { get; set; } = 1;
+    [Parameter] public string FileName { get; set; } = "document.pdf";
+    [Parameter] public double PageWidthPt { get; set; } = 595;
+    [Parameter] public double PageHeightPt { get; set; } = 842;
+
+    private static readonly System.Globalization.CultureInfo CI = System.Globalization.CultureInfo.InvariantCulture;
+
+    private bool ShowWatermark => Watermark is not null && !string.IsNullOrWhiteSpace(Watermark.Text)
+        && (Watermark.AllPages || InRange(Watermark.FromPage, Watermark.ToPage));
+    private bool InHfRange => HeaderFooter is not null
+        && (HeaderFooter.AllPages || InRange(HeaderFooter.FromPage, HeaderFooter.ToPage));
+    private bool ShowHeader => InHfRange && (HeaderFooter?.HeaderHasText ?? false);
+    private bool ShowFooter => InHfRange && (HeaderFooter?.FooterHasText ?? false);
+
+    private bool InRange(int from, int to)
+    {
+        int f = from <= 0 ? 1 : from;
+        int t = to <= 0 ? TotalPages : to;
+        if (t < f) (f, t) = (t, f);
+        return PageNumber >= f && PageNumber <= t;
+    }
+
+    private double PgH => PageHeightPt <= 0 ? 842 : PageHeightPt;
+    private double PgW => PageWidthPt <= 0 ? 595 : PageWidthPt;
+    private static string N(double v) => v.ToString("0.###", CI);
+
+    private string WmStyle
+    {
+        get
+        {
+            var wm = Watermark!;
+            // Sizes are expressed in container-query units so they track the displayed page at any zoom.
+            var fs = N(wm.FontSize / PgH * 100);
+            var rot = N(-wm.RotationDegrees);   // CSS rotates clockwise; PDF rotates counter-clockwise
+            return $"color:{wm.ColorHex};opacity:{N(wm.Opacity)};font-size:{fs}cqh;"
+                 + $"font-family:{CssFont(wm.FontFamily)};font-weight:{(wm.Bold ? "700" : "400")};"
+                 + $"font-style:{(wm.Italic ? "italic" : "normal")};"
+                 + $"transform:translate(-50%,-50%) rotate({rot}deg);";
+        }
+    }
+
+    private string BandStyle(bool header)
+    {
+        var hf = HeaderFooter!;
+        var h = N(hf.BandHeight / PgH * 100);
+        var fs = N(hf.FontSize / PgH * 100);
+        var mx = N(hf.MarginX / PgW * 100);
+        var bg = hf.BackgroundEnabled ? $"background:{hf.BackgroundHex};" : "";
+        var edge = header ? "top:0;" : "bottom:0;";
+        return $"{edge}height:{h}cqh;font-size:{fs}cqh;padding:0 {mx}cqw;color:{hf.ColorHex};{bg}";
+    }
+
+    private static string CssFont(string? family) => family switch
+    {
+        "Times" => "Georgia, 'Times New Roman', serif",
+        "Courier" => "'Courier New', monospace",
+        _ => "Arial, Helvetica, sans-serif",
+    };
+
+    private string Resolve(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var now = DateTimeOffset.Now;
+        return s.Replace("{page}", PageNumber.ToString(CI))
+                .Replace("{total}", TotalPages.ToString(CI))
+                .Replace("{filename}", FileName)
+                .Replace("{filepath}", FileName)
+                .Replace("{date}", now.ToString(HeaderFooter?.DateFmt ?? "yyyy-MM-dd", CI))
+                .Replace("{time}", now.ToString(HeaderFooter?.TimeFmt ?? "HH:mm", CI))
+                .Replace("{datetime}", now.ToString("yyyy-MM-dd HH:mm", CI));
+    }
+}

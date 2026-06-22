@@ -36,6 +36,7 @@
                 <span class="rd-zoom">@((_zoom * 100).ToString("0"))%</span>
                 <button class="ricon" @onclick="ZoomIn" disabled="@(_zoom >= 4.0)" aria-label="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
                 <span class="rd-sep"></span>
+                <button class="vbtn @(_findOpen ? "on" : null)" @onclick="ToggleFind" title="Find &amp; redact"><Icon Name="search" Size="16" /> Find</button>
                 <button class="vbtn" @onclick="Fetch" title="Open another document"><Icon Name="folder-search" Size="16" /> Fetch…</button>
             </div>
         }
@@ -64,7 +65,7 @@
 
             <span class="rd-spacer"></span>
 
-            @if (_tagged && RedactionCount > 0)
+            @if (_tagged && HasAnythingToRedact)
             {
                 <span class="rd-warn"><Icon Name="warning" Size="13" /> Tagged PDF — redaction can't be removed yet; save will be blocked.</span>
             }
@@ -76,9 +77,9 @@
                     <button class="rd-open" @onclick="OpenInReader">Open in Reader</button>
                 }
             }
-            <span class="rd-count">@RedactionCount redaction@(RedactionCount == 1 ? "" : "s")</span>
-            <button class="rd-btn" @onclick="ClearAll" disabled="@(RedactionCount == 0 || _saving)">Clear</button>
-            <button class="rd-btn primary" @onclick="Save" disabled="@(RedactionCount == 0 || _saving)" title="Redaction always saves to a new file">@(_saving ? "Saving…" : "Save redacted PDF →")</button>
+            <span class="rd-count">@RedactionCount box@(RedactionCount == 1 ? "" : "es")@(AcceptedMatchCount > 0 ? $" · {AcceptedMatchCount} found" : "")</span>
+            <button class="rd-btn" @onclick="ClearAll" disabled="@(!HasAnythingToRedact || _saving)">Clear</button>
+            <button class="rd-btn primary" @onclick="Save" disabled="@(!HasAnythingToRedact || _saving)" title="Redaction always saves to a new file">@(_saving ? "Saving…" : "Save redacted PDF →")</button>
         </div>
     }
 
@@ -110,38 +111,139 @@
     else if (_session is not null)
     {
         var session = _session;
-        <div class="rd-desk" style="--rpage-zoom:@_zoom" tabindex="-1" @ref="_desk">
-            @foreach (var n in _pages)
-            {
-                <div class="rpage-wrap" data-page="@n" @key="n">
-                    <div class="rpage">
-                        @if (session.TryGetRenderedSvg(n, out var svg))
-                        {
-                            <PageSvg Svg="@svg" Rotation="0" />
-                        }
-                        else
-                        {
-                            <div class="rpage-load">page @(n + 1)</div>
-                        }
-                        <div class="mk-layer drawmode" data-page="@n"
-                             @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
-                            @if (_redactions.TryGetValue(n, out var boxes))
+        <div class="rd-body">
+            <div class="rd-desk" style="--rpage-zoom:@_zoom" tabindex="-1" @ref="_desk">
+                @foreach (var n in _pages)
+                {
+                    <div class="rpage-wrap" data-page="@n" @key="n">
+                        <div class="rpage">
+                            @if (session.TryGetRenderedSvg(n, out var svg))
                             {
-                                @for (var i = 0; i < boxes.Count; i++)
+                                <PageSvg Svg="@svg" Rotation="0" />
+                            }
+                            else
+                            {
+                                <div class="rpage-load">page @(n + 1)</div>
+                            }
+                            <div class="mk-layer drawmode" data-page="@n"
+                                 @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
+                                @if (_redactions.TryGetValue(n, out var boxes))
                                 {
-                                    var bi = i;
-                                    var b = boxes[bi];
-                                    <div class="mk-box" style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);background:@BoxFill(0.82)">
-                                        <button class="mk-box-x" @onclick="() => RemoveBox(n, bi)" @onpointerdown:stopPropagation="true" title="Remove">&times;</button>
-                                    </div>
+                                    @for (var i = 0; i < boxes.Count; i++)
+                                    {
+                                        var bi = i;
+                                        var b = boxes[bi];
+                                        <div class="mk-box" style="left:@Pct(b.X);top:@Pct(b.Y);width:@Pct(b.W);height:@Pct(b.H);background:@BoxFill(0.82)">
+                                            <button class="mk-box-x" @onclick="() => RemoveBox(n, bi)" @onpointerdown:stopPropagation="true" title="Remove">&times;</button>
+                                        </div>
+                                    }
                                 }
-                            }
-                            @if (_draft is { } dr && _draftPage == n)
-                            {
-                                <div class="mk-box draft" style="left:@Pct(dr.X);top:@Pct(dr.Y);width:@Pct(dr.W);height:@Pct(dr.H);background:@BoxFill(0.45)"></div>
-                            }
+                                @if (_draft is { } dr && _draftPage == n)
+                                {
+                                    <div class="mk-box draft" style="left:@Pct(dr.X);top:@Pct(dr.Y);width:@Pct(dr.W);height:@Pct(dr.H);background:@BoxFill(0.45)"></div>
+                                }
+                                @if (_matchesByPage.TryGetValue(n, out var pageMatches))
+                                {
+                                    @foreach (var mm in pageMatches)
+                                    {
+                                        var m = mm;
+                                        var hb = m.Boxes[0];
+                                        <div class="rd-hl @(m.Accepted ? "on" : "off") @(ReferenceEquals(m, _currentMatch) ? "cur" : null)"
+                                             style="left:@Pct(hb.X);top:@Pct(hb.Y);width:@Pct(hb.W);height:@Pct(hb.H * 1.3)"
+                                             @onpointerdown:stopPropagation="true">
+                                            <span class="rd-hl-acts">
+                                                <button class="rd-hl-ok @(m.Accepted ? "on" : null)" title="Include in redaction" @onpointerdown:stopPropagation="true" @onclick="() => SetAccepted(m, true)">&#10003;</button>
+                                                <button class="rd-hl-no @(!m.Accepted ? "on" : null)" title="Exclude" @onpointerdown:stopPropagation="true" @onclick="() => SetAccepted(m, false)">&times;</button>
+                                            </span>
+                                        </div>
+                                    }
+                                }
+                            </div>
                         </div>
                     </div>
+                }
+            </div>
+
+            @if (_findOpen)
+            {
+                <div class="rd-find">
+                    <div class="rd-find-head">
+                        <span class="rd-find-title">Find &amp; redact</span>
+                        <span class="rd-spacer"></span>
+                        <button class="rd-x" @onclick="ToggleFind" aria-label="Close find"><Icon Name="x" Size="14" /></button>
+                    </div>
+
+                    <div class="rd-find-search">
+                        <input class="rd-find-box" placeholder="Find text…" value="@_query"
+                               @oninput="e => _query = e.Value?.ToString() ?? string.Empty"
+                               @onfocus="OnFindFocus" @onkeydown="OnFindKey" />
+                        <button class="rd-btn" @onclick="RunSearch" disabled="@_searching">@(_searching ? "…" : "Find")</button>
+                    </div>
+
+                    <div class="rd-find-opts">
+                        <button class="rd-chip @(_caseSensitive ? "on" : null)" @onclick="() => _caseSensitive = !_caseSensitive" title="Case sensitive">Aa</button>
+                        <button class="rd-chip @(_wholeWord ? "on" : null)" @onclick="() => _wholeWord = !_wholeWord" title="Whole word">word</button>
+                        <span class="rd-range">
+                            <button class="rd-chip @(_rangeAll ? "on" : null)" @onclick="() => _rangeAll = true">all</button>
+                            <button class="rd-chip @(!_rangeAll ? "on" : null)" @onclick="() => _rangeAll = false">range</button>
+                            @if (!_rangeAll)
+                            {
+                                <input class="rd-rangebox" inputmode="numeric" value="@_fromInput" @onchange="e => _fromInput = e.Value?.ToString() ?? string.Empty" />
+                                <span class="rd-range-dash">–</span>
+                                <input class="rd-rangebox" inputmode="numeric" value="@_toInput" @onchange="e => _toInput = e.Value?.ToString() ?? string.Empty" />
+                            }
+                        </span>
+                    </div>
+
+                    <div class="rd-presets">
+                        @foreach (var grp in RedactService.PatternPresets.Keys)
+                        {
+                            <button class="rd-chip preset locked" disabled title="Needs a library update — pattern redaction isn't reliable yet">+ @grp</button>
+                        }
+                        <button class="rd-chip preset locked" disabled title="Needs a library update">+ regex <Icon Name="lock" Size="10" /></button>
+                    </div>
+                    <div class="rd-find-note">Regex / category presets (Financial · Medical · PII) are awaiting a library fix to pattern redaction. Text find + redact works now.</div>
+
+                    <div class="rd-type">
+                        <span class="rd-type-lbl">type</span>
+                        <button class="rd-chip @(!_glyphOnly ? "on" : null)" @onclick="() => _glyphOnly = false">Box</button>
+                        <button class="rd-chip @(_glyphOnly ? "on" : null)" @onclick="() => _glyphOnly = true">Glyph-only</button>
+                        <button class="rd-chip locked" disabled title="Needs a library update">Replace <Icon Name="lock" Size="10" /></button>
+                    </div>
+
+                    @if (_findStatus is not null)
+                    {
+                        <div class="rd-find-status">@_findStatus</div>
+                    }
+
+                    @if (_matches.Count > 0)
+                    {
+                        <div class="rd-find-summary">
+                            <span class="rd-find-count">@AcceptedMatchCount / @_matches.Count selected</span>
+                            <span class="rd-spacer"></span>
+                            <button class="rd-link" @onclick="() => SetAllAccepted(true)">all</button>
+                            <button class="rd-link" @onclick="() => SetAllAccepted(false)">none</button>
+                        </div>
+                        <div class="rd-matches">
+                            @foreach (var mm in _matches)
+                            {
+                                var m = mm;
+                                <div class="rd-match @(ReferenceEquals(m, _currentMatch) ? "cur" : null)" @onclick="() => JumpToMatch(m)">
+                                    <button class="rd-match-ck @(m.Accepted ? "on" : null)" @onclick:stopPropagation="true" @onclick="() => SetAccepted(m, !m.Accepted)" aria-label="Toggle">
+                                        <Icon Name="@(m.Accepted ? "check" : "square")" Size="13" />
+                                    </button>
+                                    <div class="rd-match-body">
+                                        <div class="rd-match-snip @(m.Accepted ? null : "off")">@m.Snippet</div>
+                                        <div class="rd-match-page">page @(m.PageIndex + 1)</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <div class="rd-find-actions">
+                            <button class="rd-btn primary" @onclick="RedactChecked" disabled="@(AcceptedMatchCount == 0 || _saving)">Redact checked (@AcceptedMatchCount)</button>
+                            <button class="rd-btn" @onclick="RedactAll" disabled="@_saving">Redact all matches</button>
+                        </div>
+                    }
                 </div>
             }
         </div>
@@ -188,6 +290,36 @@
     private bool _tagged;
 
     private int RedactionCount => _redactions.Values.Sum(v => v.Count);
+
+    // ── Find &amp; redact state ────────────────────────────────────────────────
+    private sealed class MatchVm
+    {
+        public int PageIndex { get; init; }
+        public IReadOnlyList<NormBox> Boxes { get; init; } = Array.Empty<NormBox>();
+        public string Snippet { get; init; } = "";
+        public bool Accepted { get; set; } = true;
+    }
+
+    private bool _findOpen;
+    private string _query = "";
+    private bool _caseSensitive;
+    private bool _wholeWord;
+    private bool _rangeAll = true;
+    private string _fromInput = "1";
+    private string _toInput = "1";
+    private readonly HashSet<string> _presets = new(StringComparer.OrdinalIgnoreCase);
+    private bool _glyphOnly;            // false = Box (default)
+    private bool _searching;
+    private string? _findStatus;
+    private List<MatchVm> _matches = new();
+    private Dictionary<int, List<MatchVm>> _matchesByPage = new();
+    private MatchVm? _currentMatch;
+
+    private int AcceptedMatchCount => _matches.Count(m => m.Accepted);
+    private int ActivePatternCount => _presets.Sum(p => RedactService.PatternPresets.TryGetValue(p, out var v) ? v.Count : 0);
+    private bool HasAnythingToRedact => RedactionCount > 0 || AcceptedMatchCount > 0 || ActivePatternCount > 0;
+
+    private void ToggleFind() => _findOpen = !_findOpen;
 
     private static string Pct(double f) =>
         (f * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) + "%";
@@ -416,13 +548,18 @@
     private void ClearAll()
     {
         _redactions.Clear();
+        _matches = new(); _matchesByPage = new(); _currentMatch = null;
         _status = null; _savedPath = null;
     }
 
-    // ── Save ────────────────────────────────────────────────────────────────
-    private async Task Save()
+    // ── Save (unified: manual boxes + accepted matches + patterns) ───────────
+    private Task Save() => DoRedact(acceptAll: false);
+
+    private async Task DoRedact(bool acceptAll)
     {
-        if (_path is null || RedactionCount == 0) return;
+        if (_path is null) return;
+        if (acceptAll) SetAllAccepted(true);
+        if (!HasAnythingToRedact) return;
 
         var suggested = System.IO.Path.GetFileNameWithoutExtension(_path) + "-redacted.pdf";
         var output = await Picker.PickSavePdfAsync(suggested);
@@ -433,11 +570,20 @@
         await Task.Yield();
         try
         {
-            var pages = _redactions
-                .Where(kv => kv.Value.Count > 0)
-                .ToDictionary(kv => kv.Key, kv => new PageRedaction(0, kv.Value.ToList()));
+            // Combine manual draw boxes with accepted find-match boxes, per page.
+            var boxesByPage = new Dictionary<int, List<NormBox>>();
+            foreach (var (pg, list) in _redactions)
+                if (list.Count > 0) boxesByPage[pg] = new List<NormBox>(list);
+            foreach (var m in _matches.Where(m => m.Accepted))
+            {
+                if (!boxesByPage.TryGetValue(m.PageIndex, out var l)) { l = new(); boxesByPage[m.PageIndex] = l; }
+                l.AddRange(m.Boxes);
+            }
 
-            await RedactSvc.RedactToFileAsync(_path, output!, pages, _color);
+            var patterns = BuildPatterns();
+            var boxesArg = boxesByPage.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<NormBox>)kv.Value);
+
+            await RedactSvc.ApplyAsync(_path, output!, boxesArg, patterns, _glyphOnly, _color, padding: 1.5);
             _savedPath = output;
             _status = $"Saved → {System.IO.Path.GetFileName(output)}";
             _statusErr = false;
@@ -453,6 +599,105 @@
             StateHasChanged();
         }
     }
+
+    private IReadOnlyList<Chuvadi.Pdf.Redaction.PatternRule> BuildPatterns()
+    {
+        var regexes = new List<string>();
+        foreach (var p in _presets)
+            if (RedactService.PatternPresets.TryGetValue(p, out var v)) regexes.AddRange(v);
+        if (regexes.Count == 0) return Array.Empty<Chuvadi.Pdf.Redaction.PatternRule>();
+
+        var (start, end) = PageRange();
+        return RedactService.BuildPatternRules(regexes, start, end);
+    }
+
+    private (int? Start, int? End) PageRange()
+    {
+        if (_rangeAll) return (null, null);
+        int total = _session?.Document.PageCount ?? 1;
+        int from = int.TryParse(_fromInput, out var f) ? Math.Clamp(f, 1, total) : 1;
+        int to = int.TryParse(_toInput, out var t) ? Math.Clamp(t, 1, total) : total;
+        if (to < from) (from, to) = (to, from);
+        return (from - 1, to - 1);   // 0-based inclusive
+    }
+
+    // ── Find ─────────────────────────────────────────────────────────────────
+    private async Task OnFindFocus()
+    {
+        if (!string.IsNullOrEmpty(_query)) return;   // never clobber typing
+        try
+        {
+            var sel = _js is not null ? await _js.InvokeAsync<string?>("selectedText") : null;
+            if (!string.IsNullOrWhiteSpace(sel)) { _query = sel!.Trim(); StateHasChanged(); }
+        }
+        catch { }
+    }
+
+    private async Task OnFindKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await RunSearch();
+    }
+
+    private async Task RunSearch()
+    {
+        if (_path is null || string.IsNullOrWhiteSpace(_query)) return;
+        _searching = true; _findStatus = null;
+        _matches = new(); _matchesByPage = new(); _currentMatch = null;
+        StateHasChanged();
+        await Task.Yield();
+        try
+        {
+            var (start, end) = PageRange();
+            var found = await RedactSvc.SearchAsync(_path, _query, _caseSensitive, _wholeWord, start, end);
+            _matches = found.Select(f => new MatchVm
+            {
+                PageIndex = f.PageIndex,
+                Boxes = f.Boxes,
+                Snippet = f.Snippet,
+                Accepted = true,
+            }).ToList();
+            RebuildMatchIndex();
+            _findStatus = _matches.Count == 0 ? "No matches." : null;
+            if (_matches.Count > 0) await JumpToMatch(_matches[0]);
+        }
+        catch (Exception ex)
+        {
+            _findStatus = "Search failed: " + ex.Message;
+        }
+        finally
+        {
+            _searching = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RebuildMatchIndex()
+    {
+        _matchesByPage = _matches
+            .GroupBy(m => m.PageIndex)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private void TogglePreset(string g)
+    {
+        if (!_presets.Add(g)) _presets.Remove(g);
+    }
+
+    private void SetAccepted(MatchVm m, bool value) => m.Accepted = value;
+    private void SetAllAccepted(bool value) { foreach (var m in _matches) m.Accepted = value; }
+
+    private async Task JumpToMatch(MatchVm m)
+    {
+        _currentMatch = m;
+        _curPage = m.PageIndex + 1; _pageInput = _curPage.ToString();
+        if (_js is not null)
+        {
+            try { await _js.InvokeVoidAsync("scrollToPage", m.PageIndex); } catch { }
+        }
+    }
+
+    private Task RedactChecked() => DoRedact(acceptAll: false);
+    private Task RedactAll() => DoRedact(acceptAll: true);
 
     private void OpenInReader()
     {

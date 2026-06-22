@@ -37,8 +37,10 @@ public sealed class ChuvadiPdfReader : IPdfReader
         return new ChuvadiPdfSession(document, vm, transparentBackground);
     }
 
-    /// <summary>True when the catalog's AcroForm carries an /XFA entry. XFA content
-    /// isn't drawn by the SVG renderer, so such documents would otherwise open blank.</summary>
+    /// <summary>True only for XFA documents that <em>cannot</em> be displayed — i.e. pure
+    /// dynamic XFA whose content lives solely in the form layer, so the page renders blank.
+    /// Hybrid/static XFA (an /XFA entry alongside real page content) renders fine and is NOT
+    /// flagged: we probe-render the first page and only flag when it has no drawable content.</summary>
     private static bool IsXfaForm(PdfDocument document)
     {
         try
@@ -50,10 +52,41 @@ public sealed class ChuvadiPdfReader : IPdfReader
             }
 
             var acroForm = document.Objects.ResolveDictionaryEntry<PdfDictionary>(catalog, PdfName.Intern("AcroForm"));
-            return acroForm is not null && acroForm.ContainsKey(PdfName.Intern("XFA"));
+            var hasXfa = acroForm is not null && acroForm.ContainsKey(PdfName.Intern("XFA"));
+            if (!hasXfa)
+            {
+                return false;
+            }
+
+            // Hybrid XFA renders normally; only block when the first page is truly empty.
+            return document.PageCount == 0 || !PageHasDrawableContent(document, 0);
         }
         catch
         {
+            return false;
+        }
+    }
+
+    /// <summary>Renders one page and reports whether it produced any drawable content
+    /// (text, vector paths, or images) as opposed to a blank/background-only page.</summary>
+    private static bool PageHasDrawableContent(PdfDocument document, int pageIndex)
+    {
+        try
+        {
+            var svg = new SvgRenderer(new SvgExportOptions { TextStrategy = SvgTextStrategy.Selectable })
+                .RenderPage(document, pageIndex);
+            if (string.IsNullOrEmpty(svg))
+            {
+                return false;
+            }
+
+            return svg.Contains("<text", StringComparison.Ordinal)
+                || svg.Contains("<image", StringComparison.Ordinal)
+                || svg.Contains("<path", StringComparison.Ordinal);
+        }
+        catch
+        {
+            // If we cannot render it at all, treat it as undisplayable (keep the notice).
             return false;
         }
     }

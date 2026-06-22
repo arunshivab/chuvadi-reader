@@ -1,0 +1,30 @@
+.stamp-preview {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 5;
+    container-type: size;
+}
+.stamp-wm {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    white-space: nowrap;
+    transform-origin: center;
+    line-height: 1;
+    font-weight: 700;
+}
+.stamp-band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    line-height: 1.1;
+    gap: 8px;
+}
+.stamp-band .stamp-l { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stamp-band .stamp-c { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stamp-band .stamp-r { flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
