@@ -24,4 +24,5 @@ public enum ReaderTool
     Hand,
     Marquee,
     Loupe,
+    Snapshot,
 }

@@ -48,6 +48,23 @@ public sealed class ReaderTab
 
     /// <summary>In two-page layout, show the first page on its own so spreads line up. Off by default.</summary>
     public bool CoverAlone { get; set; }
+
+    /// <summary>Per-tab watermark config for the Stamp panel. Lives with the tab (not persisted
+    /// across app restarts), so each open file keeps its own pending stamp until the tab closes.</summary>
+    public DeskWatermark Watermark { get; set; } = new()
+    {
+        Text = "", FontFamily = "Helvetica", FontSize = 48,
+        ColorHex = "#808080", Opacity = 0.25, RotationDegrees = 45, AllPages = true,
+    };
+
+    /// <summary>Per-tab header/footer config for the Stamp panel. Starts blank (no bands enabled).</summary>
+    public DeskHeaderFooter HeaderFooter { get; set; } = new()
+    {
+        HeaderEnabled = false, FooterEnabled = false, AllPages = true, Fit = "overlay",
+    };
+
+    /// <summary>Whether the Stamp drawer is open for this tab.</summary>
+    public bool StampOpen { get; set; }
 }
 
 /// <summary>

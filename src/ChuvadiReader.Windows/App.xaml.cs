@@ -72,6 +72,7 @@ public partial class App : Application
             services.AddSingleton<DocumentPropertiesService>();
             services.AddSingleton<ExportService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.RedactService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.StampService>();
             services.AddSingleton<PressService>();
             services.AddSingleton<IPdfReader, ChuvadiPdfReader>();
             services.AddSingleton<TabsService>();
@@ -82,6 +83,7 @@ public partial class App : Application
             services.AddSingleton<RedactRequestService>();
             services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
             services.AddSingleton<IFilePicker, WpfFilePicker>();
+            services.AddSingleton<IImageClipboard, WpfImageClipboard>();
             services.AddSingleton<IAppReadySignal, AppReadySignal>();
 
             _windowControls = new WpfWindowControls();

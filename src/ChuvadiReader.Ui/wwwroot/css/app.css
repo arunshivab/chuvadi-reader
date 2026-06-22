@@ -92,6 +92,21 @@ button { font-family: inherit; }
     border-bottom: var(--chvd-stroke) solid var(--chvd-border);
 }
 
+/* App chrome is non-selectable everywhere; only the rendered PDF page stays
+   selectable, so copy-from-page and the Find auto-paste keep working. Form
+   controls (input/textarea) remain editable regardless of user-select. */
+.shell {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.rpage,
+.rpage svg,
+.rpage svg * {
+    user-select: text;
+    -webkit-user-select: text;
+}
+
 .tb-spacer { flex: 1; }
 .tb-controls { display: flex; align-items: center; gap: 8px; }
 

@@ -93,6 +93,33 @@ public sealed class WpfFilePicker : IFilePicker
         return Task.FromResult(picked);
     }
 
+    public Task<string?> PickSaveImageAsync(string suggestedName, CancellationToken ct = default)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        var picked = dispatcher.Invoke(() =>
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title = "Save image",
+                Filter = "PNG image (*.png)|*.png",
+                DefaultExt = ".png",
+                FileName = suggestedName,
+                InitialDirectory = _saveFolders.ResolveSaveFolder(),
+                AddExtension = true,
+                OverwritePrompt = true,
+            };
+
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        });
+
+        return Task.FromResult(picked);
+    }
+
     public Task<string?> PickFolderAsync(CancellationToken ct = default)
     {
         var dispatcher = Application.Current?.Dispatcher;

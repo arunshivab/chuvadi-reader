@@ -1,0 +1,55 @@
+@namespace ChuvadiReader.Ui.Components
+
+<div class="bandslot">
+    <select class="stamp-sel" value="@Kind" @onchange="OnKindChanged">
+        <option value="">— @Placeholder —</option>
+        <option value="page">Page number</option>
+        <option value="pageof">Page X of Y</option>
+        <option value="date">Date</option>
+        <option value="time">Time</option>
+        <option value="filename">File name</option>
+        <option value="custom">Custom…</option>
+    </select>
+    @if (Kind == "custom")
+    {
+        <input class="bandslot-custom" placeholder="custom text" value="@Value"
+               @oninput="OnCustomInput" />
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = "";
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "empty";
+
+    // Map the stored string back to a dropdown kind so the control round-trips.
+    private string Kind => Value switch
+    {
+        "" or null => "",
+        "{page}" => "page",
+        "{page} / {total}" => "pageof",
+        "{date}" => "date",
+        "{time}" => "time",
+        "{filename}" => "filename",
+        _ => "custom",
+    };
+
+    private async Task OnKindChanged(ChangeEventArgs e)
+    {
+        var kind = e.Value?.ToString() ?? "";
+        var v = kind switch
+        {
+            "page" => "{page}",
+            "pageof" => "{page} / {total}",
+            "date" => "{date}",
+            "time" => "{time}",
+            "filename" => "{filename}",
+            "custom" => Kind == "custom" ? Value : "",   // keep existing custom text, else start blank
+            _ => "",
+        };
+        await ValueChanged.InvokeAsync(v);
+    }
+
+    private async Task OnCustomInput(ChangeEventArgs e)
+        => await ValueChanged.InvokeAsync(e.Value?.ToString() ?? "");
+}

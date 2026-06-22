@@ -13,6 +13,8 @@ let dragging = false;
 let ghost = null;
 let escHandler = null;
 let peek = null;
+let shelfPeekTimer = null;
+let shelfPeekEl = null;
 const THRESHOLD = 6;     // px of movement before a press becomes a drag
 const GHOST_W = 180;     // drag-preview width in px (~22% of a 96-DPI A4 page) — readable
 
@@ -47,15 +49,76 @@ export function init(gridEl, dotnetRef, lazyThumbs) {
     document.addEventListener('keydown', escHandler);
 }
 
-// Hover-peek: hovering a page's peek button shows an enlarged preview of that page.
+// Hover-peek: hovering a page's peek button (desk) or a shelf thumbnail shows an enlarged preview.
 function onPeekOver(e) {
     const btn = e.target.closest('[data-peek]');
-    if (btn) showPeek(btn);
+    if (btn) { showPeek(btn); return; }
+    const sp = e.target.closest('.shelf-pg');
+    if (sp && sp !== shelfPeekEl) {
+        clearTimeout(shelfPeekTimer);
+        shelfPeekEl = sp;
+        shelfPeekTimer = setTimeout(() => showShelfPeek(sp), 350);
+    }
 }
 
 function onPeekOut(e) {
     const btn = e.target.closest('[data-peek]');
-    if (btn && !btn.contains(e.relatedTarget)) hidePeek();
+    if (btn && !btn.contains(e.relatedTarget)) { hidePeek(); return; }
+    const sp = e.target.closest('.shelf-pg');
+    if (sp && !sp.contains(e.relatedTarget)) {
+        clearTimeout(shelfPeekTimer);
+        shelfPeekTimer = null;
+        if (shelfPeekEl === sp) shelfPeekEl = null;
+        hidePeek();
+    }
+}
+
+// Shelf hover preview (#26): clone the shelf thumbnail into a larger floating box beside it.
+function showShelfPeek(sp) {
+    hidePeek();
+    const thumb = sp.querySelector('.thumb');
+    if (!thumb) return;
+    const box = document.createElement('div');
+    const clone = thumb.cloneNode(true);
+    clone.style.width = '100%';
+    clone.style.height = '100%';
+    clone.querySelectorAll('svg,img').forEach(el => { el.style.width = '100%'; el.style.height = '100%'; });
+    box.appendChild(clone);
+
+    const r = sp.getBoundingClientRect();
+    const aspect = r.width > 0 ? (r.height / r.width) : 1.414;
+    const pw = 320, ph = Math.round(pw * (aspect > 0.2 ? aspect : 1.414));
+    box.style.position = 'fixed';
+    box.style.zIndex = '210';
+    box.style.width = pw + 'px';
+    box.style.height = ph + 'px';
+    box.style.boxSizing = 'border-box';
+    box.style.background = 'var(--chvd-surface-hi, #fff)';
+    box.style.border = '1px solid var(--chvd-border, #d8cdbb)';
+    box.style.borderRadius = '10px';
+    box.style.boxShadow = '0 18px 48px rgba(0,0,0,0.45)';
+    box.style.overflow = 'hidden';
+    box.style.pointerEvents = 'none';
+    document.body.appendChild(box);
+
+    let left = r.right + 12;
+    if (left + pw > window.innerWidth - 8) left = r.left - pw - 12; // flip to the left if no room
+    left = Math.max(8, left);
+    let top = r.top + r.height / 2 - ph / 2;
+    top = Math.max(8, Math.min(top, window.innerHeight - ph - 8));
+    box.style.left = left + 'px';
+    box.style.top = top + 'px';
+    peek = box;
+}
+
+// Scroll the shelf to a page thumbnail and flash it (#25 search jump).
+export function scrollShelfTo(srcIndex, pageIndex) {
+    if (!root) return;
+    const el = root.querySelector(`[data-shelf="${srcIndex}:${pageIndex}"]`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('shelf-flash');
+    setTimeout(() => { el.classList.remove('shelf-flash'); }, 1400);
 }
 
 function showPeek(btn) {
@@ -100,6 +163,8 @@ function showPeek(btn) {
 }
 
 function hidePeek() {
+    clearTimeout(shelfPeekTimer);
+    shelfPeekTimer = null;
     if (peek && peek.parentNode) peek.parentNode.removeChild(peek);
     peek = null;
 }
@@ -280,4 +345,12 @@ function teardown() {
 export function dispose() {
     teardown();
     dotnet = null;
+}
+
+// ── item 14: crop — returns the overlay size and captures the pointer so the
+// drag keeps tracking even outside the box. All drag math is done in C#.
+export function cropBegin(el, pointerId) {
+    if (!el) return [0, 0];
+    try { el.setPointerCapture(pointerId); } catch { /* ignore */ }
+    return [el.clientWidth, el.clientHeight];
 }
