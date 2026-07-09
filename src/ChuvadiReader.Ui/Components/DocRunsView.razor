@@ -1,0 +1,59 @@
+@using ChuvadiReader.Core.Documents
+
+@foreach (var r in Runs)
+{
+    @if (r.ImageDataUrl is { } url)
+    {
+        <img class="wv-img" src="@url" alt="" style="@ImgStyle(r)" />
+    }
+    else if (!string.IsNullOrEmpty(r.Href))
+    {
+        <a class="wv-link" href="@r.Href" target="_blank" rel="noopener" style="@RunStyle(r)">@r.Text</a>
+    }
+    else
+    {
+        <span style="@RunStyle(r)">@r.Text</span>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<WordRun> Runs { get; set; } = default!;
+
+    private static string RunStyle(WordRun r)
+    {
+        var sb = new System.Text.StringBuilder();
+        if (r.Bold) sb.Append("font-weight:700;");
+        if (r.Italic) sb.Append("font-style:italic;");
+
+        var deco = (r.Underline, r.Strike) switch
+        {
+            (true, true) => "underline line-through",
+            (true, false) => "underline",
+            (false, true) => "line-through",
+            _ => null,
+        };
+        if (deco is not null) sb.Append($"text-decoration:{deco};");
+
+        if (r.ColorHex is { } c) sb.Append($"color:{c};");
+        if (r.Font is { } f) sb.Append($"font-family:'{f}';");
+        if (r.SizePt is { } s) sb.Append($"font-size:{s.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt;");
+        if (r.Highlight is { } h) sb.Append($"background-color:{CssColor(h)};");
+        return sb.ToString();
+    }
+
+    private static string ImgStyle(WordRun r)
+    {
+        if (r.ImageWidthPt > 0 && r.ImageHeightPt > 0)
+            return $"width:{r.ImageWidthPt.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt;" +
+                   $"height:{r.ImageHeightPt.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt;";
+        return "max-width:100%;";
+    }
+
+    // Word highlight is usually a named colour ("yellow", "cyan"); cope with a bare hex too.
+    private static string CssColor(string v)
+    {
+        var t = v.Trim();
+        if (t.StartsWith('#')) return t;
+        return System.Text.RegularExpressions.Regex.IsMatch(t, "^[0-9A-Fa-f]{6}$") ? "#" + t : t;
+    }
+}

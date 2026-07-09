@@ -42,7 +42,8 @@ public sealed record PageText(int ViewRotation, IReadOnlyList<TextAnno> Items);
 /// (a library-side capability is needed — see ROADMAP).</summary>
 public sealed record ImageAnno(
     double X, double Y, double W, double H,
-    byte[] ImageBytes, double Rotation, double Opacity);
+    byte[] ImageBytes, double Rotation, double Opacity,
+    bool BehindContent = false);
 
 /// <summary>The image overlays for one page, plus that page's on-screen view rotation.</summary>
 public sealed record PageImage(int ViewRotation, IReadOnlyList<ImageAnno> Items);
@@ -52,6 +53,9 @@ public enum ShapeKind
 {
     Rectangle,
     Line,
+    Ellipse,
+    Arrow,
+    Freehand,
 }
 
 /// <summary>A single overlay shape, normalised to the displayed page (top-left origin).
@@ -62,7 +66,9 @@ public enum ShapeKind
 /// screen).</summary>
 public sealed record ShapeAnno(
     double X, double Y, double W, double H,
-    ShapeKind Kind, string? FillHex, string StrokeHex, double StrokeWidthPt, double Rotation);
+    ShapeKind Kind, string? FillHex, string StrokeHex, double StrokeWidthPt, double Rotation,
+    bool BehindContent = false,
+    IReadOnlyList<(double X, double Y)>? Points = null);
 
 /// <summary>The shape overlays for one page, plus that page's on-screen view rotation.</summary>
 public sealed record PageShape(int ViewRotation, IReadOnlyList<ShapeAnno> Items);
@@ -251,54 +257,149 @@ public sealed class RedactService
     /// overlapping shapes. All authoring draw calls use the TOP-LEFT, y-DOWN coordinate system.
     /// Lines carry their angle directly through their two mapped endpoints; filled rectangles and
     /// images are axis-aligned (per-item rotation needs a library-side transform/CTM — ROADMAP).</summary>
+    /// <summary>Stamps every shape and image for one page. Each item is stamped as its own
+    /// single-item overlay (chained onto the running bytes) so per-item rotation and
+    /// behind/over placement apply independently. Shapes are drawn first, then images, so an
+    /// image sits above a shape it overlaps; text (its own later pass) sits above both.</summary>
     private static byte[] StampPageOverlay(
         byte[] source, int pageIndex, int viewRotation,
         IReadOnlyList<ShapeAnno> shapes, IReadOnlyList<ImageAnno> imageItems)
     {
+        byte[] current = source;
+        foreach (var item in shapes) current = StampOneShape(current, pageIndex, viewRotation, item);
+        foreach (var item in imageItems) current = StampOneImage(current, pageIndex, viewRotation, item);
+        return current;
+    }
+
+    /// <summary>Stamps a single shape onto its own overlay, rotated about its centre by the item's
+    /// rotation and placed over or behind the page content. Identity transform when not rotated, so
+    /// an un-rotated overlay shape lands exactly where it did before.</summary>
+    private static byte[] StampOneShape(byte[] source, int pageIndex, int viewRotation, ShapeAnno item)
+    {
         using var target = PdfDocument.Open(new MemoryStream(source, writable: false));
         if (pageIndex < 0 || pageIndex >= target.PageCount) return source;
-
         var pdfPage = target.Pages[pageIndex];
         double w = pdfPage.Width, h = pdfPage.Height;
         var rot = NormalizeRotation(pdfPage.Rotate + viewRotation);
 
         var overlay = PdfDocumentBuilder.Create();
         var pb = overlay.AddPage(new PageSize(w, h));
+        DrawShape(pb, item, rot, w, h);
 
-        // Shapes first.
-        foreach (var item in shapes)
+        using var overlayDoc = PdfDocument.Open(new MemoryStream(overlay.ToByteArray(), writable: false));
+        var rectYUp = MapToPdf(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+        var t = RotateAboutCentre(item.Rotation, rectYUp);
+        var placement = item.BehindContent ? StampPlacement.Underlay : StampPlacement.Overlay;
+        using var ms = new MemoryStream();
+        PageStamper.Place(ms, target, pageIndex, overlayDoc, 0, t, placement);
+        return ms.ToArray();
+    }
+
+    /// <summary>Stamps a single image onto its own overlay with its opacity, rotated about its
+    /// centre, over or behind the page content.</summary>
+    private static byte[] StampOneImage(byte[] source, int pageIndex, int viewRotation, ImageAnno item)
+    {
+        if (item.ImageBytes is null || item.ImageBytes.Length == 0) return source;
+        using var target = PdfDocument.Open(new MemoryStream(source, writable: false));
+        if (pageIndex < 0 || pageIndex >= target.PageCount) return source;
+        var pdfPage = target.Pages[pageIndex];
+        double w = pdfPage.Width, h = pdfPage.Height;
+        var rot = NormalizeRotation(pdfPage.Rotate + viewRotation);
+        var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+
+        var overlay = PdfDocumentBuilder.Create();
+        var pb = overlay.AddPage(new PageSize(w, h));
+        // Opacity 0–1; treat a non-positive value as "unset" → fully opaque.
+        double op = item.Opacity <= 0 ? 1.0 : Math.Clamp(item.Opacity, 0.0, 1.0);
+        pb.DrawImage(item.ImageBytes, rect.X, rect.Y, rect.Width, rect.Height, op);
+
+        using var overlayDoc = PdfDocument.Open(new MemoryStream(overlay.ToByteArray(), writable: false));
+        var rectYUp = MapToPdf(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+        var t = RotateAboutCentre(item.Rotation, rectYUp);
+        var placement = item.BehindContent ? StampPlacement.Underlay : StampPlacement.Overlay;
+        using var ms = new MemoryStream();
+        PageStamper.Place(ms, target, pageIndex, overlayDoc, 0, t, placement);
+        return ms.ToArray();
+    }
+
+    /// <summary>Draws one shape into the overlay in TOP-LEFT, y-DOWN page points. Rectangles and
+    /// lines keep their existing primitives; ellipse/arrow/freehand are authored via
+    /// <see cref="Chuvadi.Pdf.Graphics.Path"/> + <c>DrawPath</c>.</summary>
+    private static void DrawShape(PageBuilder pb, ShapeAnno item, int rot, double w, double h)
+    {
+        var strokeC = SafeColor(item.StrokeHex);
+        double sw = item.StrokeWidthPt <= 0 ? 1.0 : item.StrokeWidthPt;
+
+        switch (item.Kind)
         {
-            var stroke = SafeColor(item.StrokeHex);
-            double strokeWidth = item.StrokeWidthPt <= 0 ? 1.0 : item.StrokeWidthPt;
-
-            if (item.Kind == ShapeKind.Rectangle)
+            case ShapeKind.Rectangle:
             {
                 var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
                 Color? fill = string.IsNullOrWhiteSpace(item.FillHex) ? null : SafeColor(item.FillHex);
-                pb.DrawRectangle(rect.X, rect.Y, rect.Width, rect.Height, fill, stroke, strokeWidth);
+                pb.DrawRectangle(rect.X, rect.Y, rect.Width, rect.Height, fill, strokeC, sw);
+                break;
             }
-            else // Line: map both endpoints individually so any drawn angle is preserved.
+            case ShapeKind.Line:
             {
                 var (ax, ay) = MapPointTopLeft(item.X, item.Y, rot, w, h);
                 var (bx, by) = MapPointTopLeft(item.X + item.W, item.Y + item.H, rot, w, h);
-                pb.DrawLine(ax, ay, bx, by, stroke, strokeWidth);
+                pb.DrawLine(ax, ay, bx, by, strokeC, sw);
+                break;
+            }
+            case ShapeKind.Ellipse:
+            {
+                var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
+                Color? fillC = string.IsNullOrWhiteSpace(item.FillHex) ? null : SafeColor(item.FillHex);
+                var path = new Chuvadi.Pdf.Graphics.Path()
+                    .Ellipse(rect.X + rect.Width / 2.0, rect.Y + rect.Height / 2.0, rect.Width / 2.0, rect.Height / 2.0);
+                pb.DrawPath(path, fillC, strokeC, sw, Chuvadi.Pdf.Graphics.FillRule.NonZeroWinding);
+                break;
+            }
+            case ShapeKind.Arrow:
+            {
+                var (ax, ay) = MapPointTopLeft(item.X, item.Y, rot, w, h);
+                var (bx, by) = MapPointTopLeft(item.X + item.W, item.Y + item.H, rot, w, h);
+                pb.DrawPath(BuildArrow(ax, ay, bx, by, sw), null, strokeC, sw, Chuvadi.Pdf.Graphics.FillRule.NonZeroWinding);
+                break;
+            }
+            case ShapeKind.Freehand:
+            {
+                if (item.Points is { Count: >= 2 } pts)
+                {
+                    var path = new Chuvadi.Pdf.Graphics.Path();
+                    var (x0, y0) = MapPointTopLeft(pts[0].X, pts[0].Y, rot, w, h);
+                    path.MoveTo(x0, y0);
+                    for (int i = 1; i < pts.Count; i++)
+                    {
+                        var (px, py) = MapPointTopLeft(pts[i].X, pts[i].Y, rot, w, h);
+                        path.LineTo(px, py);
+                    }
+                    pb.DrawPath(path, null, strokeC, sw, Chuvadi.Pdf.Graphics.FillRule.NonZeroWinding);
+                }
+                break;
             }
         }
+    }
 
-        // Images above shapes.
-        foreach (var item in imageItems)
+    /// <summary>Builds an open arrow path: a shaft A→B plus a two-line arrowhead at B.</summary>
+    private static Chuvadi.Pdf.Graphics.Path BuildArrow(double ax, double ay, double bx, double by, double sw)
+    {
+        var path = new Chuvadi.Pdf.Graphics.Path().MoveTo(ax, ay).LineTo(bx, by);
+        double dx = bx - ax, dy = by - ay, len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 0.0001) return path;
+        double ux = dx / len, uy = dy / len;
+        double head = Math.Max(8.0, sw * 3.5);
+        const double ang = 0.5; // ~28.6° half-angle
+        (double X, double Y) Rot(double vx, double vy, double a)
         {
-            if (item.ImageBytes is null || item.ImageBytes.Length == 0) continue;
-            var rect = MapToPdfTopLeft(new NormBox(item.X, item.Y, item.W, item.H), rot, w, h);
-            // NOTE: no image-opacity parameter in the library yet, so item.Opacity is not applied
-            // (images stamp at full opacity). Per-item rotation also needs a library CTM — ROADMAP.
-            pb.DrawImage(item.ImageBytes, rect.X, rect.Y, rect.Width, rect.Height);
+            double c = Math.Cos(a), s = Math.Sin(a);
+            return (vx * c - vy * s, vx * s + vy * c);
         }
-
-        using var overlayDoc = PdfDocument.Open(new MemoryStream(overlay.ToByteArray(), writable: false));
-        using var ms = new MemoryStream();
-        PageStamper.Place(ms, target, pageIndex, overlayDoc, 0, Transform.Identity, StampPlacement.Overlay);
-        return ms.ToArray();
+        var (h1x, h1y) = Rot(-ux, -uy, ang);
+        var (h2x, h2y) = Rot(-ux, -uy, -ang);
+        path.MoveTo(bx, by).LineTo(bx + h1x * head, by + h1y * head);
+        path.MoveTo(bx, by).LineTo(bx + h2x * head, by + h2y * head);
+        return path;
     }
 
     /// <summary>Maps a single normalised on-screen point (top-left origin) through the page's

@@ -8,6 +8,9 @@
 @inject IJSRuntime JS
 @inject PressService Press
 @inject DocumentPropertiesService DocProps
+@inject SessionService Session
+@inject RedactRequestService RedactReq
+@inject BenchDropService BenchDrop
 @implements IAsyncDisposable
 
 <PageTitle>Chuvadi · Bench</PageTitle>
@@ -22,8 +25,21 @@
     <div class="bench-bar">
         <a class="bench-back" href="/" title="Back to dashboard"><Icon Name="chevron-left" Size="15" /></a>
         <span class="bench-name">Bench</span>
+        <div class="session-wrap">
+            <button class="bench-session" @onclick="ToggleSessionMenu" title="Save or open a bench session"><Icon Name="save" Size="13" /> Session <span class="caret">▾</span></button>
+            @if (_sessionMenu)
+            {
+                <div class="session-menu">
+                    <button @onclick="SaveSession" disabled="@(_busy || (BenchSvc.IsEmpty && !BenchSvc.HasSources))">Save session…</button>
+                    <button @onclick="OpenSession" disabled="@_busy">Open session…</button>
+                </div>
+            }
+        </div>
         <span style="flex:1"></span>
         <button class="bench-reset" @onclick="ConfirmReset" disabled="@(_busy || (!BenchSvc.HasSources && BenchSvc.IsEmpty))" title="Clear the bench"><Icon Name="rotate-ccw" Size="13" /> Reset</button>
+        <span class="bt-sep"></span>
+        <button class="bench-hist" @onclick="Undo" disabled="@(_busy || !BenchSvc.CanUndo)" title="Undo (Ctrl+Z)" aria-label="Undo"><Icon Name="rotate-ccw" Size="14" /></button>
+        <button class="bench-hist flip" @onclick="Redo" disabled="@(_busy || !BenchSvc.CanRedo)" title="Redo (Ctrl+Y)" aria-label="Redo"><Icon Name="rotate-ccw" Size="14" /></button>
         <span class="bt-sep"></span>
         <span class="bench-view">
             <button class="bv @(_perRow == 1 ? "on" : null)" @onclick="() => SetPerRow(1)" title="One desk per row"><Icon Name="square" Size="15" /></button>
@@ -38,6 +54,10 @@
         @if (BenchSvc.SelectedCount > 0)
         {
             <button class="bt" @onclick="ExtractSelected" disabled="@(_busy || !BenchSvc.CanAddDesk)" title="@(BenchSvc.CanAddDesk ? "Move the selected pages into a new desk" : "30-desk limit reached")"><Icon Name="upload" Size="15" /> Extract (@BenchSvc.SelectedCount)</button>
+        }
+        @if (BenchSvc.SelectedCount == 2)
+        {
+            <button class="bt" @onclick="OpenCompare" disabled="@_busy" title="Compare the two selected pages side by side"><Icon Name="columns" Size="15" /> Compare</button>
         }
     </div>
 
@@ -221,6 +241,11 @@
                         }
                         <button class="desk-wm desk-bm @(desk.AddBookmarks ? "on" : "off")" @onclick="() => BenchSvc.SetDeskBookmarks(deskId, !desk.AddBookmarks)" title="@(desk.AddBookmarks ? "Bookmarks added on Bind (one per source, originals nested) — click to turn off" : "No bookmarks on Bind — click to turn on")">BM</button>
                         <span class="desk-count">@desk.Pages.Count pg</span>
+                        @if (!desk.IsEmpty)
+                        {
+                            <button class="desk-sel" @onclick="() => BenchSvc.SelectAllInDesk(deskId)" title="Select all pages on this desk (Ctrl+A)" aria-label="Select all">All</button>
+                            <button class="desk-sel" @onclick="() => BenchSvc.InvertSelectionInDesk(deskId)" title="Invert selection on this desk" aria-label="Invert selection">Inv</button>
+                        }
                         @if (!string.IsNullOrEmpty(desk.NormalizeSize))
                         {
                             <span class="desk-wm desk-size-chip" title="Every page normalised to @desk.NormalizeSize at Bind / Export">@(desk.NormalizeSize == "Letter" ? "LTR" : "A4")</span>
@@ -232,8 +257,30 @@
                         {
                             <button class="desk-clear" @onclick="() => ClearDesk(deskId)" title="Delete all pages on this desk" aria-label="Delete all pages">Clear</button>
                         }
+                        <button class="desk-more" @onclick="() => ToggleDeskMenu(deskId)" title="More desk actions" aria-label="More actions">⋯</button>
                         <button class="desk-del" @onclick="() => RemoveDesk(deskId)" title="Delete desk" aria-label="Delete desk"><Icon Name="trash" Size="14" /></button>
                     </div>
+                    @if (_deskMenu == deskId)
+                    {
+                        <div class="desk-menu">
+                            <button @onclick="() => OpenDeskInReader(deskId)" disabled="@(_busy || desk.IsEmpty)"><Icon Name="reader" Size="13" /> Open in Reader</button>
+                            <button @onclick="() => SendDeskToRedact(deskId)" disabled="@(_busy || desk.IsEmpty)"><Icon Name="redact" Size="13" /> Send to Redact</button>
+                            <div class="desk-menu-sep"></div>
+                            <button @onclick="() => SaveDeskAsTemplate(deskId)" disabled="@_busy">Save as template…</button>
+                            @if (_templates.Count == 0)
+                            {
+                                <div class="desk-menu-note">No templates yet</div>
+                            }
+                            else
+                            {
+                                <div class="desk-menu-label">Apply template</div>
+                                @foreach (var t in _templates)
+                                {
+                                    <button class="desk-menu-tpl" @onclick="() => ApplyDeskTemplate(deskId, t)" disabled="@_busy" title="Apply &quot;@t.Name&quot; settings to this desk">@t.Name</button>
+                                }
+                            }
+                        </div>
+                    }
                     @if (_deskPalette == deskId)
                     {
                         <div class="desk-palette">
@@ -287,6 +334,28 @@
                                             @if (pg.Crop is { } cr)
                                             {
                                                 <div class="bcrop-mask" style="left:@Pct(cr.X);top:@Pct(cr.Y);width:@Pct(cr.W);height:@Pct(cr.H)"></div>
+                                            }
+                                        </div>
+                                        <div class="bbadges">
+                                            @if (pg.IsBlank)
+                                            {
+                                                <span class="bbadge type">blank</span>
+                                            }
+                                            else if (pg.IsImage)
+                                            {
+                                                <span class="bbadge type">image</span>
+                                            }
+                                            @if (pg.Rotation != 0)
+                                            {
+                                                <span class="bbadge rot" title="Rotated @(pg.Rotation)°">@(pg.Rotation)°</span>
+                                            }
+                                            @if (pg.Crop is not null)
+                                            {
+                                                <span class="bbadge edit" title="Cropped">crop</span>
+                                            }
+                                            @if (pg.Margins is not null)
+                                            {
+                                                <span class="bbadge edit" title="Margins set">margin</span>
                                             }
                                         </div>
                                         @if (BenchSvc.IsSelected(pg.Id))
@@ -635,9 +704,10 @@
                 </div>
                 <label class="modal-lbl">Format</label>
                 <div class="seg">
+                    <button class="@(_expPdf ? "on" : null)" @onclick="() => _expPdf = true" title="Export as a single PDF (desk settings applied)">PDF</button>
                     @foreach (var f in _formats)
                     {
-                        <button class="@(_expFormat == f ? "on" : null)" @onclick="() => _expFormat = f">@f.ToString().ToUpperInvariant()</button>
+                        <button class="@(!_expPdf && _expFormat == f ? "on" : null)" @onclick="() => { _expPdf = false; _expFormat = f; }">@f.ToString().ToUpperInvariant()</button>
                     }
                 </div>
                 <label class="modal-lbl">Pages</label>
@@ -645,7 +715,7 @@
                     <button class="@(_expSelectedOnly ? "on" : null)" @onclick="() => _expSelectedOnly = true" disabled="@(BenchSvc.SelectedInDesk(exId) == 0)">Selected (@BenchSvc.SelectedInDesk(exId))</button>
                     <button class="@(!_expSelectedOnly ? "on" : null)" @onclick="() => _expSelectedOnly = false">All</button>
                 </div>
-                @if (_expFormat != ChuvadiReader.Core.Documents.ExportFormat.Svg)
+                @if (!_expPdf && _expFormat != ChuvadiReader.Core.Documents.ExportFormat.Svg)
                 {
                     <label class="modal-lbl">Resolution</label>
                     <div class="seg">
@@ -655,13 +725,20 @@
                         }
                     </div>
                 }
-                <div class="folder-row">
-                    <span class="folder-path" title="@_expFolder">@_expFolder</span>
-                    <button class="link" @onclick="ChangeExportFolder">change…</button>
-                </div>
+                @if (_expPdf)
+                {
+                    <p class="modal-note">You'll choose where to save the PDF. Watermark, header/footer, numbering and bookmarks are applied.</p>
+                }
+                else
+                {
+                    <div class="folder-row">
+                        <span class="folder-path" title="@_expFolder">@_expFolder</span>
+                        <button class="link" @onclick="ChangeExportFolder">change…</button>
+                    </div>
+                }
                 <div class="modal-foot">
                     <span style="flex:1"></span>
-                    <button class="primary" @onclick="() => RunExport(exId)" disabled="@_expBusy">@(_expBusy ? "exporting…" : "Export →")</button>
+                    <button class="primary" @onclick="() => RunExport(exId)" disabled="@_expBusy">@(_expBusy ? "exporting…" : (_expPdf ? "Save PDF →" : "Export →"))</button>
                 </div>
             </div>
         </div>
@@ -961,6 +1038,73 @@
             </div>
         </div>
     }
+
+    @if (_compareOpen && _comparePair is { } cp)
+    {
+        <div class="modal-scrim" @onclick="CloseCompare">
+            <div class="modal modal-wide cmp-modal" @onclick:stopPropagation="true">
+                <div class="modal-h">
+                    <span>Compare pages</span>
+                    <button class="modal-x" @onclick="CloseCompare" aria-label="Close"><Icon Name="x" Size="14" /></button>
+                </div>
+                <div class="cmp-grid">
+                    <div class="cmp-col">
+                        <div class="cmp-cap">@PageLabel(cp.A)@CompareDeskSuffix(cp.A)</div>
+                        <div class="cmp-stage">
+                            @{
+                                string? svgA = null;
+                                if (!cp.A.IsBlank && !cp.A.IsImage)
+                                {
+                                    BenchSvc.TryGetThumb(cp.A, out svgA);
+                                }
+                            }
+                            <div class="cmp-page" style="@PageAspectStyle(svgA);transform:rotate(@(cp.A.Rotation)deg)">
+                                @if (cp.A.IsBlank)
+                                {
+                                    <div class="cmp-blank" style="@BlankStyle(cp.A)"></div>
+                                }
+                                else if (cp.A.IsImage)
+                                {
+                                    <img class="cmp-img" src="@ImageSrc(cp.A)" alt="(image)" />
+                                }
+                                else if (svgA is not null)
+                                {
+                                    @((MarkupString)ResponsiveSvg(svgA))
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cmp-col">
+                        <div class="cmp-cap">@PageLabel(cp.B)@CompareDeskSuffix(cp.B)</div>
+                        <div class="cmp-stage">
+                            @{
+                                string? svgB = null;
+                                if (!cp.B.IsBlank && !cp.B.IsImage)
+                                {
+                                    BenchSvc.TryGetThumb(cp.B, out svgB);
+                                }
+                            }
+                            <div class="cmp-page" style="@PageAspectStyle(svgB);transform:rotate(@(cp.B.Rotation)deg)">
+                                @if (cp.B.IsBlank)
+                                {
+                                    <div class="cmp-blank" style="@BlankStyle(cp.B)"></div>
+                                }
+                                else if (cp.B.IsImage)
+                                {
+                                    <img class="cmp-img" src="@ImageSrc(cp.B)" alt="(image)" />
+                                }
+                                else if (svgB is not null)
+                                {
+                                    @((MarkupString)ResponsiveSvg(svgB))
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="modal-note">Showing the two selected pages. Close and select a different pair to compare others.</p>
+            </div>
+        </div>
+    }
 </div>
 
 @code {
@@ -976,9 +1120,14 @@
     private string? _resultPath;
 
     private Guid? _deskMenu;
+    private bool _sessionMenu;
+    private List<DeskTemplateDto> _templates = new();
     private int _perRow = 1;
     private bool _fetching;
     private readonly Dictionary<Guid, string> _imgCache = new();
+
+    private bool _compareOpen;
+    private (BenchPage A, BenchPage B)? _comparePair;
 
     // Interleave (item 13) shelf picker
     private bool _interleaveOpen;
@@ -1018,6 +1167,8 @@
     {
         BenchSvc.EnsureDesk();
         BenchSvc.Changed += OnBenchChanged;
+        BenchDrop.SetBenchActive(true);
+        BenchDrop.FilesDropped += OnFilesDropped;
         try
         {
             var saved = await Storage.GetAsync("bench.perRow");
@@ -1033,6 +1184,48 @@
     {
         _dirty = true;
         InvokeAsync(StateHasChanged);
+    }
+
+    // #21 — files dropped from Explorer while the Bench is open are added to the shelf.
+    private void OnFilesDropped(IReadOnlyList<string> paths)
+        => _ = InvokeAsync(() => AddDroppedFiles(paths));
+
+    private async Task AddDroppedFiles(IReadOnlyList<string> paths)
+    {
+        var pdfs = paths
+            .Where(p => string.Equals(System.IO.Path.GetExtension(p), ".pdf", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var skipped = paths.Count - pdfs.Count;
+
+        var added = 0;
+        foreach (var p in pdfs)
+        {
+            try
+            {
+                await BenchSvc.AddSourceAsync(p, System.IO.Path.GetFileName(p));
+                added++;
+            }
+            catch (Exception ex)
+            {
+                _error = true;
+                _status = $"Couldn't add {System.IO.Path.GetFileName(p)}: {ex.Message}";
+            }
+        }
+
+        if (added > 0)
+        {
+            _error = false;
+            _status = skipped > 0
+                ? $"Added {added} file{(added == 1 ? "" : "s")} to the shelf · {skipped} non-PDF skipped."
+                : $"Added {added} file{(added == 1 ? "" : "s")} to the shelf.";
+        }
+        else if (skipped > 0)
+        {
+            _error = true;
+            _status = "Only PDF files can be added to the shelf.";
+        }
+
+        StateHasChanged();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1094,9 +1287,10 @@
     public void CloseTransient()
     {
         var any = _deskMenu is not null || _wmDesk is not null || _hfDesk is not null || _scatterDesk is not null
-                  || _expDesk is not null || _pressSrc is not null || _propsSrc is not null || _showReset;
+                  || _expDesk is not null || _pressSrc is not null || _propsSrc is not null || _showReset || _sessionMenu;
         if (!any) return;
         _deskMenu = null;
+        _sessionMenu = false;
         _wmDesk = null;
         _hfDesk = null;
         _scatterDesk = null;
@@ -1248,6 +1442,310 @@
     }
 
     private void TurnPage(Guid pageId) => BenchSvc.TurnPage(pageId);
+
+    private void Undo() => BenchSvc.Undo();
+
+    // ── sessions, templates, handoff (#36 / #37 / #56 / #57) ────────────────────
+
+    private void ToggleSessionMenu()
+    {
+        _sessionMenu = !_sessionMenu;
+        _deskMenu = null;
+    }
+
+    private async Task ToggleDeskMenu(Guid deskId)
+    {
+        if (_deskMenu == deskId)
+        {
+            _deskMenu = null;
+            return;
+        }
+
+        _deskMenu = deskId;
+        _sessionMenu = false;
+        await LoadTemplates();
+    }
+
+    private async Task LoadTemplates()
+    {
+        try
+        {
+            _templates = await Session.ListTemplatesAsync();
+        }
+        catch
+        {
+            _templates = new List<DeskTemplateDto>();
+        }
+    }
+
+    private async Task SaveSession()
+    {
+        _sessionMenu = false;
+        var path = await Picker.PickSaveSessionAsync("bench-session");
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        try
+        {
+            await Session.SaveSessionAsync(path, BenchSvc.ExportSession());
+            _error = false;
+            _status = $"Session saved to {System.IO.Path.GetFileName(path)}.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _status = $"Couldn't save the session: {ex.Message}";
+        }
+    }
+
+    private async Task OpenSession()
+    {
+        _sessionMenu = false;
+        var path = await Picker.PickOpenSessionAsync();
+        if (string.IsNullOrEmpty(path))
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyLabel = "Opening session…";
+        StateHasChanged();
+        try
+        {
+            var dto = await Session.LoadSessionAsync(path);
+            var result = await BenchSvc.ImportSessionAsync(dto);
+            _error = false;
+            _status = result.HasWarnings
+                ? $"Session opened with {result.SourcesLoaded} source(s). Skipped {result.SourcesMissing} missing source(s) and {result.PagesSkipped} page(s): {string.Join("; ", result.Warnings.Take(4))}{(result.Warnings.Count > 4 ? "…" : "")}"
+                : $"Session opened — {result.SourcesLoaded} source(s) restored.";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _status = $"Couldn't open the session: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+            _busyLabel = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveDeskAsTemplate(Guid deskId)
+    {
+        _deskMenu = null;
+        var desk = BenchSvc.Desks.FirstOrDefault(d => d.Id == deskId);
+        var name = string.IsNullOrWhiteSpace(desk?.Name) ? "Template" : desk!.Name.Trim();
+        var tpl = BenchSvc.CaptureTemplate(deskId, name);
+        if (tpl is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Session.SaveTemplateAsync(tpl);
+            await LoadTemplates();
+            _error = false;
+            _status = $"Saved desk settings as template \"{tpl.Name}\".";
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _status = $"Couldn't save the template: {ex.Message}";
+        }
+    }
+
+    private void ApplyDeskTemplate(Guid deskId, DeskTemplateDto template)
+    {
+        _deskMenu = null;
+        BenchSvc.ApplyTemplate(deskId, template);
+        _error = false;
+        _status = $"Applied template \"{template.Name}\" to the desk.";
+    }
+
+    private async Task OpenDeskInReader(Guid deskId) => await BindDeskAndRoute(deskId, toRedact: false);
+
+    private async Task SendDeskToRedact(Guid deskId) => await BindDeskAndRoute(deskId, toRedact: true);
+
+    private async Task BindDeskAndRoute(Guid deskId, bool toRedact)
+    {
+        _deskMenu = null;
+        var desk = BenchSvc.Desks.FirstOrDefault(d => d.Id == deskId);
+        if (desk is null || desk.IsEmpty)
+        {
+            return;
+        }
+
+        _busy = true;
+        _busyLabel = toRedact ? "Sending to Redact…" : "Opening in Reader…";
+        StateHasChanged();
+        try
+        {
+            var safe = string.IsNullOrWhiteSpace(desk.Name) ? "desk" : desk.Name.Trim();
+            foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+            {
+                safe = safe.Replace(c, '_');
+            }
+
+            var tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{safe}-{Guid.NewGuid():N}.pdf");
+            await BenchSvc.BindDeskAsync(deskId, tmp);
+
+            if (toRedact)
+            {
+                RedactReq.Request(tmp, safe + ".pdf");
+                Nav.NavigateTo("/redact");
+            }
+            else
+            {
+                OpenDoc.Request(tmp, safe + ".pdf");
+                Nav.NavigateTo("/reader");
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = true;
+            _status = $"Couldn't bind the desk: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+            _busyLabel = null;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Strips the intrinsic <c>width</c>/<c>height</c> attributes from the rendered page
+    /// SVG so it has only its <c>viewBox</c> and therefore scales to fill its container, instead of
+    /// imposing its natural point size (which would overflow the compare frame).</summary>
+    private static string ResponsiveSvg(string svg)
+    {
+        var end = svg.IndexOf('>');
+        if (end < 0)
+        {
+            return svg;
+        }
+
+        var head = System.Text.RegularExpressions.Regex.Replace(
+            svg[..end], @"\s(width|height)\s*=\s*""[^""]*""", "");
+        return head + svg[end..];
+    }
+
+    /// <summary>Sizes a compare frame to the page's true aspect ratio, read from the rendered SVG's
+    /// viewBox. Matching the frame to the viewBox means the SVG fills it exactly with no clipping or
+    /// letterboxing, whatever the page's real size. Falls back to A4 when the viewBox is absent
+    /// (e.g. blank/image pages).</summary>
+    private static string PageAspectStyle(string? svg)
+    {
+        var ratio = "1 / 1.414";
+        if (!string.IsNullOrEmpty(svg))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                svg, @"viewBox\s*=\s*[""']\s*[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+([\d.]+)");
+            if (m.Success
+                && double.TryParse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture, out var w)
+                && double.TryParse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture, out var h)
+                && w > 0 && h > 0)
+            {
+                ratio = string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture, $"{w} / {h}");
+            }
+        }
+        return $"aspect-ratio: {ratio};";
+    }
+
+    private void Redo() => BenchSvc.Redo();
+
+    private async Task OpenCompare()
+    {
+        var pair = BenchSvc.SelectedPair();
+        if (pair is not { } p)
+        {
+            return;
+        }
+
+        foreach (var page in new[] { p.A, p.B })
+        {
+            if (!page.IsBlank && !page.IsImage && !BenchSvc.TryGetThumb(page, out _))
+            {
+                await BenchSvc.RenderThumbAsync(page);
+            }
+        }
+
+        _comparePair = p;
+        _compareOpen = true;
+        StateHasChanged();
+    }
+
+    private void CloseCompare()
+    {
+        _compareOpen = false;
+        _comparePair = null;
+    }
+
+    private string CompareDeskSuffix(BenchPage p)
+    {
+        var name = BenchSvc.DeskOf(p.Id)?.Name;
+        return string.IsNullOrWhiteSpace(name) ? "" : $" · {name}";
+    }
+
+    /// <summary>Keyboard shortcuts reported by bench.js (it filters out typing in inputs and ignores
+    /// keys while a modal is open). Desk-scoped actions target the active desk.</summary>
+    [JSInvokable]
+    public async Task OnKey(string key, bool ctrl, bool shift, bool alt)
+    {
+        if (_busy)
+        {
+            return;
+        }
+
+        if (_compareOpen && key == "Escape")
+        {
+            CloseCompare();
+            StateHasChanged();
+            return;
+        }
+
+        var active = BenchSvc.ActiveDesk;
+
+        if (ctrl && !alt && key is "z" or "Z" && !shift)
+        {
+            BenchSvc.Undo();
+        }
+        else if (ctrl && !alt && (key is "y" or "Y" || (shift && key is "z" or "Z")))
+        {
+            BenchSvc.Redo();
+        }
+        else if (ctrl && !alt && key is "a" or "A" && active is { } sa)
+        {
+            BenchSvc.SelectAllInDesk(sa);
+        }
+        else if (ctrl && !alt && key is "d" or "D" && active is { } sd)
+        {
+            BenchSvc.DuplicateSelected(sd);
+        }
+        else if (!ctrl && !alt && key is "r" or "R" && active is { } sr)
+        {
+            BenchSvc.RotateSelected(sr, clockwise: !shift);
+        }
+        else if (!ctrl && !alt && key is "Delete" or "Backspace")
+        {
+            BenchSvc.RemoveSelectedAll();
+        }
+        else if (key == "Escape")
+        {
+            BenchSvc.ClearSelection();
+        }
+        else
+        {
+            return;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
 
     private void RemovePage(Guid pageId) => BenchSvc.RemovePage(pageId);
 
@@ -2125,6 +2623,7 @@
     private ChuvadiReader.Core.Documents.ExportFormat _expFormat = ChuvadiReader.Core.Documents.ExportFormat.Png;
     private int _expDpi = 150;
     private bool _expSelectedOnly;
+    private bool _expPdf;
     private bool _expBusy;
     private string _expFolder = string.Empty;
 
@@ -2133,6 +2632,7 @@
         _deskMenu = null;
         _expFolder = SaveFolders.SubFolder("Export");
         _expSelectedOnly = BenchSvc.SelectedInDesk(deskId) > 0;
+        _expPdf = false;
         _expDesk = deskId;
     }
 
@@ -2146,6 +2646,35 @@
 
     private async Task RunExport(Guid deskId)
     {
+        if (_expPdf)
+        {
+            var path = await Picker.PickSavePdfAsync(SafeFileName(DeskName(deskId)));
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+
+            _expBusy = true; StateHasChanged();
+            try
+            {
+                if (_expSelectedOnly && BenchSvc.SelectedInDesk(deskId) > 0)
+                {
+                    await BenchSvc.LiftDeskAsync(deskId, path);
+                }
+                else
+                {
+                    await BenchSvc.BindDeskAsync(deskId, path);
+                }
+
+                _expDesk = null;
+                _status = $"Exported PDF: {System.IO.Path.GetFileName(path)}";
+                _error = false; _resultPath = path;
+            }
+            catch (Exception ex) { _status = ex.Message; _error = true; }
+            finally { _expBusy = false; StateHasChanged(); }
+            return;
+        }
+
         _expBusy = true; StateHasChanged();
         try
         {
@@ -2156,6 +2685,16 @@
         }
         catch (Exception ex) { _status = ex.Message; _error = true; }
         finally { _expBusy = false; StateHasChanged(); }
+    }
+
+    private static string SafeFileName(string name)
+    {
+        var safe = string.IsNullOrWhiteSpace(name) ? "desk" : name.Trim();
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+        {
+            safe = safe.Replace(c, '_');
+        }
+        return safe;
     }
 
     private string? _pressSrc;
@@ -2280,6 +2819,8 @@
     public async ValueTask DisposeAsync()
     {
         BenchSvc.Changed -= OnBenchChanged;
+        BenchDrop.FilesDropped -= OnFilesDropped;
+        BenchDrop.SetBenchActive(false);
         try
         {
             if (_module is not null)

@@ -73,13 +73,17 @@ public partial class App : Application
             services.AddSingleton<ExportService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.RedactService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.StampService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.DocxViewService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.XlsxViewService>();
             services.AddSingleton<PressService>();
             services.AddSingleton<IPdfReader, ChuvadiPdfReader>();
             services.AddSingleton<TabsService>();
             services.AddSingleton<PdfToolsService>();
             services.AddSingleton<BenchComposer>();
             services.AddSingleton<BenchService>();
+            services.AddSingleton<SessionService>();
             services.AddSingleton<OpenDocumentService>();
+            services.AddSingleton<BenchDropService>();
             services.AddSingleton<RedactRequestService>();
             services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
             services.AddSingleton<IFilePicker, WpfFilePicker>();

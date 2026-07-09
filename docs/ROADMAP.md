@@ -373,15 +373,15 @@ The full Bench feature set folded into v1 scope (agreed Jun 2026). ✅ = already
 16. Fetch a PDF ✅
 17. Collapsible sources ✅
 18. Page thumbnails ✅
-19. Page-range fetch (bring in only pp. X–Y)  — open (follow-up)
+19. Page-range fetch (bring in only pp. X–Y) ✅ (shelf per-source “Pages e.g. 1-5, 8” input → SetSourcePageFilter; N/M count + All reset)
 20. Fetch multiple files at once ✅ (FetchFile loops PickDocumentsAsync)
-21. Drag files in from Explorer  — open (follow-up; WebView2 file-path limits)
+21. Drag files in from Explorer ✅ (#344 — WPF host Drop reads real FileDrop paths; route-aware: adds PDFs to the shelf when the Bench is open via BenchDropService, else opens in Reader)
 22. Reorder sources ✅ (BenchService.MoveSource + ↑/↓ on each source header)
 23. Remove a source ✅ (shelf 'Close file', delivered #317)
 24. Collapse-all / expand-all ✅ (shelf toolbar toggle + BenchService.SetAllCollapsed)
-25. Search a source and jump to a page  — open (follow-up; needs library search)
-26. Larger page preview on hover
-27. Thumbnail size slider
+25. Search a source and jump to a page ✅ (shelf per-source “Search this file…” → DocumentSearch; matches as page chips → JumpToPage + “Only matches” filter)
+26. Larger page preview on hover ✅ (bench.js shelf hover-preview: clones the thumbnail into an enlarged floating box; desk pages have a peek button)
+27. Thumbnail size slider ✅ (shelf header 4-step size slider → --shelf-thumb / SetShelfThumb)
 
 **Desk management**
 28. Multiple desks ✅
@@ -392,8 +392,8 @@ The full Bench feature set folded into v1 scope (agreed Jun 2026). ✅ = already
 33. Duplicate a desk ✅ (#335 — deep copy of pages + size/colour/watermark/header-footer, inserted after the original)
 34. Desk colour / label ✅ (#335 — label via rename; colour swatch + 8-colour palette, drives the desk-card top accent)
 35. Per-desk page-size & margin normalization ✅ (size via #15; **Add Margins** #332: per-page hover-strip Margins dialog — cm/in toggle, Default 0.5in preset, per-side T/R/B/L, apply to This page / All pages on the desk; content scales-to-fit-centered inside the page minus margins, page size unchanged. v1 limitation: page-space margins on rotated pages)
-36. Desk templates / presets
-37. Save / restore a whole bench session (arrangement, not just output)
+36. Desk templates / presets ✅ (#342 — CaptureTemplate/ApplyTemplate; app-data store desk-templates.json; per-desk ⋯ menu)
+37. Save / restore a whole bench session ✅ (#342 — Session ▾ menu: Save/Open .json; sources by path; missing-source skip+warn)
 
 **Imposition / layout (print-shop style)**
 38. N-up ✅ (#336 — desk “Impose” dialog: 2/4/6/9-up + custom rows×cols, A4/Letter, gutter; flattens the desk then lays pages scaled-fit-centered per cell → new source + new desk) (2-up, 4-up) onto one sheet
@@ -405,26 +405,26 @@ The full Bench feature set folded into v1 scope (agreed Jun 2026). ✅ = already
 42. Bind a desk → PDF ✅
 43. Scatter / export desks ✅
 44. Combine all desks into one PDF ✅ (#335 — “Combine” toolbar button: binds each desk with its own settings, then object-level merge via PageOperations.Merge; distinct from “Bind all” one-per-desk)
-45. Export selected pages only
-46. Export pages as images (PNG / JPG)
+45. Export selected pages only ✅ (per-desk Lift = selected→PDF; Export modal Selected/All; #343 added PDF option)
+46. Export pages as images (PNG / JPG) ✅ (Export modal: PNG/JPG/BMP/SVG + DPI → ExportDeskAsync). NOTE: blocked by library bug LA-29 — PageRasterizer drops CFF/FontFile3 text; SVG export is faithful, raster is not, until fixed)
 47. Export with bookmarks ✅ (#340 — desk “BM” toggle, default on: Bind writes a per-source-section outline, each source's own bookmarks nested + remapped to output pages)
-48. Encrypt / password-protect on export
+48. Encrypt / password-protect on export — LIBRARY ASK (LA-26): low-level EncryptionOptions exists but no clean high-level save-encrypted
 49. PDF/A export
 50. Compress & downsample images on export
-51. Flatten annotations on export
-52. Print directly
+51. Flatten annotations on export — LIBRARY ASK (LA-28): no flatten primitive exists (only unrelated PathFlattener)
+52. Print directly — pending (host-side WPF; agreed approach: bind → render via ExportService → native PrintDialog/FixedDocument; deferred)
 
 **Quality-of-life**
-53. Undo / redo for desk edits
-54. Select-all / invert selection
-55. Keyboard shortcuts for arrange
-56. Open a desk's result in the Reader
-57. Send a desk to Redact
-58. Page badges (source colour, rotation indicator) ◐
-59. Compare two pages side by side
-60. Image-page thumbnail polish (downsize the inline data-URI, tidy drag feel)
+53. Undo / redo for desk edits ✅ (#341)
+54. Select-all / invert selection ✅ (#341 — per-desk)
+55. Keyboard shortcuts for arrange ✅ (#341 — Ctrl+Z/Y/A, Esc, Del, R/Shift+R, Ctrl+D)
+56. Open a desk's result in the Reader ✅ (#342 — ⋯ menu → bind desk → OpenDoc.Request → /reader)
+57. Send a desk to Redact ✅ (#342 — ⋯ menu → bind desk → RedactReq.Request → /redact)
+58. Page badges (source colour, rotation indicator) ✅ (#341)
+59. Compare two pages side by side ✅ (#341 — select 2 → Compare; #341p1–p4 fixed the page sizing: aspect from viewBox + min-width:0 + definite height)
+60. Image-page thumbnail polish ✅ (#341)
 
-> Held: not started. Dr. Arun has another job first; we resume here page by page.
+> Status (June 2026): the Bench-60 is COMPLETE except #52 Print (deferred, host-side). #48/#51 are library asks (LA-26/LA-28). Shipped across deltas #335–#344.
 
 ---
 
@@ -561,6 +561,8 @@ Wire `PatternSets`/`PatternValidators` into the deferred find-and-redact SSN/PII
 ## 12. Outstanding library asks (consolidated)
 
 - **#84 Redactor rect-removal position-unreliable** (above) — highest priority; breaks core redaction.
+- **LA-29 `PageRasterizer` drops/garbles CFF (Type1C/`FontFile3`) text** — highest priority for export; breaks image export (#46) on most professional PDFs. PROVEN on `User_manual_english.pdf` (p2: SVG 46 text els vs raster 0% ink; no RenderOptions combo fixes it; SVG renderer renders the same fonts fine). See LA doc.
+- **LA-30 `SvgRenderer` ImageEncoder crash** — `ArgumentOutOfRangeException` in `ImageEncoder.EncodePng` on a page with an embedded image (manual p10).
 - **#82 HeaderFooter `Background` floods whole page** under ReserveAndScale/ScaleIfIntruding.
 - **#62 Pattern/regex redaction removes nothing** (rect path aside; presets gated off until fixed).
 - **#70 Shapes:** `Graphics.Path` exists but `PageBuilder` has no draw-path / ellipse / polygon.

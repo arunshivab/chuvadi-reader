@@ -20,6 +20,15 @@ public sealed class BenchService
     private readonly List<Desk> _desks = new();
     private readonly HashSet<Guid> _selected = new();
     private Guid? _selectionAnchor;
+    private Guid? _activeDesk;
+
+    // ── undo / redo history (desk + page edits only; shelf and selection excluded) ──
+    private const int MaxHistory = 50;
+    private readonly List<BenchSnapshot> _undo = new();
+    private readonly List<BenchSnapshot> _redo = new();
+    private BenchSnapshot? _baseline;   // state as of the last accepted edit (the next undo target)
+    private string _baselineSig = "";   // structural signature of that state
+    private bool _restoring;            // true while applying a snapshot, to suppress re-recording
     private readonly ChuvadiReader.Core.Documents.StampService _stamp = new();
     private readonly ChuvadiReader.Core.Documents.OutlineService _outline = new();
 
@@ -30,6 +39,8 @@ public sealed class BenchService
         _reader = reader;
         _composer = composer;
         _export = export;
+        _baseline = TakeSnapshot();
+        _baselineSig = DeskSignature();
     }
 
     public IReadOnlyList<BenchSource> Sources => _sources;
@@ -46,7 +57,301 @@ public sealed class BenchService
 
     public event Action? Changed;
 
-    private void Raise() => Changed?.Invoke();
+    /// <summary>Notify the UI. When a desk/page edit changed the structural signature (and we are
+    /// not mid-restore), the pre-edit state is pushed onto the undo stack first. Selection-only and
+    /// shelf-only changes leave the signature unchanged, so they never create history entries.</summary>
+    private void Raise()
+    {
+        if (!_restoring)
+        {
+            var sig = DeskSignature();
+            if (sig != _baselineSig)
+            {
+                if (_baseline is not null)
+                {
+                    _undo.Add(_baseline);
+                    if (_undo.Count > MaxHistory)
+                    {
+                        _undo.RemoveAt(0);
+                    }
+                    _redo.Clear();
+                }
+                _baseline = TakeSnapshot();
+                _baselineSig = sig;
+            }
+        }
+
+        Changed?.Invoke();
+    }
+
+    // ── undo / redo ─────────────────────────────────────────────────────────────
+
+    public bool CanUndo => _undo.Count > 0;
+
+    public bool CanRedo => _redo.Count > 0;
+
+    /// <summary>The desk keyboard shortcuts act on (the one most recently selected into). Null
+    /// when nothing is active.</summary>
+    public Guid? ActiveDesk => _activeDesk is { } a && _desks.Any(d => d.Id == a) ? _activeDesk : _desks.FirstOrDefault()?.Id;
+
+    public void SetActiveDesk(Guid? deskId) => _activeDesk = deskId;
+
+    /// <summary>Steps back one desk/page edit. No-op when there is nothing to undo.</summary>
+    public void Undo()
+    {
+        if (_undo.Count == 0)
+        {
+            return;
+        }
+
+        var current = TakeSnapshot();
+        var target = _undo[^1];
+        _undo.RemoveAt(_undo.Count - 1);
+        _redo.Add(current);
+        if (_redo.Count > MaxHistory)
+        {
+            _redo.RemoveAt(0);
+        }
+
+        ApplySnapshot(target);
+    }
+
+    /// <summary>Re-applies the edit most recently undone. No-op when there is nothing to redo.</summary>
+    public void Redo()
+    {
+        if (_redo.Count == 0)
+        {
+            return;
+        }
+
+        var current = TakeSnapshot();
+        var target = _redo[^1];
+        _redo.RemoveAt(_redo.Count - 1);
+        _undo.Add(current);
+        if (_undo.Count > MaxHistory)
+        {
+            _undo.RemoveAt(0);
+        }
+
+        ApplySnapshot(target);
+    }
+
+    private void ClearHistory()
+    {
+        _undo.Clear();
+        _redo.Clear();
+        _baseline = TakeSnapshot();
+        _baselineSig = DeskSignature();
+    }
+
+    /// <summary>Captures the current desk arrangement + selection as an independent deep copy.</summary>
+    private BenchSnapshot TakeSnapshot() => new(
+        _desks.Select(d => d.Clone()).ToList(),
+        new HashSet<Guid>(_selected),
+        _selectionAnchor,
+        _activeDesk);
+
+    /// <summary>Restores a snapshot (re-cloned so the stored copy stays pristine) and re-bases the
+    /// history baseline to the restored state, then notifies the UI once.</summary>
+    private void ApplySnapshot(BenchSnapshot snap)
+    {
+        _restoring = true;
+        try
+        {
+            _desks.Clear();
+            _desks.AddRange(snap.Desks.Select(d => d.Clone()));
+            _selected.Clear();
+            foreach (var id in snap.Selected)
+            {
+                _selected.Add(id);
+            }
+            _selectionAnchor = snap.Anchor;
+            _activeDesk = snap.ActiveDesk;
+            _baseline = TakeSnapshot();
+            _baselineSig = DeskSignature();
+        }
+        finally
+        {
+            _restoring = false;
+        }
+
+        Changed?.Invoke();
+    }
+
+    /// <summary>A structural fingerprint of everything the undo history tracks: desk order, names,
+    /// colours, normalise/bookmarks, the per-desk stamp configs, and each page's id / rotation /
+    /// crop / margins. Selection and shelf state are deliberately excluded.</summary>
+    private string DeskSignature()
+    {
+        var sb = new System.Text.StringBuilder(256);
+        foreach (var d in _desks)
+        {
+            sb.Append('D').Append(d.Id.ToString("N")).Append('|')
+              .Append(d.Name).Append('|').Append(d.NameLocked ? '1' : '0').Append('|')
+              .Append(d.NormalizeSize).Append('|').Append(d.ColorHex).Append('|')
+              .Append(d.AddBookmarks ? '1' : '0').Append('|');
+
+            if (d.Watermark is { } w)
+            {
+                sb.Append("W:").Append(w.Text).Append(';').Append(w.FontFamily).Append(';')
+                  .Append(w.Bold ? '1' : '0').Append(w.Italic ? '1' : '0').Append(';')
+                  .Append(w.FontSize).Append(';').Append(w.ColorHex).Append(';')
+                  .Append(w.Opacity).Append(';').Append(w.RotationDegrees).Append(';')
+                  .Append(w.AllPages ? '1' : '0').Append(';').Append(w.FromPage).Append(';').Append(w.ToPage).Append('|');
+            }
+            if (d.HeaderFooter is { } h)
+            {
+                sb.Append("H:").Append(h.HeaderLeft).Append(';').Append(h.HeaderCenter).Append(';').Append(h.HeaderRight).Append(';')
+                  .Append(h.FooterLeft).Append(';').Append(h.FooterCenter).Append(';').Append(h.FooterRight).Append(';')
+                  .Append(h.FontSize).Append(';').Append(h.ColorHex).Append(';').Append(h.Fit).Append(';')
+                  .Append(h.BackgroundEnabled ? '1' : '0').Append(';').Append(h.BackgroundHex).Append(';')
+                  .Append(h.BandHeight).Append(';').Append(h.MarginX).Append(';')
+                  .Append(h.AllPages ? '1' : '0').Append(';').Append(h.FromPage).Append(';').Append(h.ToPage).Append('|');
+            }
+            if (d.Numbering is { } n)
+            {
+                sb.Append("N:").Append(n.Style).Append(';').Append(n.Prefix).Append(';').Append(n.Start).Append(';')
+                  .Append(n.PadWidth).Append(';').Append(n.Position).Append(';').Append(n.FontSize).Append(';')
+                  .Append(n.ColorHex).Append(';').Append(n.AllPages ? '1' : '0').Append(';')
+                  .Append(n.FromPage).Append(';').Append(n.ToPage).Append(';').Append(n.FirstPage).Append('|');
+            }
+
+            foreach (var p in d.Pages)
+            {
+                sb.Append('p').Append(p.Id.ToString("N")).Append(':').Append(p.Rotation);
+                if (p.Crop is { } c)
+                {
+                    sb.Append("c(").Append(c.X).Append(',').Append(c.Y).Append(',').Append(c.W).Append(',').Append(c.H).Append(')').Append(p.CropMode);
+                }
+                if (p.Margins is { } m)
+                {
+                    sb.Append("m(").Append(m.Top).Append(',').Append(m.Right).Append(',').Append(m.Bottom).Append(',').Append(m.Left).Append(')');
+                }
+                sb.Append(';');
+            }
+            sb.Append('\n');
+        }
+        return sb.ToString();
+    }
+
+    // ── select-all / invert (per desk) ──────────────────────────────────────────
+
+    /// <summary>Adds every page on the desk to the selection.</summary>
+    public void SelectAllInDesk(Guid deskId)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null || desk.Pages.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var p in desk.Pages)
+        {
+            _selected.Add(p.Id);
+        }
+        _selectionAnchor = desk.Pages[^1].Id;
+        _activeDesk = deskId;
+        Raise();
+    }
+
+    /// <summary>Flips the selected state of every page on the desk.</summary>
+    public void InvertSelectionInDesk(Guid deskId)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null || desk.Pages.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var p in desk.Pages)
+        {
+            if (!_selected.Remove(p.Id))
+            {
+                _selected.Add(p.Id);
+            }
+        }
+        _activeDesk = deskId;
+        Raise();
+    }
+
+    /// <summary>The two distinct pages currently selected (for the side-by-side compare), or null
+    /// when the selection is not exactly two pages.</summary>
+    public (BenchPage A, BenchPage B)? SelectedPair()
+    {
+        var pages = _desks.SelectMany(d => d.Pages).Where(p => _selected.Contains(p.Id)).ToList();
+        return pages.Count == 2 ? (pages[0], pages[1]) : null;
+    }
+
+    /// <summary>Removes every selected page across all desks (the Delete shortcut).</summary>
+    public void RemoveSelectedAll()
+    {
+        if (_selected.Count == 0)
+        {
+            return;
+        }
+
+        var removed = 0;
+        foreach (var desk in _desks)
+        {
+            removed += desk.Pages.RemoveAll(p => _selected.Contains(p.Id));
+        }
+        if (removed == 0)
+        {
+            return;
+        }
+
+        _selected.RemoveWhere(id => !_desks.Any(d => d.Pages.Any(p => p.Id == id)));
+        Raise();
+    }
+
+    /// <summary>Rotates the selected pages on a desk by ±90° (whole desk if nothing is selected).</summary>
+    public void RotateSelected(Guid deskId, bool clockwise)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null)
+        {
+            return;
+        }
+
+        var targets = desk.Pages.Where(p => _selected.Contains(p.Id)).ToList();
+        if (targets.Count == 0)
+        {
+            targets = desk.Pages.ToList();
+        }
+
+        var delta = clockwise ? 90 : 270;
+        foreach (var page in targets)
+        {
+            page.Rotation = (page.Rotation + delta) % 360;
+        }
+        Raise();
+    }
+
+    /// <summary>Duplicates every selected page on a desk in place (after each original).</summary>
+    public void DuplicateSelected(Guid deskId)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null)
+        {
+            return;
+        }
+
+        var ids = desk.Pages.Where(p => _selected.Contains(p.Id)).Select(p => p.Id).ToList();
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var id in ids)
+        {
+            var idx = desk.Pages.FindIndex(p => p.Id == id);
+            if (idx >= 0)
+            {
+                desk.Pages.Insert(idx + 1, ClonePage(desk.Pages[idx]));
+            }
+        }
+        Raise();
+    }
 
     // ── shelf ─────────────────────────────────────────────────────────────────
 
@@ -602,6 +907,7 @@ public sealed class BenchService
         }
 
         _selectionAnchor = id;
+        _activeDesk = DeskOf(id)?.Id ?? _activeDesk;
         Raise();
     }
 
@@ -698,6 +1004,9 @@ public sealed class BenchService
         BackgroundHex = p.BackgroundHex,
         IsImage = p.IsImage,
         ImagePath = p.ImagePath,
+        Crop = p.Crop,
+        CropMode = p.CropMode,
+        Margins = p.Margins,
     };
 
     /// <summary>Inserts a copy of a page directly after the original, on the same desk.</summary>
@@ -1296,6 +1605,237 @@ public sealed class BenchService
 
     // ── reset ──────────────────────────────────────────────────────────────────
 
+    // ── sessions & templates (#36 / #37) ───────────────────────────────────────
+
+    /// <summary>Captures the whole bench — shelf sources and every desk/page/setting — as a
+    /// serializable DTO. Sources are recorded by path, not embedded.</summary>
+    public BenchSessionDto ExportSession() => new()
+    {
+        Version = 1,
+        Sources = _sources
+            .OrderBy(s => s.Index)
+            .Select(s => new SessionSourceDto
+            {
+                Index = s.Index,
+                Path = s.Path,
+                FileName = s.FileName,
+                PageFilter = s.PageFilter?.ToList(),
+                Collapsed = s.Collapsed,
+            })
+            .ToList(),
+        Desks = _desks
+            .Select(d => new SessionDeskDto
+            {
+                Name = d.Name,
+                NameLocked = d.NameLocked,
+                ColorHex = d.ColorHex,
+                NormalizeSize = d.NormalizeSize,
+                AddBookmarks = d.AddBookmarks,
+                Watermark = d.Watermark?.Clone(),
+                HeaderFooter = d.HeaderFooter?.Clone(),
+                Numbering = d.Numbering?.Clone(),
+                Pages = d.Pages.Select(p => new SessionPageDto
+                {
+                    SourceIndex = p.SourceIndex,
+                    OriginalIndex = p.OriginalIndex,
+                    SourcePath = p.SourcePath,
+                    SourceName = p.SourceName,
+                    Rotation = p.Rotation,
+                    IsBlank = p.IsBlank,
+                    BackgroundHex = p.BackgroundHex,
+                    IsImage = p.IsImage,
+                    ImagePath = p.ImagePath,
+                    Crop = p.Crop,
+                    CropMode = p.CropMode,
+                    Margins = p.Margins,
+                }).ToList(),
+            })
+            .ToList(),
+    };
+
+    /// <summary>Replaces the whole bench with a restored session. Each source is re-opened from its
+    /// path; a source whose file is missing is skipped (and its pages with it), and every skip is
+    /// reported in the returned <see cref="SessionImportResult"/>. Pages are matched to sources by
+    /// path, so a single missing source doesn't corrupt the rest.</summary>
+    public async Task<SessionImportResult> ImportSessionAsync(BenchSessionDto session, CancellationToken ct = default)
+    {
+        var result = new SessionImportResult();
+
+        foreach (var source in _sources)
+        {
+            source.Session.Dispose();
+        }
+        _sources.Clear();
+        _desks.Clear();
+        _selected.Clear();
+        _selectionAnchor = null;
+        _activeDesk = null;
+
+        // Re-open the sources first, by path. Skipped sources are remembered so their pages drop.
+        var byPath = new Dictionary<string, BenchSource>(StringComparer.OrdinalIgnoreCase);
+        foreach (var sd in session.Sources.OrderBy(s => s.Index))
+        {
+            if (byPath.ContainsKey(sd.Path))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (!File.Exists(sd.Path))
+                {
+                    throw new FileNotFoundException(sd.Path);
+                }
+
+                var pdfSession = await _reader.OpenAsync(sd.Path, sd.FileName, null, ct).ConfigureAwait(false);
+                var src = new BenchSource
+                {
+                    Index = _sources.Count == 0 ? 0 : _sources.Max(s => s.Index) + 1,
+                    Path = sd.Path,
+                    FileName = sd.FileName,
+                    Session = pdfSession,
+                };
+                src.PageFilter = sd.PageFilter is { Count: > 0 } ? sd.PageFilter.ToList() : null;
+                src.Collapsed = sd.Collapsed;
+                _sources.Add(src);
+                byPath[sd.Path] = src;
+            }
+            catch
+            {
+                result.SourcesMissing++;
+                result.Warnings.Add($"Source not found — skipped: {sd.FileName}");
+            }
+        }
+        result.SourcesLoaded = _sources.Count;
+
+        foreach (var dd in session.Desks)
+        {
+            var desk = new Desk
+            {
+                Name = dd.Name,
+                NameLocked = dd.NameLocked,
+                ColorHex = dd.ColorHex,
+                NormalizeSize = dd.NormalizeSize,
+                AddBookmarks = dd.AddBookmarks,
+                Watermark = dd.Watermark?.Clone(),
+                HeaderFooter = dd.HeaderFooter?.Clone(),
+                Numbering = dd.Numbering?.Clone(),
+            };
+
+            foreach (var pd in dd.Pages)
+            {
+                if (pd.IsBlank)
+                {
+                    desk.Pages.Add(new BenchPage
+                    {
+                        SourcePath = string.Empty,
+                        SourceName = string.Empty,
+                        SourceIndex = -1,
+                        OriginalIndex = -1,
+                        IsBlank = true,
+                        BackgroundHex = pd.BackgroundHex,
+                        Rotation = pd.Rotation,
+                        Crop = pd.Crop,
+                        CropMode = pd.CropMode,
+                        Margins = pd.Margins,
+                    });
+                }
+                else if (pd.IsImage)
+                {
+                    if (string.IsNullOrEmpty(pd.ImagePath) || !File.Exists(pd.ImagePath))
+                    {
+                        result.PagesSkipped++;
+                        result.Warnings.Add($"Image not found — skipped: {Path.GetFileName(pd.ImagePath ?? "(unknown)")}");
+                        continue;
+                    }
+
+                    desk.Pages.Add(new BenchPage
+                    {
+                        SourcePath = string.Empty,
+                        SourceName = string.Empty,
+                        SourceIndex = -1,
+                        OriginalIndex = -1,
+                        IsImage = true,
+                        ImagePath = pd.ImagePath,
+                        Rotation = pd.Rotation,
+                        Crop = pd.Crop,
+                        CropMode = pd.CropMode,
+                        Margins = pd.Margins,
+                    });
+                }
+                else if (byPath.TryGetValue(pd.SourcePath, out var src))
+                {
+                    desk.Pages.Add(new BenchPage
+                    {
+                        SourcePath = src.Path,
+                        SourceName = src.FileName,
+                        SourceIndex = src.Index,
+                        OriginalIndex = pd.OriginalIndex,
+                        Rotation = pd.Rotation,
+                        Crop = pd.Crop,
+                        CropMode = pd.CropMode,
+                        Margins = pd.Margins,
+                    });
+                }
+                else
+                {
+                    // Its source was missing/skipped above (already reported at source level).
+                    result.PagesSkipped++;
+                }
+            }
+
+            _desks.Add(desk);
+        }
+
+        if (_desks.Count == 0)
+        {
+            EnsureDesk();
+        }
+
+        ClearHistory();
+        Raise();
+        return result;
+    }
+
+    /// <summary>Snapshots a desk's settings (no pages) as a reusable template.</summary>
+    public DeskTemplateDto? CaptureTemplate(Guid deskId, string name)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null)
+        {
+            return null;
+        }
+
+        return new DeskTemplateDto
+        {
+            Name = string.IsNullOrWhiteSpace(name) ? "Template" : name.Trim(),
+            ColorHex = desk.ColorHex,
+            NormalizeSize = desk.NormalizeSize,
+            AddBookmarks = desk.AddBookmarks,
+            Watermark = desk.Watermark?.Clone(),
+            HeaderFooter = desk.HeaderFooter?.Clone(),
+            Numbering = desk.Numbering?.Clone(),
+        };
+    }
+
+    /// <summary>Applies a template's settings to a desk (its pages are untouched). Undoable.</summary>
+    public void ApplyTemplate(Guid deskId, DeskTemplateDto template)
+    {
+        var desk = FindDesk(deskId);
+        if (desk is null)
+        {
+            return;
+        }
+
+        desk.ColorHex = template.ColorHex;
+        desk.NormalizeSize = template.NormalizeSize;
+        desk.AddBookmarks = template.AddBookmarks;
+        desk.Watermark = template.Watermark?.Clone();
+        desk.HeaderFooter = template.HeaderFooter?.Clone();
+        desk.Numbering = template.Numbering?.Clone();
+        Raise();
+    }
+
     public void Reset()
     {
         foreach (var source in _sources)
@@ -1307,7 +1847,18 @@ public sealed class BenchService
         _desks.Clear();
         _selected.Clear();
         _selectionAnchor = null;
+        _activeDesk = null;
         EnsureDesk();
+        ClearHistory();
         Raise();
     }
+
+    /// <summary>An immutable deep-copied capture of the desk arrangement and selection, used as
+    /// one undo/redo step. Desks are already cloned when a snapshot is taken and cloned again when
+    /// applied, so a stored snapshot is never mutated by later edits.</summary>
+    private sealed record BenchSnapshot(
+        List<Desk> Desks,
+        HashSet<Guid> Selected,
+        Guid? Anchor,
+        Guid? ActiveDesk);
 }

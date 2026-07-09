@@ -149,6 +149,9 @@
                 <button class="mk-tool @(_mkTool == "image" ? "on" : null)" @onclick="AddImageViaPicker" title="Add image"><Icon Name="image" Size="15" /> Image</button>
                 <button class="mk-tool @(_mkTool == "rect" ? "on" : null)" @onclick='() => SetMkTool("rect")' title="Rectangle"><Icon Name="shape-rect" Size="15" /> Rect</button>
                 <button class="mk-tool @(_mkTool == "line" ? "on" : null)" @onclick='() => SetMkTool("line")' title="Line"><Icon Name="minus" Size="15" /> Line</button>
+                <button class="mk-tool @(_mkTool == "ellipse" ? "on" : null)" @onclick='() => SetMkTool("ellipse")' title="Ellipse"><Icon Name="shape-ellipse" Size="15" /> Ellipse</button>
+                <button class="mk-tool @(_mkTool == "arrow" ? "on" : null)" @onclick='() => SetMkTool("arrow")' title="Arrow"><Icon Name="shape-arrow" Size="15" /> Arrow</button>
+                <button class="mk-tool @(_mkTool == "freehand" ? "on" : null)" @onclick='() => SetMkTool("freehand")' title="Freehand draw"><Icon Name="shape-draw" Size="15" /> Draw</button>
                 <button class="mk-tool @(_sigOpen ? "on" : null)" @onclick="OpenSignature" title="Add signature"><Icon Name="sign" Size="15" /> Sign</button>
             </div>
 
@@ -180,13 +183,13 @@
             else if (_selShape is { } ssel)
             {
                 <span class="mk-style">
-                    <span class="mk-style-lbl">@(ssel.Kind == ShapeKind.Line ? "Line" : "Rectangle")</span>
+                    <span class="mk-style-lbl">@ShapeKindLabel(ssel.Kind)</span>
                     <span class="mk-stroke-lbl">Stroke</span>
                     <label class="mk-swatch custom on" title="Stroke colour" style="background:@ssel.StrokeHex">
                         <input type="color" value="@ssel.StrokeHex" @onchange="e => SetShapeStroke(ssel, e)" />
                     </label>
                     <input class="mk-num" type="number" min="0.25" max="60" step="0.25" value="@ssel.StrokeWidthPt" @onchange="e => SetShapeWidth(ssel, e)" title="Stroke width (pt)" />
-                    @if (ssel.Kind == ShapeKind.Rectangle)
+                    @if (ssel.Kind == ShapeKind.Rectangle || ssel.Kind == ShapeKind.Ellipse)
                     {
                         <span class="mk-fill-grp">
                             <button class="mk-tg @(string.IsNullOrEmpty(ssel.FillHex) ? null : "on")" @onclick="() => ToggleShapeFill(ssel)" title="Toggle fill">Fill</button>
@@ -198,6 +201,8 @@
                             }
                         </span>
                     }
+                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@ssel.Rotation" @onchange="e => SetShapeRotation(ssel, e)" title="Rotation (°)" />°</span>
+                    <button class="mk-tg @(ssel.BehindContent ? "on" : null)" @onclick="() => { ssel.BehindContent = !ssel.BehindContent; }" title="Place behind page content">Behind</button>
                     <button class="mk-tg del" @onclick="() => RemoveSelectedShape()" title="Delete shape">&times;</button>
                 </span>
             }
@@ -207,7 +212,12 @@
                     <span class="mk-style-lbl">Image</span>
                     <button class="mk-tg @(isel.Lock ? "on" : null)" @onclick="() => ToggleImageLock(isel)" title="@(isel.Lock ? "Aspect locked" : "Aspect unlocked")"><Icon Name="lock" Size="13" /></button>
                     <button class="mk-tg" @onclick="AddImageViaPicker" title="Replace / add another image"><Icon Name="image" Size="13" /></button>
-                    <span class="mk-note" title="The library can't apply image opacity yet (v40)">full opacity</span>
+                    <span class="mk-opacity" title="Opacity">
+                        <input class="mk-range" type="range" min="0.1" max="1" step="0.05" value="@isel.Opacity" @oninput="e => SetImageOpacity(isel, e)" />
+                        <span class="mk-opacity-val">@(((int)Math.Round(isel.Opacity * 100)))%</span>
+                    </span>
+                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@isel.Rotation" @onchange="e => SetImageRotation(isel, e)" title="Rotation (°)" />°</span>
+                    <button class="mk-tg @(isel.BehindContent ? "on" : null)" @onclick="() => { isel.BehindContent = !isel.BehindContent; }" title="Place behind page content">Behind</button>
                     <button class="mk-tg del" @onclick="() => RemoveSelectedImage()" title="Delete image">&times;</button>
                 </span>
             }
@@ -444,7 +454,7 @@
                         }
                         @if (_markup)
                         {
-                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null) @((_mkTool == "rect" || _mkTool == "line") ? "drawmode" : null)" data-page="@n"
+                            <div class="mk-layer @(_mkTool == "text" ? "textmode" : null) @(IsShapeTool(_mkTool) ? "drawmode" : null)" data-page="@n"
                                  @onpointerdown="e => MkDown(e, n)" @onpointermove="MkMove" @onpointerup="MkUp">
                                 @if (_texts.TryGetValue(n, out var tboxes))
                                 {
@@ -474,15 +484,15 @@
                                     <div class="mk-text draft" style="left:@Pct(td.X);top:@Pct(td.Y);width:@Pct(td.W);height:@Pct(td.H)"></div>
                                 }
 
-                                @* Shapes: rectangles as boxes, lines as an SVG overlay. *@
+                                @* Shapes: rect/ellipse as boxes; line/arrow/freehand as an SVG overlay. *@
                                 @if (_shapes.TryGetValue(n, out var shapeList))
                                 {
-                                    @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Rectangle))
+                                    @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Ellipse))
                                     {
                                         var sb = s;
                                         var selS = ReferenceEquals(_selShape, sb);
-                                        <div class="mk-shape rect @(selS ? "sel" : null)"
-                                             style="left:@Pct(sb.X);top:@Pct(sb.Y);width:@Pct(sb.W);height:@Pct(sb.H);border-color:@sb.StrokeHex;border-width:@(ShapeBorderPx(sb.StrokeWidthPt))px;background:@(string.IsNullOrEmpty(sb.FillHex) ? "transparent" : sb.FillHex)"
+                                        <div class="mk-shape rect @(sb.Kind == ShapeKind.Ellipse ? "ell" : null) @(sb.BehindContent ? "behind" : null) @(selS ? "sel" : null)"
+                                             style="left:@Pct(sb.X);top:@Pct(sb.Y);width:@Pct(sb.W);height:@Pct(sb.H);border-color:@sb.StrokeHex;border-width:@(ShapeBorderPx(sb.StrokeWidthPt))px;background:@(string.IsNullOrEmpty(sb.FillHex) ? "transparent" : sb.FillHex);@(sb.Kind == ShapeKind.Ellipse ? "border-radius:50%;" : "")transform:rotate(@(F(sb.Rotation))deg)"
                                              @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveShape(e, n, sb)">
                                             @if (selS)
                                             {
@@ -493,21 +503,36 @@
                                     }
 
                                     <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                        @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Line))
+                                        @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Line || s.Kind == ShapeKind.Arrow))
                                         {
                                             var sb = s;
                                             var selS = ReferenceEquals(_selShape, sb);
                                             <line x1="@F(sb.X * 100)" y1="@F(sb.Y * 100)" x2="@F((sb.X + sb.W) * 100)" y2="@F((sb.Y + sb.H) * 100)"
                                                   stroke="@sb.StrokeHex" stroke-width="@F(sb.StrokeWidthPt)" stroke-linecap="round"
                                                   vector-effect="non-scaling-stroke" class="@(selS ? "sel" : null)" />
+                                            @if (sb.Kind == ShapeKind.Arrow)
+                                            {
+                                                <polyline points="@ArrowHeadPoints(sb)" fill="none" stroke="@sb.StrokeHex" stroke-width="@F(sb.StrokeWidthPt)"
+                                                          stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                            }
                                             <line x1="@F(sb.X * 100)" y1="@F(sb.Y * 100)" x2="@F((sb.X + sb.W) * 100)" y2="@F((sb.Y + sb.H) * 100)"
                                                   stroke="transparent" stroke-width="12" vector-effect="non-scaling-stroke"
                                                   style="pointer-events:stroke;cursor:move"
                                                   @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveShape(e, n, sb)" />
                                         }
+                                        @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Freehand && s.Points is { Count: >= 2 }))
+                                        {
+                                            var sb = s;
+                                            var selS = ReferenceEquals(_selShape, sb);
+                                            <polyline points="@PointsAttr(sb.Points!)" fill="none" stroke="@sb.StrokeHex" stroke-width="@F(sb.StrokeWidthPt)"
+                                                      stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" class="@(selS ? "sel" : null)" />
+                                            <polyline points="@PointsAttr(sb.Points!)" fill="none" stroke="transparent" stroke-width="12"
+                                                      vector-effect="non-scaling-stroke" style="pointer-events:stroke;cursor:move"
+                                                      @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveShape(e, n, sb)" />
+                                        }
                                     </svg>
 
-                                    @foreach (var s in shapeList.Where(s => s.Kind == ShapeKind.Line && ReferenceEquals(_selShape, s)))
+                                    @foreach (var s in shapeList.Where(s => (s.Kind == ShapeKind.Line || s.Kind == ShapeKind.Arrow) && ReferenceEquals(_selShape, s)))
                                     {
                                         var sb = s;
                                         <span class="mk-line-end" style="left:@Pct(sb.X);top:@Pct(sb.Y)" title="Move start"
@@ -518,7 +543,7 @@
                                 }
                                 @if (_shapeDraft is { } sd && _shapeDraftPage == n)
                                 {
-                                    @if (_mkTool == "line")
+                                    @if (_mkTool == "line" || _mkTool == "arrow")
                                     {
                                         <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
                                             <line x1="@F(sd.X * 100)" y1="@F(sd.Y * 100)" x2="@F((sd.X + sd.W) * 100)" y2="@F((sd.Y + sd.H) * 100)"
@@ -526,9 +551,16 @@
                                                   vector-effect="non-scaling-stroke" stroke-dasharray="4 3" />
                                         </svg>
                                     }
+                                    else if (_mkTool == "freehand" && _freehandPts is { Count: >= 2 })
+                                    {
+                                        <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                            <polyline points="@PointsAttr(_freehandPts)" fill="none" stroke="@_shapeStroke" stroke-width="@F(_shapeStrokeWidth)"
+                                                      stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" />
+                                        </svg>
+                                    }
                                     else
                                     {
-                                        <div class="mk-shape rect draft" style="left:@Pct(sd.X);top:@Pct(sd.Y);width:@Pct(sd.W);height:@Pct(sd.H);border-color:@_shapeStroke"></div>
+                                        <div class="mk-shape rect draft @(_mkTool == "ellipse" ? "ell" : null)" style="left:@Pct(sd.X);top:@Pct(sd.Y);width:@Pct(sd.W);height:@Pct(sd.H);border-color:@_shapeStroke;@(_mkTool == "ellipse" ? "border-radius:50%;" : "")"></div>
                                     }
                                 }
 
@@ -539,8 +571,8 @@
                                     {
                                         var ib = im;
                                         var selI = ReferenceEquals(_selImage, ib);
-                                        <div class="mk-image @(selI ? "sel" : null)"
-                                             style="left:@Pct(ib.X);top:@Pct(ib.Y);width:@Pct(ib.W);height:@Pct(ib.H)"
+                                        <div class="mk-image @(ib.BehindContent ? "behind" : null) @(selI ? "sel" : null)"
+                                             style="left:@Pct(ib.X);top:@Pct(ib.Y);width:@Pct(ib.W);height:@Pct(ib.H);opacity:@F(ib.Opacity);transform:rotate(@(F(ib.Rotation))deg)"
                                              @onpointerdown:stopPropagation="true" @onpointerdown="e => StartMoveImage(e, n, ib)">
                                             <img src="@ib.DataUrl" draggable="false" />
                                             @if (selI)
@@ -1368,9 +1400,11 @@
         public double H { get; set; }
         public byte[] Bytes { get; set; } = Array.Empty<byte>();
         public string DataUrl { get; set; } = "";
-        public double Opacity { get; set; } = 1.0;   // recorded; library stamps full opacity (v40)
+        public double Opacity { get; set; } = 1.0;   // 0–1 alpha, applied on stamp
         public bool Lock { get; set; } = true;        // aspect lock on by default
         public double Aspect { get; set; } = 1.0;     // natural width/height (pixels)
+        public double Rotation { get; set; }          // degrees, clockwise on screen
+        public bool BehindContent { get; set; }       // draw under the page content
     }
 
     private sealed class ShapeBox
@@ -1383,6 +1417,9 @@
         public string? FillHex { get; set; }            // rectangle only; null = no fill
         public string StrokeHex { get; set; } = "#E03131";
         public double StrokeWidthPt { get; set; } = 2;
+        public double Rotation { get; set; }            // degrees, clockwise on screen
+        public bool BehindContent { get; set; }         // draw under the page content
+        public List<(double X, double Y)>? Points { get; set; }  // freehand path (normalised)
     }
 
     private enum MkMode
@@ -1406,6 +1443,7 @@
     // Shape draft + style defaults for new shapes.
     private int _shapeDraftPage = -1;
     private NormBox? _shapeDraft;
+    private List<(double X, double Y)>? _freehandPts;   // accumulates while drawing freehand
     private string _shapeStroke = "#E03131";
     private string? _shapeFill = null;          // null = no fill
     private double _shapeStrokeWidth = 2;
@@ -1419,6 +1457,7 @@
     private ShapeBox? _dragShape;
     private ImageBox? _dragImage;
     private double _dragOX, _dragOY, _dragOW, _dragOH;
+    private List<(double X, double Y)>? _dragShapePts;   // freehand points snapshot at move start
     private bool _lineEndIsEnd = true;           // which end of a line is being dragged
 
     private bool _mkSaving;
@@ -1988,6 +2027,35 @@
         _mkStatus = null; _mkSavedPath = null;
     }
 
+    private static bool IsShapeTool(string? t) =>
+        t is "rect" or "line" or "ellipse" or "arrow" or "freehand";
+
+    /// <summary>"x,y x,y …" in the 0–100 viewBox space for an SVG polyline/polygon.</summary>
+    private static string PointsAttr(IEnumerable<(double X, double Y)> pts) =>
+        string.Join(" ", pts.Select(p => $"{F(p.X * 100)},{F(p.Y * 100)}"));
+
+    /// <summary>Arrowhead barbs for a preview arrow, as an SVG polyline "barb tip barb"
+    /// in the 0–100 viewBox space. Approximate (the viewBox is non-uniform); the saved
+    /// PDF uses the library's exact arrowhead.</summary>
+    private static string ArrowHeadPoints(ShapeBox sb)
+    {
+        double x2 = (sb.X + sb.W) * 100, y2 = (sb.Y + sb.H) * 100;
+        double dx = sb.W * 100, dy = sb.H * 100, len = Math.Sqrt(dx * dx + dy * dy);
+        if (len < 0.001) return $"{F(x2)},{F(y2)}";
+        double ux = dx / len, uy = dy / len;
+        double head = Math.Max(3.0, sb.StrokeWidthPt * 1.6);
+        const double a = 0.5;
+        (double X, double Y) Barb(double sign)
+        {
+            double c = Math.Cos(a), s = sign * Math.Sin(a);
+            double rx = -ux * c + uy * s;
+            double ry = -ux * s - uy * c;
+            return (x2 + rx * head, y2 + ry * head);
+        }
+        var b1 = Barb(1); var b2 = Barb(-1);
+        return $"{F(b1.X)},{F(b1.Y)} {F(x2)},{F(y2)} {F(b2.X)},{F(b2.Y)}";
+    }
+
     private void EnsureMarkupDoc()
     {
         var path = Tab?.Path;
@@ -2024,12 +2092,15 @@
         _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
         _mkStatus = null; _mkSavedPath = null;
 
-        if (_mkTool == "rect" || _mkTool == "line")
+        if (IsShapeTool(_mkTool))
         {
             _selShape = null;
             _mkMode = MkMode.ShapeDraw;
             _shapeDraftPage = page;
             _shapeDraft = new NormBox(_mkStartX, _mkStartY, 0, 0);
+            _freehandPts = _mkTool == "freehand"
+                ? new List<(double X, double Y)> { (_mkStartX, _mkStartY) }
+                : null;
         }
         else if (_mkTool == "image")
         {
@@ -2069,10 +2140,17 @@
                 break;
 
             case MkMode.ShapeDraw:
-                if (_mkTool == "line")
+                if (_mkTool == "line" || _mkTool == "arrow")
                 {
                     // Free endpoints (signed), so any angle is allowed.
                     _shapeDraft = new NormBox(_mkStartX, _mkStartY, cx - _mkStartX, cy - _mkStartY);
+                }
+                else if (_mkTool == "freehand")
+                {
+                    (_freehandPts ??= new()).Add((cx, cy));
+                    var xs = _freehandPts.Select(p => p.X); var ys = _freehandPts.Select(p => p.Y);
+                    double minX = xs.Min(), minY = ys.Min();
+                    _shapeDraft = new NormBox(minX, minY, xs.Max() - minX, ys.Max() - minY);
                 }
                 else
                 {
@@ -2082,7 +2160,7 @@
                 break;
 
             case MkMode.MoveShape when _dragShape is { } s:
-                if (s.Kind == ShapeKind.Line)
+                if (s.Kind == ShapeKind.Line || s.Kind == ShapeKind.Arrow)
                 {
                     // Translate both endpoints, keeping them on-page.
                     var nx = _dragOX + (cx - _mkStartX);
@@ -2091,6 +2169,16 @@
                     var minY = Math.Min(0, s.H); var maxY = Math.Max(0, s.H);
                     s.X = Math.Clamp(nx, -minX, 1 - maxX);
                     s.Y = Math.Clamp(ny, -minY, 1 - maxY);
+                }
+                else if (s.Kind == ShapeKind.Freehand && _dragShapePts is { } op)
+                {
+                    // Translate every captured point by the same delta (clamped to page).
+                    double dx = cx - _mkStartX, dy = cy - _mkStartY;
+                    double maxDx = 1 - (s.X + s.W), maxDy = 1 - (s.Y + s.H);
+                    dx = Math.Clamp(dx, -s.X, maxDx);
+                    dy = Math.Clamp(dy, -s.Y, maxDy);
+                    s.Points = op.Select(p => (p.X + dx, p.Y + dy)).ToList();
+                    s.X = Clamp01(_dragOX + dx); s.Y = Clamp01(_dragOY + dy);
                 }
                 else
                 {
@@ -2168,41 +2256,52 @@
             case MkMode.ShapeDraw:
                 {
                     var d = _shapeDraft ?? new NormBox(_mkStartX, _mkStartY, 0, 0);
-                    if (_mkTool == "line")
+                    if (_mkTool == "line" || _mkTool == "arrow")
                     {
                         // Need a minimum length; a bare click does nothing.
                         if (Math.Abs(d.W) > 0.01 || Math.Abs(d.H) > 0.01)
                         {
-                            var sb = new ShapeBox
+                            AddShape(_shapeDraftPage, new ShapeBox
                             {
-                                Kind = ShapeKind.Line,
+                                Kind = _mkTool == "arrow" ? ShapeKind.Arrow : ShapeKind.Line,
                                 X = Clamp01(d.X), Y = Clamp01(d.Y), W = d.W, H = d.H,
                                 StrokeHex = _shapeStroke, StrokeWidthPt = _shapeStrokeWidth,
-                            };
-                            AddShape(_shapeDraftPage, sb);
+                            });
+                        }
+                    }
+                    else if (_mkTool == "freehand")
+                    {
+                        if (_freehandPts is { Count: >= 2 })
+                        {
+                            AddShape(_shapeDraftPage, new ShapeBox
+                            {
+                                Kind = ShapeKind.Freehand,
+                                X = Clamp01(d.X), Y = Clamp01(d.Y), W = d.W, H = d.H,
+                                StrokeHex = _shapeStroke, StrokeWidthPt = _shapeStrokeWidth,
+                                Points = _freehandPts.ToList(),
+                            });
                         }
                     }
                     else
                     {
-                        // Tiny drag = a click → default-sized rectangle at the click point.
+                        // Tiny drag = a click → default-sized box at the click point.
                         var w = d.W < 0.02 ? 0.20 : d.W;
                         var h = d.H < 0.02 ? 0.12 : d.H;
                         var x = Math.Min(d.X, 1 - w);
                         var y = Math.Min(d.Y, 1 - h);
-                        var sb = new ShapeBox
+                        AddShape(_shapeDraftPage, new ShapeBox
                         {
-                            Kind = ShapeKind.Rectangle,
+                            Kind = _mkTool == "ellipse" ? ShapeKind.Ellipse : ShapeKind.Rectangle,
                             X = Clamp01(x), Y = Clamp01(y), W = w, H = h,
                             FillHex = _shapeFill, StrokeHex = _shapeStroke, StrokeWidthPt = _shapeStrokeWidth,
-                        };
-                        AddShape(_shapeDraftPage, sb);
+                        });
                     }
                 }
                 break;
         }
 
         _mkMode = MkMode.None;
-        _textDraft = null; _shapeDraft = null;
+        _textDraft = null; _shapeDraft = null; _freehandPts = null;
         _textDraftPage = -1; _shapeDraftPage = -1;
         _dragText = null; _dragShape = null; _dragImage = null;
     }
@@ -2283,6 +2382,7 @@
         _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
         _mkStartY = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
         _dragShape = sb; _dragOX = sb.X; _dragOY = sb.Y;
+        _dragShapePts = sb.Points?.ToList();
         _mkMode = MkMode.MoveShape;
     }
 
@@ -2327,6 +2427,21 @@
             _shapeStrokeWidth = sb.StrokeWidthPt;
         }
     }
+
+    private void SetShapeRotation(ShapeBox sb, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+            sb.Rotation = Math.Clamp(v, -180, 180);
+    }
+
+    private static string ShapeKindLabel(ShapeKind k) => k switch
+    {
+        ShapeKind.Line => "Line",
+        ShapeKind.Ellipse => "Ellipse",
+        ShapeKind.Arrow => "Arrow",
+        ShapeKind.Freehand => "Drawing",
+        _ => "Rectangle",
+    };
 
     // ── Images ────────────────────────────────────────────────────────────────
     private async Task AddImageViaPicker()
@@ -2441,6 +2556,18 @@
     }
 
     private void ToggleImageLock(ImageBox ib) => ib.Lock = !ib.Lock;
+
+    private void SetImageOpacity(ImageBox ib, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+            ib.Opacity = Math.Clamp(v, 0.1, 1.0);
+    }
+
+    private void SetImageRotation(ImageBox ib, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.CultureInfo.InvariantCulture, out var v))
+            ib.Rotation = Math.Clamp(v, -180, 180);
+    }
 
     private async Task StartMoveImage(PointerEventArgs e, int page, ImageBox ib)
     {
@@ -2579,8 +2706,10 @@
                 kv => new PageShape(RotationFor(kv.Key),
                     kv.Value.Select(s => new ShapeAnno(
                             s.X, s.Y, s.W, s.H, s.Kind,
-                            s.Kind == ShapeKind.Rectangle ? s.FillHex : null,
-                            s.StrokeHex, s.StrokeWidthPt, 0))
+                            (s.Kind == ShapeKind.Rectangle || s.Kind == ShapeKind.Ellipse) ? s.FillHex : null,
+                            s.StrokeHex, s.StrokeWidthPt, s.Rotation,
+                            s.BehindContent,
+                            s.Points is { Count: > 0 } ? (IReadOnlyList<(double X, double Y)>)s.Points.ToList() : null))
                         .ToList() as IReadOnlyList<ShapeAnno>));
 
     private Dictionary<int, PageImage> BuildImagesDict() =>
@@ -2590,7 +2719,7 @@
                 kv => kv.Key,
                 kv => new PageImage(RotationFor(kv.Key),
                     kv.Value.Where(i => i.Bytes.Length > 0)
-                        .Select(i => new ImageAnno(i.X, i.Y, i.W, i.H, i.Bytes, 0, i.Opacity))
+                        .Select(i => new ImageAnno(i.X, i.Y, i.W, i.H, i.Bytes, i.Rotation, i.Opacity, i.BehindContent))
                         .ToList() as IReadOnlyList<ImageAnno>));
 
     private async Task SaveInPlace()

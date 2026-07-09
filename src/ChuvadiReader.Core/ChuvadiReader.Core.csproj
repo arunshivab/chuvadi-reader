@@ -11,6 +11,8 @@
       The meta-package pulls Chuvadi.Pdf.Documents + Chuvadi.Pdf.Svg (and the
       rest of the cross-platform modules), which is what ChuvadiPdfReader uses.
     -->
-    <PackageReference Include="Chuvadi.Pdf" Version="3.14.1" />
+    <PackageReference Include="Chuvadi.Pdf" Version="3.17.1" />
+    <PackageReference Include="Chuvadi.Docs" Version="1.1.0" />
+    <PackageReference Include="Chuvadi.Sheets" Version="1.1.2" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,76 @@
+@using ChuvadiReader.Core.Documents
+
+@if (Block is WordHeading h)
+{
+    <div class="wv-h wv-h@(h.Level)" style="text-align:@Align(h.Align)"><DocRunsView Runs="h.Runs" /></div>
+}
+else if (Block is WordPara p)
+{
+    @if (p.ListKind == "bullet")
+    {
+        <div class="wv-li wv-bullet" style="margin-left:@(Indent(p.ListLevel))px"><span class="wv-marker">•</span><span class="wv-li-body"><DocRunsView Runs="p.Runs" /></span></div>
+    }
+    else if (p.ListKind == "number")
+    {
+        <div class="wv-li wv-num" style="margin-left:@(Indent(p.ListLevel))px"><span class="wv-marker">–</span><span class="wv-li-body"><DocRunsView Runs="p.Runs" /></span></div>
+    }
+    else if (p.Quote)
+    {
+        <blockquote class="wv-quote" style="text-align:@Align(p.Align)"><DocRunsView Runs="p.Runs" /></blockquote>
+    }
+    else if (p.Runs.Count == 0)
+    {
+        <p class="wv-p wv-empty">&nbsp;</p>
+    }
+    else
+    {
+        <p class="wv-p" style="text-align:@Align(p.Align)"><DocRunsView Runs="p.Runs" /></p>
+    }
+}
+else if (Block is WordTableBlock t)
+{
+    <table class="wv-table">
+        @if (t.ColWidthsPt.Count > 0)
+        {
+            <colgroup>
+                @foreach (var w in t.ColWidthsPt)
+                {
+                    <col style="width:@(w.ToString(System.Globalization.CultureInfo.InvariantCulture))pt" />
+                }
+            </colgroup>
+        }
+        <tbody>
+            @foreach (var row in t.Rows)
+            {
+                <tr class="@(row.Header ? "wv-tr-head" : null)">
+                    @foreach (var cell in row.Cells)
+                    {
+                        <td class="wv-td" colspan="@cell.ColSpan" style="@CellStyle(cell)">
+                            @foreach (var cb in cell.Content)
+                            {
+                                <DocBlockView Block="cb" />
+                            }
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired] public WordBlock Block { get; set; } = default!;
+
+    private static string Align(string a) => a switch
+    {
+        "Center" => "center",
+        "Right" => "right",
+        "Justify" => "justify",
+        _ => "left",
+    };
+
+    private static int Indent(int level) => 8 + Math.Clamp(level, 0, 8) * 24;
+
+    private static string? CellStyle(WordCell c) =>
+        c.ShadeHex is { } sh ? $"background-color:{sh}" : null;
+}

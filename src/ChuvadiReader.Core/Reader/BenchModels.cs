@@ -35,7 +35,7 @@ public sealed class BenchSource
 /// </summary>
 public sealed class BenchPage
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; init; } = Guid.NewGuid();
 
     public required string SourcePath { get; init; }
 
@@ -76,6 +76,28 @@ public sealed class BenchPage
     /// content scales to fit inside the page minus these margins; the page size is unchanged.
     /// Null = no margins.</summary>
     public MarginSet? Margins { get; set; }
+
+    /// <summary>A full, identity-preserving deep copy — same <see cref="Id"/> and every field,
+    /// including rotation, crop and margins. Used by the undo/redo history so a restore brings
+    /// back the exact same page objects (selection, which is keyed by Id, stays valid).
+    /// <see cref="CropRect"/> and <see cref="MarginSet"/> are immutable records, so sharing the
+    /// reference is safe.</summary>
+    public BenchPage Clone() => new()
+    {
+        Id = Id,
+        SourcePath = SourcePath,
+        SourceName = SourceName,
+        SourceIndex = SourceIndex,
+        OriginalIndex = OriginalIndex,
+        Rotation = Rotation,
+        IsBlank = IsBlank,
+        BackgroundHex = BackgroundHex,
+        IsImage = IsImage,
+        ImagePath = ImagePath,
+        Crop = Crop,
+        CropMode = CropMode,
+        Margins = Margins,
+    };
 }
 
 /// <summary>A normalised crop window (top-left origin, y-down, fractions 0..1).</summary>
@@ -329,7 +351,7 @@ public sealed class DeskNumbering
 /// </summary>
 public sealed class Desk
 {
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; init; } = Guid.NewGuid();
 
     public string Name { get; set; } = string.Empty;
 
@@ -358,4 +380,27 @@ public sealed class Desk
     public string? ColorHex { get; set; }
 
     public bool IsEmpty => Pages.Count == 0;
+
+    /// <summary>A full, identity-preserving deep copy — same <see cref="Id"/>, same page Ids,
+    /// and deep copies of every per-desk setting. Used by the undo/redo history.</summary>
+    public Desk Clone()
+    {
+        var copy = new Desk
+        {
+            Id = Id,
+            Name = Name,
+            NameLocked = NameLocked,
+            Watermark = Watermark?.Clone(),
+            HeaderFooter = HeaderFooter?.Clone(),
+            Numbering = Numbering?.Clone(),
+            AddBookmarks = AddBookmarks,
+            NormalizeSize = NormalizeSize,
+            ColorHex = ColorHex,
+        };
+        foreach (var p in Pages)
+        {
+            copy.Pages.Add(p.Clone());
+        }
+        return copy;
+    }
 }

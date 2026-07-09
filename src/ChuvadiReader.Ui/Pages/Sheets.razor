@@ -1,0 +1,176 @@
+@page "/sheets"
+@using ChuvadiReader.Core.Documents
+@inject XlsxViewService Xlsx
+@inject IFilePicker Picker
+
+<PageTitle>Chuvadi · Sheets</PageTitle>
+
+<div class="shp">
+    <div class="shp-bar">
+        <a href="/" class="shp-back"><Icon Name="chevron-left" Size="14" /> dashboard</a>
+        <span class="shp-title"><Icon Name="grid-view" Size="15" /> Sheets</span>
+        @if (_wb is not null)
+        {
+            <span class="shp-name" title="@_path">@System.IO.Path.GetFileName(_path)</span>
+            <span class="shp-meta">@_wb.Sheets.Count sheet@(_wb.Sheets.Count == 1 ? "" : "s")</span>
+        }
+        <div class="shp-spacer"></div>
+        <button class="shp-open" @onclick="Open"><Icon Name="image" Size="14" /> Open Excel file</button>
+    </div>
+
+    <div class="shp-stage">
+        @if (_error is not null)
+        {
+            <div class="shp-msg shp-err"><Icon Name="x" Size="16" /> @_error</div>
+        }
+        else if (_wb is null)
+        {
+            <div class="shp-empty">
+                <div class="shp-empty-card">
+                    <div class="shp-empty-ic"><Icon Name="grid-view" Size="40" /></div>
+                    <h2>View a spreadsheet</h2>
+                    <p>Open an <strong>.xlsx</strong> file to read it here as a grid — values, multiple sheets and frozen headers, no Excel needed.</p>
+                    <button class="shp-open lg" @onclick="Open"><Icon Name="image" Size="16" /> Open Excel file</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            var s = _wb.Sheets[_active];
+            var lastRow = Math.Min(Math.Max(s.LastRow + 2, 24), 5000);
+            var lastCol = Math.Min(Math.Max(s.LastCol + 1, 12), 256);
+            <div class="shp-gridwrap">
+                <table class="shp-grid">
+                    <thead>
+                        <tr>
+                            <th class="shp-corner"></th>
+                            @for (int c = 1; c <= lastCol; c++)
+                            {
+                                <th class="shp-colhdr" style="@ColWidthStyle(s, c)">@ColLetter(c)</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int r = 1; r <= lastRow; r++)
+                        {
+                            <tr>
+                                <th class="shp-rowhdr">@r</th>
+                                @for (int c = 1; c <= lastCol; c++)
+                                {
+                                    var cell = Cell(r, c);
+                                    <td class="shp-cell @(cell is null ? "empty" : null) @(s.FreezeRows > 0 && r <= s.FreezeRows ? "frozen-row" : null)"
+                                        style="@CellStyle(cell)">@cell?.Text</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="shp-tabs">
+                @for (int i = 0; i < _wb.Sheets.Count; i++)
+                {
+                    var idx = i;
+                    <button class="shp-tab @(idx == _active ? "on" : null)" @onclick="() => Select(idx)">@_wb.Sheets[idx].Name</button>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private WorkbookView? _wb;
+    private string _path = "";
+    private string? _error;
+    private int _active;
+    private Dictionary<(int, int), SheetCell> _index = new();
+
+    private async Task Open()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path)) return;
+        Load(path);
+    }
+
+    private void Load(string path)
+    {
+        _error = null;
+        if (!path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            _wb = null;
+            _error = "That isn't an Excel workbook. Please choose a .xlsx file.";
+            return;
+        }
+
+        try
+        {
+            _wb = Xlsx.Load(path);
+            _path = path;
+            _active = 0;
+            Reindex();
+        }
+        catch (DocumentViewException ex) when (ex.Reason == ViewErrorReason.PasswordProtected)
+        {
+            _wb = null;
+            _error = "This workbook is password-protected — open it in Excel and save an unprotected copy to view it here.";
+        }
+        catch (DocumentViewException ex)
+        {
+            _wb = null;
+            _error = $"{ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            _wb = null;
+            _error = $"Couldn't open this workbook: {ex.Message}";
+        }
+    }
+
+    private void Select(int i)
+    {
+        _active = i;
+        Reindex();
+    }
+
+    private void Reindex()
+    {
+        _index = new();
+        if (_wb is null) return;
+        foreach (var c in _wb.Sheets[_active].Cells) _index[(c.Row, c.Col)] = c;
+    }
+
+    private SheetCell? Cell(int r, int c) => _index.TryGetValue((r, c), out var v) ? v : null;
+
+    private static string ColLetter(int col)
+    {
+        // 1 → A, 26 → Z, 27 → AA …
+        var sb = new System.Text.StringBuilder();
+        while (col > 0)
+        {
+            int rem = (col - 1) % 26;
+            sb.Insert(0, (char)('A' + rem));
+            col = (col - 1) / 26;
+        }
+        return sb.ToString();
+    }
+
+    private static string? ColWidthStyle(SheetView s, int col) =>
+        s.ColWidths.TryGetValue(col, out var w) ? $"width:{(w * 7).ToString(System.Globalization.CultureInfo.InvariantCulture)}px" : null;
+
+    private static string? CellStyle(SheetCell? c)
+    {
+        if (c is null) return null;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("text-align:").Append(c.Align.ToLowerInvariant() switch { "center" => "center", "right" => "right", _ => "left" }).Append(';');
+        sb.Append("vertical-align:").Append(c.VAlign.ToLowerInvariant() switch { "top" => "top", "center" or "middle" => "middle", _ => "bottom" }).Append(';');
+        if (c.Bold) sb.Append("font-weight:700;");
+        if (c.Italic) sb.Append("font-style:italic;");
+        if (c.Underline) sb.Append("text-decoration:underline;");
+        if (c.FontName is { } fn) sb.Append($"font-family:'{fn}';");
+        if (c.FontSizePt is { } fz) sb.Append($"font-size:{fz.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt;");
+        if (c.Wrap) sb.Append("white-space:normal;");
+        if (c.Color is { } col) sb.Append($"color:{col};");
+        if (c.Fill is { } fill) sb.Append($"background-color:{fill};");
+        return sb.ToString();
+    }
+}

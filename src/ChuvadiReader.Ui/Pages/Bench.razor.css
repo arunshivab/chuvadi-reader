@@ -1014,3 +1014,129 @@
 .desk-wm.desk-bm { cursor: pointer; font-weight: 600; letter-spacing: 0.02em; }
 .desk-wm.desk-bm.on { background: color-mix(in srgb, var(--chvd-binding) 16%, transparent); color: var(--chvd-binding); border-color: color-mix(in srgb, var(--chvd-binding) 32%, transparent); }
 .desk-wm.desk-bm.off { opacity: 0.5; text-decoration: line-through; }
+
+/* ── #341 QoL + polish: undo/redo, select-all/invert, badges, compare, image frame ── */
+
+/* toolbar undo / redo */
+.bench-hist {
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--chvd-ink-muted); background: none;
+    border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 7px; padding: 6px 8px; cursor: pointer;
+}
+.bench-hist:hover:not(:disabled) { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+.bench-hist:disabled { opacity: 0.35; cursor: default; }
+.bench-hist.flip { transform: scaleX(-1); }
+
+/* per-desk select-all / invert */
+.desk-sel {
+    font-family: var(--chvd-mono); font-size: 9px; letter-spacing: 0.06em;
+    color: var(--chvd-ink-muted); background: none;
+    border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 4px; padding: 1px 5px; flex: none; cursor: pointer;
+}
+.desk-sel:hover:not(:disabled) { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+.desk-sel:disabled { opacity: 0.4; cursor: default; }
+
+/* page badges — upright, top-right of the page body, above the (rotated) thumb */
+.bbadges {
+    position: absolute; top: 3px; right: 3px; z-index: 3;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+    pointer-events: none;
+}
+.bbadge {
+    font-family: var(--chvd-mono); font-size: 8px; line-height: 1; letter-spacing: 0.04em;
+    padding: 2px 4px; border-radius: 3px;
+    background: color-mix(in srgb, var(--chvd-surface-hi) 86%, transparent);
+    color: var(--chvd-ink-muted); border: 0.5px solid var(--chvd-border-soft);
+}
+.bbadge.rot  { color: var(--chvd-binding); border-color: color-mix(in srgb, var(--chvd-binding) 50%, transparent); }
+.bbadge.edit { color: var(--chvd-marigold); border-color: color-mix(in srgb, var(--chvd-marigold) 50%, transparent); }
+.bbadge.type { color: var(--chvd-ink-soft); text-transform: uppercase; }
+
+/* image-page thumbnail polish — sit in the white page frame, preserve aspect, centered */
+.bthumb-img {
+    width: 100%; height: 100%;
+    object-fit: contain; object-position: center;
+    background: #fff; display: block;
+}
+
+/* compare side-by-side — render each page exactly like a bench thumbnail (A4 box, SVG fills it),
+   so the page is sized by its frame rather than the SVG's (viewBox-only) intrinsic size. */
+.cmp-modal { width: min(980px, 96vw); }
+.cmp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 4px 2px 2px; }
+.cmp-col { display: flex; flex-direction: column; min-width: 0; }
+.cmp-cap {
+    font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted);
+    text-align: center; margin-bottom: 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cmp-stage {
+    display: flex; align-items: center; justify-content: center;
+    height: min(72vh, 760px); background: var(--chvd-surface-lo);
+    border: var(--chvd-stroke) solid var(--chvd-border-soft); border-radius: 8px;
+    padding: 12px; overflow: hidden;
+}
+.cmp-page {
+    height: 100%; width: auto; max-width: 100%; max-height: 100%;
+    min-width: 0; min-height: 0;
+    background: #fff; box-shadow: 0 1px 12px rgba(0,0,0,0.18); border-radius: 3px;
+    overflow: hidden; transform-origin: center;
+}
+.cmp-page :deep(svg) { width: 100%; height: 100%; display: block; }
+.cmp-img { width: 100%; height: 100%; object-fit: contain; display: block; background: #fff; }
+.cmp-blank { width: 100%; height: 100%; }
+@media (max-width: 720px) {
+    .cmp-grid { grid-template-columns: 1fr; }
+    .cmp-stage { height: 44vh; }
+}
+
+/* ── #342 Sessions & handoff: session menu, per-desk more-menu, templates ── */
+
+.session-wrap { position: relative; }
+.bench-session {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12px; color: var(--chvd-ink-muted);
+    background: none; border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 7px; padding: 5px 9px; cursor: pointer;
+}
+.bench-session:hover { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+.bench-session .caret { font-size: 9px; opacity: 0.7; }
+.session-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
+    display: flex; flex-direction: column; min-width: 168px;
+    background: var(--chvd-surface-hi); border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 8px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); padding: 4px;
+}
+.session-menu button {
+    text-align: left; background: none; border: 0; border-radius: 5px;
+    padding: 7px 10px; font-size: 12px; color: var(--chvd-ink); cursor: pointer;
+}
+.session-menu button:hover:not(:disabled) { background: var(--chvd-surface-mid); }
+.session-menu button:disabled { opacity: 0.4; cursor: default; }
+
+.desk-more {
+    font-size: 14px; line-height: 1; color: var(--chvd-ink-muted);
+    background: none; border: var(--chvd-stroke) solid var(--chvd-border-soft);
+    border-radius: 5px; padding: 0 6px; flex: none; cursor: pointer;
+}
+.desk-more:hover { color: var(--chvd-binding); border-color: var(--chvd-binding); }
+.desk-menu {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 6px 8px; border-bottom: var(--chvd-stroke) solid var(--chvd-border-soft);
+    background: var(--chvd-surface-mid);
+}
+.desk-menu > button {
+    display: flex; align-items: center; gap: 7px; text-align: left;
+    background: none; border: 0; border-radius: 5px; padding: 6px 8px;
+    font-size: 12px; color: var(--chvd-ink); cursor: pointer;
+}
+.desk-menu > button:hover:not(:disabled) { background: var(--chvd-surface-hi); }
+.desk-menu > button:disabled { opacity: 0.4; cursor: default; }
+.desk-menu-sep { height: 1px; background: var(--chvd-border-soft); margin: 4px 2px; }
+.desk-menu-label {
+    font-family: var(--chvd-mono); font-size: 9px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--chvd-ink-soft); padding: 4px 8px 2px;
+}
+.desk-menu-note { font-size: 11px; color: var(--chvd-ink-soft); padding: 4px 8px; font-style: italic; }
+.desk-menu-tpl { font-size: 12px; }

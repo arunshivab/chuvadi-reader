@@ -12,6 +12,7 @@ let down = null;        // { type:'shelf'|'source'|'desk', el, x, y, srcIdx?, pa
 let dragging = false;
 let ghost = null;
 let escHandler = null;
+let keyHandler = null;
 let peek = null;
 let shelfPeekTimer = null;
 let shelfPeekEl = null;
@@ -47,6 +48,25 @@ export function init(gridEl, dotnetRef, lazyThumbs) {
 
     escHandler = (e) => { if (e.key === 'Escape') invoke('CloseTransient'); };
     document.addEventListener('keydown', escHandler);
+
+    // Bench keyboard shortcuts. Skip when typing in a field; behind a modal only Escape passes
+    // through. We report the key to .NET, which owns all ordering/selection logic.
+    keyHandler = (e) => {
+        const t = e.target;
+        const tag = t && t.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+        const k = e.key;
+        const ctrl = e.ctrlKey === true || e.metaKey === true;
+        const isShortcut =
+            (ctrl && (k === 'z' || k === 'Z' || k === 'y' || k === 'Y' || k === 'a' || k === 'A' || k === 'd' || k === 'D')) ||
+            (!ctrl && !e.altKey && (k === 'r' || k === 'R' || k === 'Delete' || k === 'Backspace')) ||
+            (k === 'Escape');
+        if (!isShortcut) return;
+        if (document.querySelector('.modal-scrim') && k !== 'Escape') return;
+        if (k !== 'Escape') e.preventDefault();
+        invoke('OnKey', k, ctrl, e.shiftKey === true, e.altKey === true);
+    };
+    document.addEventListener('keydown', keyHandler);
 }
 
 // Hover-peek: hovering a page's peek button (desk) or a shelf thumbnail shows an enlarged preview.
@@ -334,6 +354,7 @@ function teardown() {
         root.removeEventListener('pointerout', onPeekOut);
     }
     if (escHandler) { document.removeEventListener('keydown', escHandler); escHandler = null; }
+    if (keyHandler) { document.removeEventListener('keydown', keyHandler); keyHandler = null; }
     window.removeEventListener('pointermove', onPointerMove);
     window.removeEventListener('pointerup', onPointerUp);
     clearMarks();

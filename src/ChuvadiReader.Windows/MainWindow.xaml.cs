@@ -58,9 +58,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        var path = files.FirstOrDefault(IsSupportedFile);
-        if (path is null)
+        var supported = files.Where(IsSupportedFile).ToArray();
+        if (supported.Length == 0)
         {
+            return;
+        }
+
+        // If the Bench is open, dropped files join the shelf as sources (the bench workflow)
+        // rather than yanking the user into the Reader.
+        if (Web.Services?.GetService(typeof(BenchDropService)) is BenchDropService bench && bench.IsBenchActive)
+        {
+            bench.Drop(supported);
+            Activate();
             return;
         }
 
@@ -69,7 +78,7 @@ public partial class MainWindow : Window
         // OpenDocumentService.Requested event.
         if (Web.Services?.GetService(typeof(OpenDocumentService)) is OpenDocumentService open)
         {
-            open.Request(path);
+            open.Request(supported[0]);
             Activate();
         }
     }

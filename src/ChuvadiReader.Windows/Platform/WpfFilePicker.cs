@@ -66,6 +66,56 @@ public sealed class WpfFilePicker : IFilePicker
         return Task.FromResult(picked);
     }
 
+    public Task<string?> PickSaveSessionAsync(string suggestedName, CancellationToken ct = default)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        var picked = dispatcher.Invoke(() =>
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title = "Save bench session",
+                Filter = "Chuvadi session (*.json)|*.json",
+                DefaultExt = ".json",
+                FileName = suggestedName,
+                InitialDirectory = _saveFolders.ResolveSaveFolder(),
+                AddExtension = true,
+                OverwritePrompt = true,
+            };
+
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        });
+
+        return Task.FromResult(picked);
+    }
+
+    public Task<string?> PickOpenSessionAsync(CancellationToken ct = default)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        var picked = dispatcher.Invoke(() =>
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Open bench session",
+                Filter = "Chuvadi session (*.json)|*.json|All files (*.*)|*.*",
+                CheckFileExists = true,
+            };
+
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        });
+
+        return Task.FromResult(picked);
+    }
+
     public Task<string?> PickSavePdfAsync(string suggestedName, CancellationToken ct = default)
     {
         var dispatcher = Application.Current?.Dispatcher;

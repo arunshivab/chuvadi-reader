@@ -1,0 +1,104 @@
+@page "/docs"
+@using ChuvadiReader.Core.Documents
+@inject DocxViewService Docx
+@inject IFilePicker Picker
+
+<PageTitle>Chuvadi · Docs</PageTitle>
+
+<div class="docp">
+    <div class="docp-bar">
+        <a href="/" class="docp-back"><Icon Name="chevron-left" Size="14" /> dashboard</a>
+        <span class="docp-title"><Icon Name="reader" Size="15" /> Docs</span>
+        @if (_view is not null)
+        {
+            <span class="docp-name" title="@_path">@System.IO.Path.GetFileName(_path)</span>
+            <span class="docp-meta">@_view.PageSize@(_view.Landscape ? " · landscape" : "") · @_view.Blocks.Count blocks</span>
+        }
+        <div class="docp-spacer"></div>
+        <button class="docp-open" @onclick="Open"><Icon Name="image" Size="14" /> Open Word file</button>
+    </div>
+
+    <div class="docp-stage">
+        @if (_error is not null)
+        {
+            <div class="docp-msg docp-err"><Icon Name="x" Size="16" /> @_error</div>
+        }
+        else if (_view is null)
+        {
+            <div class="docp-empty">
+                <div class="docp-empty-card">
+                    <div class="docp-empty-ic"><Icon Name="reader" Size="40" /></div>
+                    <h2>View a Word document</h2>
+                    <p>Open a <strong>.docx</strong> file to read it here — headings, formatting, tables and images, no Word needed.</p>
+                    <button class="docp-open lg" @onclick="Open"><Icon Name="image" Size="16" /> Open Word file</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <article class="docp-sheet @(_view.Landscape ? "ls" : null)">
+                @if (_view.Header.Count > 0)
+                {
+                    <div class="docp-hf docp-header">
+                        @foreach (var b in _view.Header) { <DocBlockView Block="b" /> }
+                    </div>
+                }
+                @foreach (var b in _view.Blocks)
+                {
+                    <DocBlockView Block="b" />
+                }
+                @if (_view.Footer.Count > 0)
+                {
+                    <div class="docp-hf docp-footer">
+                        @foreach (var b in _view.Footer) { <DocBlockView Block="b" /> }
+                    </div>
+                }
+            </article>
+        }
+    </div>
+</div>
+
+@code {
+    private WordView? _view;
+    private string _path = "";
+    private string? _error;
+
+    private async Task Open()
+    {
+        var path = await Picker.PickDocumentAsync();
+        if (string.IsNullOrEmpty(path)) return;
+        Load(path);
+    }
+
+    private void Load(string path)
+    {
+        _error = null;
+        if (!path.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+        {
+            _view = null;
+            _error = "That isn't a Word document. Please choose a .docx file.";
+            return;
+        }
+
+        try
+        {
+            _view = Docx.Load(path);
+            _path = path;
+        }
+        catch (DocumentViewException ex) when (ex.Reason == ViewErrorReason.PasswordProtected)
+        {
+            _view = null;
+            _error = "This document is password-protected — open it in Word and save an unprotected copy to view it here.";
+        }
+        catch (DocumentViewException ex)
+        {
+            _view = null;
+            _error = $"{ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            _view = null;
+            _error = $"Couldn't open this document: {ex.Message}";
+        }
+    }
+}

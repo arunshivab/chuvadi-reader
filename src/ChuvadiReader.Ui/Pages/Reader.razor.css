@@ -734,3 +734,17 @@
 .bm-status { flex: 1; font-size: 11px; color: var(--chvd-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bm-save { font-family: var(--chvd-sans-display); font-size: 12px; color: #fff; background: var(--chvd-binding); border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; }
 .bm-save:disabled { opacity: 0.5; cursor: default; }
+
+/* C3–C6 markup additions: ellipse, behind-content cue, image opacity slider */
+.mk-shape.ell { border-style: solid; cursor: move; }
+.mk-shape.ell.sel { outline: 1px dashed var(--chvd-binding); outline-offset: 2px; }
+.mk-shape.ell.draft { border-style: dashed; background: rgba(224,168,46,0.06); }
+.mk-shape.behind, .mk-image.behind { opacity: 0.85; }
+.mk-shape.behind::after, .mk-image.behind::after {
+    content: ""; position: absolute; inset: -3px; border: 1px dotted var(--chvd-ink-muted);
+    border-radius: inherit; pointer-events: none; opacity: 0.5;
+}
+.mk-shape-svg polyline.sel { filter: drop-shadow(0 0 0.5px var(--chvd-binding)); }
+.mk-opacity { display: inline-flex; align-items: center; gap: 5px; }
+.mk-range { width: 70px; accent-color: var(--chvd-binding); cursor: pointer; }
+.mk-opacity-val { font-size: 11px; color: var(--chvd-ink-muted); min-width: 30px; }
