@@ -75,6 +75,7 @@ public partial class App : Application
             services.AddSingleton<ChuvadiReader.Core.Documents.StampService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.DocxViewService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.XlsxViewService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.FlattenService>();
             services.AddSingleton<PressService>();
             services.AddSingleton<IPdfReader, ChuvadiPdfReader>();
             services.AddSingleton<TabsService>();

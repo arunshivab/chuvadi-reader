@@ -15,6 +15,7 @@
 @inject IAppStorage Storage
 @inject RedactService Redact
 @inject StampService Stamp
+@inject ChuvadiReader.Core.Documents.FlattenService Flatten
 @inject RedactRequestService RedactHandoff
 @inject IEntitlements Entitlements
 @using ChuvadiReader.Core.Documents
@@ -60,6 +61,10 @@
                 <button class="vbtn @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)" title="Loupe"><Icon Name="loupe" Size="18" /></button>
                 <button class="vbtn @(_tool == ReaderTool.Snapshot ? "on" : null)" @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region"><Icon Name="crop" Size="18" /></button>
                 <button class="vbtn @(Tab?.ScrollLocked == true ? "on" : null)" @onclick="ToggleScrollLock" title="Lock scrolling"><Icon Name="lock" Size="16" /></button>
+                <button class="vbtn rflatten @(_isXfaDoc ? "xfa" : null)" @onclick="FlattenNow" disabled="@_flattening"
+                        title="@(_isXfaDoc ? "Flatten this XFA form to a static PDF" : "Flatten form fields & markup to a static PDF")">
+                    <Icon Name="flatten" Size="17" />
+                </button>
 
                 <span class="rsep"></span>
                 <button class="vbtn @(_drawerOpen ? "on" : null)" @onclick="ToggleDrawer" title="View options"><Icon Name="eye" Size="16" /></button>
@@ -2825,6 +2830,47 @@
         _mkStatus = null; _mkSavedPath = null;
     }
 
+    // ── Flatten to a static PDF (XFA form data / AcroForm fields / markup) ──────
+    private bool _isXfaDoc;
+    private bool _flattening;
+
+    private void RefreshDocKind(string? path)
+    {
+        try { _isXfaDoc = !string.IsNullOrEmpty(path) && Flatten.Probe(path!).IsXfa; }
+        catch { _isXfaDoc = false; }
+    }
+
+    private async Task FlattenNow()
+    {
+        var source = Tab?.Path;
+        if (string.IsNullOrEmpty(source) || _flattening) return;
+
+        _flattening = true;
+        StateHasChanged();
+        try
+        {
+            var baseName = System.IO.Path.GetFileNameWithoutExtension(source);
+            var output = await Picker.PickSavePdfAsync(baseName + " (flattened).pdf");
+            if (string.IsNullOrEmpty(output)) return;
+
+            await Flatten.FlattenToFileAsync(source!, output);
+
+            var name = System.IO.Path.GetFileName(output);
+            var format = DocumentFormatExtensions.FromPath(output);
+            await Recents.TouchAsync(new RecentItem(name, output, format, DateTimeOffset.Now, false));
+            await Tabs.OpenAsync(output, name, format);
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", "Couldn't flatten this PDF: " + ex.Message);
+        }
+        finally
+        {
+            _flattening = false;
+            StateHasChanged();
+        }
+    }
+
     private sealed class MkRect
     {
         public double left { get; set; }
@@ -2911,6 +2957,7 @@
                 _mkTagged = false; _mkTaggedPath = null;
                 if (_markup) _ = CheckTaggedAsync();
             }
+            RefreshDocKind(tab?.Path);
         }
         else if (pageCount != _shownPageCount)
         {

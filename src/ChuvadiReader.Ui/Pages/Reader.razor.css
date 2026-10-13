@@ -748,3 +748,11 @@
 .mk-opacity { display: inline-flex; align-items: center; gap: 5px; }
 .mk-range { width: 70px; accent-color: var(--chvd-binding); cursor: pointer; }
 .mk-opacity-val { font-size: 11px; color: var(--chvd-ink-muted); min-width: 30px; }
+
+/* Flatten toolbar button — subtle dot when the open doc is an XFA form */
+.vbtn.rflatten { position: relative; }
+.vbtn.rflatten.xfa::after {
+    content: ""; position: absolute; top: 3px; right: 3px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--chvd-binding); box-shadow: 0 0 0 1.5px var(--chvd-surface);
+}
