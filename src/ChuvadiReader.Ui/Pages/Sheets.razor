@@ -15,7 +15,7 @@
             <span class="shp-meta">@_wb.Sheets.Count sheet@(_wb.Sheets.Count == 1 ? "" : "s")</span>
         }
         <div class="shp-spacer"></div>
-        <button class="shp-open" @onclick="Open"><Icon Name="image" Size="14" /> Open Excel file</button>
+        <button class="shp-open" @onclick="Open"><Icon Name="upload" Size="14" /> Open Excel file</button>
     </div>
 
     <div class="shp-stage">
@@ -30,7 +30,7 @@
                     <div class="shp-empty-ic"><Icon Name="grid-view" Size="40" /></div>
                     <h2>View a spreadsheet</h2>
                     <p>Open an <strong>.xlsx</strong> file to read it here as a grid — values, multiple sheets and frozen headers, no Excel needed.</p>
-                    <button class="shp-open lg" @onclick="Open"><Icon Name="image" Size="16" /> Open Excel file</button>
+                    <button class="shp-open lg" @onclick="Open"><Icon Name="upload" Size="16" /> Open Excel file</button>
                 </div>
             </div>
         }
