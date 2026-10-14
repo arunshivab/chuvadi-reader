@@ -42,11 +42,13 @@
             <div class="tile-eye"><Icon Name="tools" Size="13" /> tools</div>
             <div class="tools">
                 <button class="act" @onclick='() => Nav.NavigateTo("/reader")'><Icon Name="file-pdf" Size="19" /><span>Reader</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/bench")'><Icon Name="library" Size="19" /><span>Bench</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/bench")'><Icon Name="grid-view" Size="19" /><span>Bench</span></button>
                 <button class="act" @onclick='() => Nav.NavigateTo("/library")'><Icon Name="library" Size="19" /><span>Library</span></button>
-                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="compress" Size="19" /><span>Compress</span></button>
-                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="redact" Size="19" /><span>Redact</span></button>
-                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="sign" Size="19" /><span>Sign</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/merge")'><Icon Name="merge" Size="19" /><span>Merge</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/split")'><Icon Name="split" Size="19" /><span>Split</span></button>
+                <button class="act" @onclick="OpenFile" title="Open a PDF, then Compress (Press) in the toolbar"><Icon Name="compress" Size="19" /><span>Compress</span></button>
+                <button class="act" @onclick='() => Nav.NavigateTo("/redact")'><Icon Name="redact" Size="19" /><span>Redact</span></button>
+                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="edit" Size="19" /><span>Sign</span></button>
                 <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="ocr" Size="19" /><span>OCR</span></button>
             </div>
         </div>
