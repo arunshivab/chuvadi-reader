@@ -97,7 +97,7 @@ public sealed class XlsxViewService
     {
         CellStyle? st = c.Style;
         bool isNum = c.Value is double or float or int or long or decimal;
-        string text = FormatValue(c.Value, st?.NumberFormat);
+        string text = FormatValue(c.Value);
         string align = st is { } s && s.HAlign != HorizontalAlign.General
             ? s.HAlign.ToString()
             : (isNum ? "Right" : "Left");
@@ -112,49 +112,31 @@ public sealed class XlsxViewService
             st is { } vs && vs.VAlign != VerticalAlign.Bottom ? vs.VAlign.ToString() : "Bottom");
     }
 
-    private static string FormatValue(object? v, string? fmt) => v switch
+    // Displays the cell's value as-is. Interpreting the workbook's number-format code
+    // (percent, thousands, decimals, date masks, etc.) is the library's job and must NOT
+    // be re-implemented here — when Chuvadi.Sheets exposes a formatted display string per
+    // cell, map that instead. Until then the raw value is shown plainly.
+    private static string FormatValue(object? v) => v switch
     {
         null => "",
         string s => s,
         bool b => b ? "TRUE" : "FALSE",
-        DateTime dt => dt.TimeOfDay == TimeSpan.Zero ? dt.ToString("d", CultureInfo.CurrentCulture)
-                                                     : dt.ToString("g", CultureInfo.CurrentCulture),
-        double d => FormatNumber(d, fmt),
-        float f => FormatNumber(f, fmt),
-        decimal m => FormatNumber((double)m, fmt),
+        DateTime dt => dt.TimeOfDay == TimeSpan.Zero ? dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                                                     : dt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+        double d => PlainNumber(d),
+        float f => PlainNumber(f),
+        decimal m => PlainNumber((double)m),
         int i => i.ToString(CultureInfo.CurrentCulture),
         long l => l.ToString(CultureInfo.CurrentCulture),
         _ => v.ToString() ?? "",
     };
 
-    /// <summary>Lightweight number-format handling: percent, thousands, and a fixed/auto
-    /// decimal count. Not a full Excel format-code engine (v1).</summary>
-    private static string FormatNumber(double d, string? fmt)
-    {
-        if (!string.IsNullOrWhiteSpace(fmt))
-        {
-            if (fmt.Contains('%'))
-                return (d * 100).ToString(DecimalsFrom(fmt) is int dp ? "N" + dp : "0.##", CultureInfo.CurrentCulture) + "%";
-
-            bool thousands = fmt.Contains("#,##0") || fmt.Contains("#,###");
-            int? dec = DecimalsFrom(fmt);
-            if (thousands) return d.ToString("N" + (dec ?? 0), CultureInfo.CurrentCulture);
-            if (dec is int dd) return d.ToString("F" + dd, CultureInfo.CurrentCulture);
-        }
-
-        // Auto: integers without a decimal point, otherwise trim to a sensible precision.
-        if (d == Math.Floor(d) && Math.Abs(d) < 1e15) return ((long)d).ToString(CultureInfo.CurrentCulture);
-        return d.ToString("0.######", CultureInfo.CurrentCulture);
-    }
-
-    private static int? DecimalsFrom(string fmt)
-    {
-        int dot = fmt.IndexOf('.');
-        if (dot < 0) return null;
-        int n = 0;
-        for (int i = dot + 1; i < fmt.Length && fmt[i] == '0'; i++) n++;
-        return n;
-    }
+    // Plain rendering of a numeric value (whole numbers without a trailing ".0"); no
+    // number-format-code interpretation.
+    private static string PlainNumber(double d) =>
+        d == Math.Floor(d) && Math.Abs(d) < 1e15
+            ? ((long)d).ToString(CultureInfo.CurrentCulture)
+            : d.ToString(CultureInfo.CurrentCulture);
 
     private static string? Hex(string? hex)
     {

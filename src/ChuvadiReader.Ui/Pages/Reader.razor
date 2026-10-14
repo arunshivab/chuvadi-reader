@@ -16,6 +16,7 @@
 @inject RedactService Redact
 @inject StampService Stamp
 @inject ChuvadiReader.Core.Documents.FlattenService Flatten
+@inject ChuvadiReader.Core.Documents.RecoveryService Recovery
 @inject RedactRequestService RedactHandoff
 @inject IEntitlements Entitlements
 @using ChuvadiReader.Core.Documents
@@ -65,6 +66,7 @@
                         title="@(_isXfaDoc ? "Flatten this XFA form to a static PDF" : "Flatten form fields & markup to a static PDF")">
                     <Icon Name="flatten" Size="17" />
                 </button>
+                <button class="vbtn @(_showPress ? "on" : null)" @onclick="ShowPress" title="Compress (Press)"><Icon Name="compress" Size="16" /></button>
 
                 <span class="rsep"></span>
                 <button class="vbtn @(_drawerOpen ? "on" : null)" @onclick="ToggleDrawer" title="View options"><Icon Name="eye" Size="16" /></button>
@@ -443,6 +445,19 @@
     else if (tab.Session is not null)
     {
         var session = tab.Session;
+        @if (_renderFailed && !_recoverBannerDismissed)
+        {
+            <div class="rrecover-banner">
+                <span class="rrecover-dot">!</span>
+                <span class="rrecover-msg">Some pages of this file couldn't be read.</span>
+                <button class="rrecover-btn" @onclick="TryRecovery" disabled="@_recovering">@(_recovering ? "Recovering…" : "Try recovery")</button>
+                @if (_recoverStatus is not null)
+                {
+                    <span class="rrecover-status">@_recoverStatus</span>
+                }
+                <button class="rrecover-x" @onclick="() => _recoverBannerDismissed = true" title="Dismiss"><Icon Name="x" Size="13" /></button>
+            </div>
+        }
         <div class="rdesk @LayoutClass @(CurScale > 1.001 ? "zoomed" : null) @(Tab?.ScrollLocked == true ? "locked" : null)"
              style="--rpage-zoom:@Zoom" tabindex="-1" @ref="_desk">
             @foreach (var n in _pages)
@@ -2834,6 +2849,45 @@
     private bool _isXfaDoc;
     private bool _flattening;
 
+    // ── Recovery (opt-in): a page failed to decode, offer to open a repaired copy ──
+    private bool _renderFailed;          // set when any page throws during render
+    private bool _recoverBannerDismissed;
+    private bool _recovering;
+    private string? _recoverStatus;
+
+    // User-initiated only. Repairs the file via the library's PdfRepairer into a new
+    // "(recovered)" copy and opens it as a new tab. Never automatic: it rewrites the
+    // document, so the original stays untouched and the user chooses to do this.
+    private async Task TryRecovery()
+    {
+        var source = Tab?.Path;
+        if (string.IsNullOrEmpty(source) || _recovering)
+        {
+            return;
+        }
+
+        _recovering = true;
+        _recoverStatus = null;
+        StateHasChanged();
+        try
+        {
+            var result = await Recovery.RecoverAsync(source!);
+            var name = System.IO.Path.GetFileName(result.OutputPath);
+            var format = DocumentFormatExtensions.FromPath(result.OutputPath);
+            await Recents.TouchAsync(new RecentItem(name, result.OutputPath, format, DateTimeOffset.Now, false));
+            await Tabs.OpenAsync(result.OutputPath, name, format);
+        }
+        catch (Exception ex)
+        {
+            _recoverStatus = "Couldn't recover: " + ex.Message;
+        }
+        finally
+        {
+            _recovering = false;
+            StateHasChanged();
+        }
+    }
+
     private void RefreshDocKind(string? path)
     {
         try { _isXfaDoc = !string.IsNullOrEmpty(path) && Flatten.Probe(path!).IsXfa; }
@@ -2945,6 +2999,9 @@
             _loadGen++;
             _restoreScroll = pageCount > 0;
             _pageColorOpen = false;
+            _renderFailed = false;
+            _recoverBannerDismissed = false;
+            _recoverStatus = null;
             if (tab?.Path != _pageBgPath) _ = LoadPageBgAsync(tab?.Path);
             if (tab?.Path != _mkDocPath)
             {
@@ -3109,7 +3166,8 @@
         }
         catch
         {
-            // A failed page stays a placeholder.
+            // A failed page stays a placeholder; surface the opt-in recovery banner.
+            _renderFailed = true;
         }
         finally
         {

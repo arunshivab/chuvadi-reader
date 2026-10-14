@@ -756,3 +756,28 @@
     width: 6px; height: 6px; border-radius: 50%;
     background: var(--chvd-binding); box-shadow: 0 0 0 1.5px var(--chvd-surface);
 }
+
+/* Opt-in recovery banner — shown above the canvas when a page fails to decode */
+.rrecover-banner {
+    display: flex; align-items: center; gap: 10px; flex: none;
+    padding: 8px 14px;
+    background: var(--chvd-surface-hi);
+    border-bottom: var(--chvd-stroke) solid var(--chvd-warn);
+    font-family: var(--chvd-sans-display); font-size: 13px; color: var(--chvd-ink);
+}
+.rrecover-dot {
+    display: inline-flex; align-items: center; justify-content: center; flex: none;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--chvd-warn); color: #fff; font-weight: 700; font-size: 12px; line-height: 1;
+}
+.rrecover-msg { flex: 1; }
+.rrecover-btn {
+    font-family: var(--chvd-mono); font-size: 12px; padding: 5px 12px; border-radius: 7px;
+    border: none; cursor: pointer; background: var(--chvd-binding); color: var(--chvd-surface-lo);
+}
+.rrecover-btn:disabled { opacity: 0.6; cursor: default; }
+.rrecover-status { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); }
+.rrecover-x {
+    background: none; border: none; color: var(--chvd-ink-muted); cursor: pointer;
+    padding: 2px; display: inline-flex; align-items: center;
+}
