@@ -1,7 +1,10 @@
+using System.Globalization;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Graphics;
+using Chuvadi.Pdf.Images;
 using Chuvadi.Pdf.Objects;
 using Chuvadi.Pdf.Primitives;
+using Chuvadi.Pdf.Rendering;
 using Chuvadi.Pdf.Svg;
 
 namespace ChuvadiReader.Core.Reader;
@@ -99,6 +102,14 @@ public sealed class ChuvadiPdfReader : IPdfReader
 /// </summary>
 public sealed class ChuvadiPdfSession : IPdfSession
 {
+    // A page whose area exceeds this (≈ larger than A2, i.e. CAD/large-format sheets)
+    // is displayed as a rasterised image rather than SVG: dense vector drawings emit
+    // tens of MB of SVG with 100k+ <path> nodes that no WebView can hold.
+    private const double LargeFormatAreaPt = 1_500_000d;
+    // A normal-size page whose SVG still comes out this large also falls back to raster.
+    private const int HeavySvgBytes = 6_000_000;
+    private const double RasterDpi = 150d;
+
     private readonly SvgRenderer _svgRenderer;
     private readonly Dictionary<int, string> _svgCache = new();
     private PdfDocument? _document;
@@ -132,11 +143,52 @@ public sealed class ChuvadiPdfSession : IPdfSession
             return Task.FromResult(cached);
         }
 
-        // SvgRenderer renders at the page's natural size; zoom is applied in the
-        // UI (CSS), so there is no scale parameter here.
-        var svg = _svgRenderer.RenderPage(_document, pageNumber);
+        var page = _document.Pages[pageNumber];
+        string svg;
+
+        // Large-format sheets (CAD/architectural) are rasterised up front: their vector
+        // SVG is too dense for the WebView. Everything else renders as selectable-text SVG,
+        // with a safety fallback if a normal-size page's SVG is unexpectedly huge.
+        if (page.Width * page.Height > LargeFormatAreaPt)
+        {
+            svg = RenderPageAsRasterSvg(page);
+        }
+        else
+        {
+            // SvgRenderer renders at the page's natural size; zoom is applied in the
+            // UI (CSS), so there is no scale parameter here.
+            svg = _svgRenderer.RenderPage(_document, pageNumber);
+            if (svg.Length > HeavySvgBytes)
+            {
+                svg = RenderPageAsRasterSvg(page);
+            }
+        }
+
         _svgCache[pageNumber] = svg;
         return Task.FromResult(svg);
+    }
+
+    /// <summary>Renders a page to a raster image (via the library rasteriser + PNG encoder)
+    /// and wraps it in a minimal SVG carrying a single &lt;image&gt;, so the UI's SVG display
+    /// path is unchanged while the WebView only has to hold one image node instead of
+    /// hundreds of thousands of vector paths.</summary>
+    private string RenderPageAsRasterSvg(PdfPage page)
+    {
+        var buffer = new PageRasterizer(
+                _document!.Objects,
+                new RenderOptions { Dpi = RasterDpi, Background = ColorF.White, AntiAlias = true })
+            .Rasterize(page);
+
+        using var ms = new MemoryStream();
+        PngEncoder.Encode(new ImageFrame(buffer, ImageColorFormat.Rgba32), ms, false);
+        var dataUri = "data:image/png;base64," + Convert.ToBase64String(ms.ToArray());
+
+        string w = page.Width.ToString("0.###", CultureInfo.InvariantCulture);
+        string h = page.Height.ToString("0.###", CultureInfo.InvariantCulture);
+        return $"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}pt\" height=\"{h}pt\" " +
+               $"viewBox=\"0 0 {w} {h}\" preserveAspectRatio=\"xMidYMid meet\">" +
+               $"<image x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" preserveAspectRatio=\"none\" " +
+               $"href=\"{dataUri}\"/></svg>";
     }
 
     public void DropRenderCache() => _svgCache.Clear();
