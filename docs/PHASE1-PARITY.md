@@ -1,50 +1,66 @@
 # Phase 1 — parity log & progress
 
 Living record for the UI revamp. Rule #11: **no existing feature is lost.** Every change
-is logged here as either ADD, FIX, or MOVE — and MOVEs record the old home → new home so
-nothing can silently vanish.
+is logged here as ADD, FIX, or MOVE — and MOVEs record old home → new home so nothing can
+silently vanish.
 
-Bench→Arrange decision (locked): **Option C** — Arrange is one shared workspace whose
-shelf auto-loads all open-tab documents (current tab focused/expanded, others collapsed;
-sync is additive; non-PDF tabs greyed until the Office→PDF converter lands; desks persist
-via the existing bench session).
-
----
-
-## Increment 1a — the 5 verified bugs  ✅ (built clean, 52/52 tests)
-
-| Bug | What was wrong | Fix | Removed anything? |
-|-----|----------------|-----|-------------------|
-| #1 | `/merge` and `/split` had routes but **no way to reach them** | Added **Merge** and **Split** tiles to the Dashboard tools (`→/merge`, `→/split`). (Also folding into Arrange + ⌘K in 1b.) | No — pure ADD |
-| #2 | Reader `ShowProperties` / `ShowExport` existed but **nothing called them** | Added **Properties** (`info`) and **Export** (`download`) buttons to the Reader toolbar, next to Press. (They move into the Document menu in 1b.) | No — pure ADD |
-| #3 | `<Icon Name="image">` isn't in LiPicons → **blank icons** in the Reader image tool and the Docs/Sheets "Open" buttons | Reader add-image tool → `file-image`; Docs/Sheets "Open file" → `upload`. Also found `sign` is blank → swapped the (disabled) Sign tile to `edit`. | No — icon swap only |
-| #4 | Dashboard showed **shipped** features as disabled "v2" | **Redact** → enabled (`→/redact`). **Compress** → enabled (opens a PDF; Press lives in the Reader toolbar). **Sign / OCR** kept as "v2" — they genuinely aren't shipped (no route), so that label is accurate. | No — enabled existing |
-| #5 (partial) | Icons reused for different things | Dashboard **Bench** tile shared the `library` icon with Library → changed Bench to `grid-view`. | No — icon swap only |
-
-**Files touched:** `Dashboard.razor`, `Reader.razor`, `Docs.razor`, `Sheets.razor`.
-**Parity:** increment 1a only ADDs and FIXES — nothing removed.
-
-**Still open from bug #5 (deferred, not forgotten):** a full icon-name audit across the app
-(e.g. the Docs empty-state uses `Name="reader"`, the tools tile `Name="tools"` — unverified
-against the manifest), and the Settings theme-label mismatch. These land in Phase 2 (visual
-pass) with the token reconciliation, so they're done once, properly.
+Bench→Arrange decision (locked): **Option C** — Arrange is one shared workspace whose shelf
+auto-loads all open-tab documents (current tab focused/expanded, others collapsed; sync is
+additive; non-PDF tabs greyed until the Office→PDF converter lands; desks persist via the
+existing bench session).
 
 ---
 
-## Roadmap (each is its own testable delta → you verify on Windows → next)
+## Increment 1a — the 5 verified bugs  ✅ merged
 
-- **1b — the shell:** tab + mode bar (Read · Mark · Arrange · Protect), the single floating
-  leaf bar (removing the duplicate toolbar/drawer view controls), the Document menu
-  (Properties/Export/Press/Flatten/Password + merge/split), and ⌘K. Wraps the *existing*
-  Read + Mark; Arrange/Protect appear as modes that (for now) host the current Bench/Redact.
-- **1c — Arrange:** re-parent Bench as the Arrange mode per decision C (shelf = open tabs).
-- **1d — Protect:** re-parent Redact + Stamp + Flatten + Password as the Protect mode.
-- **Phase 2 — visual:** `tokens.css` (with the 5-token reconciliation), 5 themes,
-  Home/Library/Settings polish, status bar, the deferred icon/label audit.
-- **Phase 3 — new features:** library-gated (Office→PDF, signature verification, OCR,
-  layers, measurement, …) — built as the library delivers each.
+| Bug | Fix | Removed? |
+|-----|-----|----------|
+| #1 `/merge` `/split` unreachable | Added Merge/Split Dashboard tiles (`→/merge`, `→/split`) | No — ADD |
+| #2 Properties/Export never called | Added Properties + Export buttons to the Reader toolbar | No — ADD |
+| #3 blank `image` icon | Reader add-image → `file-image`; Docs/Sheets open → `upload`; disabled Sign → `edit` | No — icon swap |
+| #4 shipped features shown as "v2" | Redact → `/redact`; Compress → opens a PDF (Press in toolbar); Sign/OCR left as v2 (genuinely unshipped) | No — enabled |
+| #5 (partial) reused icons | Dashboard Bench icon `library` → `grid-view` | No — icon swap |
 
-## Full 129-feature matrix
-Built incrementally from `Feature Audit.dc.html` as each shell increment lands — every
-feature ticked off against its new home before that increment is called done. (1a touched
-no existing feature's home, so there's nothing to re-home yet.)
+---
+
+## Increment 1b-i — mode bar + Document menu  ✅ (built clean, 52/52)
+
+The shell takes shape: a **mode bar** (Read · Mark · Arrange · Protect) under the toolbar,
+and a **Document menu** off the filename.
+
+| Change | Detail | Parity |
+|--------|--------|--------|
+| ADD | **Mode bar** — Read · Mark · Arrange · Protect (keys shown 1–4; key-binding comes with ⌘K). Read/Mark drive the existing markup toggle. Arrange/Protect reuse the existing `OpenInBench` / `SendToRedact` hand-offs (navigate to Bench/Redact **until** they re-parent in 1c/1d). | pure ADD |
+| ADD | **Document menu** off the filename + chevron: Properties · Export · Press · Flatten · Merge · Split. | pure ADD |
+| MOVE | **Flatten · Press · Properties · Export** buttons: Reader toolbar → **Document menu**. Still reachable, same methods. | MOVE — toolbar → doc menu, nothing lost |
+
+**Not touched yet (on purpose):** the view controls (zoom/fit/layout/rotate/hand/loupe) and
+the Edit / Bench / Redact toolbar buttons still live in the toolbar — so for now the mode bar
+and those buttons overlap. That's the intermediate state; **1b-ii** moves the view controls
+into the single floating leaf bar and removes the duplicates, which is what actually slims the
+top. Splitting it this way keeps the risky toolbar surgery separate from the mode structure.
+
+**Files:** `Reader.razor`, `Reader.razor.css`.
+
+**Test on Windows:** the mode bar appears under the toolbar; **Read ↔ Mark** switches the
+markup tools on/off; **Arrange** opens Bench, **Protect** opens Redact; the **filename
+chevron** opens the Document menu and every item works (Properties, Export, Press, Flatten,
+Merge, Split). Toolbar still has its old buttons — expected until 1b-ii.
+
+---
+
+## Roadmap
+- **1b-ii:** single floating leaf bar — move all view controls there, remove the toolbar +
+  View-drawer duplicates (the triplication fix). This is the big toolbar surgery.
+- **1b-iii:** ⌘K command bar + the 1–4 mode keys.
+- **1c:** Arrange = re-parent Bench (decision C — shelf = open tabs).
+- **1d:** Protect = re-parent Redact + Stamp + Flatten + Password.
+- **Phase 2:** visual — `tokens.css` (+ the 5-token reconciliation), themes, Home/Library/
+  Settings polish, the deferred icon/label audit.
+- **Phase 3:** library-gated features (Office→PDF, signature verification, OCR, layers,
+  measurement) as the library delivers each.
+
+## 129-feature matrix
+Built from `Feature Audit.dc.html` as the re-parenting increments (1c/1d) land — that's where
+features actually change home. 1a/1b-i only added and relocated-within-reach, so there is
+nothing re-homed to tick yet.

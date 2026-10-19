@@ -62,14 +62,6 @@
                 <button class="vbtn @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)" title="Loupe"><Icon Name="loupe" Size="18" /></button>
                 <button class="vbtn @(_tool == ReaderTool.Snapshot ? "on" : null)" @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region"><Icon Name="crop" Size="18" /></button>
                 <button class="vbtn @(Tab?.ScrollLocked == true ? "on" : null)" @onclick="ToggleScrollLock" title="Lock scrolling"><Icon Name="lock" Size="16" /></button>
-                <button class="vbtn rflatten @(_isXfaDoc ? "xfa" : null)" @onclick="FlattenNow" disabled="@_flattening"
-                        title="@(_isXfaDoc ? "Flatten this XFA form to a static PDF" : "Flatten form fields & markup to a static PDF")">
-                    <Icon Name="flatten" Size="17" />
-                </button>
-                <button class="vbtn @(_showPress ? "on" : null)" @onclick="ShowPress" title="Compress (Press)"><Icon Name="compress" Size="16" /></button>
-                <button class="vbtn" @onclick="ShowProperties" title="Document properties"><Icon Name="info" Size="16" /></button>
-                <button class="vbtn" @onclick="ShowExport" title="Export pages as images"><Icon Name="download" Size="16" /></button>
-
                 <span class="rsep"></span>
                 <button class="vbtn @(_drawerOpen ? "on" : null)" @onclick="ToggleDrawer" title="View options"><Icon Name="eye" Size="16" /></button>
                 <span class="rpc-wrap">
@@ -104,6 +96,42 @@
             }
         </div>
     </header>
+
+    @if (doc is not null)
+    {
+        <nav class="rmodebar">
+            <div class="rmode-doc">
+                <button class="rdoctitle" @onclick="ToggleDocMenu" title="Document actions">
+                    <span class="rdoctitle-name">@(tab?.FileName ?? "Document")</span>
+                    <Icon Name="chevron-down" Size="13" />
+                </button>
+                @if (_docMenuOpen)
+                {
+                    <div class="rdocmenu-scrim" @onclick="CloseDocMenu"></div>
+                    <div class="rdocmenu" @onclick:stopPropagation="true">
+                        <button class="rdm-item" @onclick="DocProperties"><Icon Name="info" Size="15" /><span>Properties</span></button>
+                        <button class="rdm-item" @onclick="DocExport"><Icon Name="download" Size="15" /><span>Export pages as images</span></button>
+                        <button class="rdm-item" @onclick="DocPress"><Icon Name="compress" Size="15" /><span>Reduce file size (Press)</span></button>
+                        <div class="rdm-sep"></div>
+                        <button class="rdm-item" @onclick="DocFlatten" disabled="@_flattening"><Icon Name="flatten" Size="15" /><span>Flatten forms &amp; marks</span></button>
+                        <div class="rdm-sep"></div>
+                        <button class="rdm-item" @onclick='() => DocNav("/merge")'><Icon Name="merge" Size="15" /><span>Merge files…</span></button>
+                        <button class="rdm-item" @onclick='() => DocNav("/split")'><Icon Name="split" Size="15" /><span>Split pages…</span></button>
+                    </div>
+                }
+            </div>
+            <div class="rmode-switch">
+                <button class="rmode-seg @(!_markup ? "on" : null)" @onclick="SetRead" title="Read (1)"><span class="rmode-verb">Read</span><span class="rmode-key">1</span></button>
+                <button class="rmode-seg @(_markup ? "on" : null)" @onclick="SetMark" title="Mark (2)"><span class="rmode-verb">Mark</span><span class="rmode-key">2</span></button>
+                <button class="rmode-seg" @onclick="OpenInBench" title="Arrange (3)"><span class="rmode-verb">Arrange</span><span class="rmode-key">3</span></button>
+                @if (Entitlements.CanRedact)
+                {
+                    <button class="rmode-seg" @onclick="SendToRedact" title="Protect (4)"><span class="rmode-verb">Protect</span><span class="rmode-key">4</span></button>
+                }
+            </div>
+            <div class="rmode-end"></div>
+        </nav>
+    }
 
     @if (_bm && doc is not null)
     {
@@ -2889,6 +2917,22 @@
             StateHasChanged();
         }
     }
+
+    // ── Shell: mode switch (Read · Mark · Arrange · Protect) + Document menu ──────
+    // Phase 1b-i. Read/Mark drive the existing markup toggle; Arrange/Protect reuse the
+    // existing hand-off methods (they navigate to Bench/Redact until those re-parent in 1c/1d).
+    private bool _docMenuOpen;
+    private void ToggleDocMenu() => _docMenuOpen = !_docMenuOpen;
+    private void CloseDocMenu() => _docMenuOpen = false;
+
+    private void SetRead() { if (_markup) ToggleMarkup(); }
+    private void SetMark() { if (!_markup) ToggleMarkup(); }
+
+    private async Task DocProperties() { CloseDocMenu(); await ShowProperties(); }
+    private void DocExport() { CloseDocMenu(); ShowExport(); }
+    private void DocPress() { CloseDocMenu(); ShowPress(); }
+    private async Task DocFlatten() { CloseDocMenu(); await FlattenNow(); }
+    private void DocNav(string path) { CloseDocMenu(); Nav.NavigateTo(path); }
 
     private void RefreshDocKind(string? path)
     {
