@@ -1,0 +1,179 @@
+@inject IJSRuntime JS
+
+@*
+    Ctrl K command bar: find and run any feature. Commands come from the shell (global)
+    and from the mounted page (Reader, Arrange, Protect). Disabled commands are listed
+    greyed with their reason, so unbuilt features stay discoverable.
+*@
+
+@if (_open)
+{
+    <div class="cmd-scrim" @onclick="Close"></div>
+    <div class="cmd" role="dialog" aria-label="Command bar">
+        <div class="cmd-field">
+            <Icon Name="search" Size="16" />
+            <input @ref="_input" class="cmd-in" placeholder="Find or do anything…" value="@_query"
+                   @oninput="OnInput" @onkeydown="OnKey" @onkeydown:preventDefault="_swallow" spellcheck="false" />
+            <span class="kbd">Esc</span>
+        </div>
+        <div class="cmd-list">
+            @if (_results.Count == 0)
+            {
+                <div class="cmd-empty">Nothing matches “@_query”.</div>
+            }
+            @{
+                string? lastGroup = null;
+                var i = 0;
+            }
+            @foreach (var c in _results)
+            {
+                var idx = i++;
+                var cc = c;
+                if (string.IsNullOrEmpty(_query) && cc.Group != lastGroup)
+                {
+                    lastGroup = cc.Group;
+                    <div class="cmd-group">@cc.Group</div>
+                }
+                <button class="cmd-item @(idx == _sel ? "sel" : null)" disabled="@(!cc.IsEnabled)"
+                        title="@(cc.DisabledReason ?? cc.Label)" @onclick="() => Run(cc)" @onmousemove="() => _sel = idx">
+                    <Icon Name="@cc.Icon" Size="15" />
+                    <span class="cmd-l">@cc.Label</span>
+                    @if (!cc.IsEnabled)
+                    {
+                        <span class="cmd-why">@cc.DisabledReason</span>
+                    }
+                    else if (!string.IsNullOrEmpty(_query))
+                    {
+                        <span class="cmd-g">@cc.Group</span>
+                    }
+                    @if (cc.Keys is not null)
+                    {
+                        <span class="kbd">@cc.Keys</span>
+                    }
+                </button>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<ShellCommand> Commands { get; set; } = Array.Empty<ShellCommand>();
+
+    /// <summary>When set, typed text can also be searched for in the open document.</summary>
+    [Parameter] public Func<string, Task>? FindText { get; set; }
+
+    private bool _open;
+    private string _query = string.Empty;
+    private int _sel;
+    private bool _swallow;
+    private bool _focus;
+    private ElementReference _input;
+    private List<ShellCommand> _results = new();
+
+    public void Open()
+    {
+        _open = true;
+        _query = string.Empty;
+        _sel = 0;
+        _focus = true;
+        Refresh();
+        StateHasChanged();
+    }
+
+    private void Close() => _open = false;
+
+    protected override void OnParametersSet()
+    {
+        if (_open)
+        {
+            Refresh();
+        }
+    }
+
+    private void Refresh()
+    {
+        var ordered = string.IsNullOrEmpty(_query)
+            ? Commands.OrderBy(c => GroupRank(c.Group)).ThenBy(c => c.IsEnabled ? 0 : 1).ToList()
+            : ShellService.Search(Commands, _query).ToList();
+        _results = ordered.Take(60).ToList();
+        var q = _query.Trim();
+        if (q.Length > 0 && FindText is { } find)
+        {
+            _results.Insert(0, new ShellCommand("find.text", $"Find “{q}” in this document", "Find", "find-in-page", "Enter", () => find(q)));
+        }
+        if (_sel >= _results.Count)
+        {
+            _sel = Math.Max(0, _results.Count - 1);
+        }
+    }
+
+    private static int GroupRank(string g) => g switch
+    {
+        "Document" => 0,
+        "Modes" => 1,
+        "Read" or "Mark" or "Arrange" or "Protect" or "View" => 2,
+        "File" => 3,
+        "Tabs" => 4,
+        "Tools" => 5,
+        "Go to" => 6,
+        _ => 7,
+    };
+
+    private void OnInput(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? string.Empty;
+        _sel = 0;
+        Refresh();
+    }
+
+    private async Task OnKey(KeyboardEventArgs e)
+    {
+        _swallow = e.Key is "ArrowDown" or "ArrowUp" or "Enter";
+        switch (e.Key)
+        {
+            case "Escape":
+                Close();
+                break;
+            case "ArrowDown":
+                _sel = Math.Min(_results.Count - 1, _sel + 1);
+                break;
+            case "ArrowUp":
+                _sel = Math.Max(0, _sel - 1);
+                break;
+            case "Enter":
+                if (_sel >= 0 && _sel < _results.Count)
+                {
+                    await Run(_results[_sel]);
+                }
+
+                break;
+        }
+    }
+
+    private async Task Run(ShellCommand c)
+    {
+        if (!c.IsEnabled)
+        {
+            return;
+        }
+
+        _open = false;
+        StateHasChanged();
+        await c.Run();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_open && _focus)
+        {
+            _focus = false;
+            try
+            {
+                await _input.FocusAsync();
+            }
+            catch
+            {
+            }
+        }
+    }
+}

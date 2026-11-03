@@ -1,138 +1,154 @@
 @page "/settings"
+@using ChuvadiReader.Ui.Components.Settings
+@implements IDisposable
 @inject ThemeService Theme
 @inject UserProfileService Profile
-@inject IAppStorage Storage
 @inject SaveFolderService SaveFolders
-@inject IFilePicker Picker
+@inject PreferencesService Prefs
+@inject WatchedFolderService Watched
+@inject LibraryService Lib
+@inject NavigationManager Nav
 
 <PageTitle>Chuvadi · Settings</PageTitle>
 
-<div style="min-height:100vh;background:var(--chvd-surface-mid);color:var(--chvd-ink);font-family:var(--chvd-sans-display);padding:24px">
-    <a href="/" style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-binding);text-decoration:none">&larr; dashboard</a>
-    <h1 style="font-family:var(--chvd-serif-display);font-weight:400;font-size:30px;margin:12px 0 18px">Settings</h1>
-
-    <div style="display:flex;flex-direction:column;gap:18px;max-width:420px">
-        <div>
-            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">theme</div>
-            <button @onclick="ToggleTheme"
-                    style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer">
-                @(Theme.Current == ChuvadiTheme.Light ? "Mono lobby (light)" : "Grid lobby (dark)") — switch
+@*
+    Settings: a 244 px section nav + the section's cards. Every change saves immediately
+    (each control calls its service). Unbuilt features stay visible, greyed out with a
+    "Coming soon" tooltip. Deep link: /settings?section=reading (ids in Sections below).
+*@
+<div class="settings">
+    <nav class="snav" aria-label="Settings sections">
+        <h1 class="snav-title" tabindex="-1">Settings</h1>
+        @foreach (var s in Sections)
+        {
+            var on = s.Id == _active;
+            <button type="button" class="snav-item @(on ? "on" : null)" aria-current="@(on ? "page" : null)" @onclick="() => Show(s.Id)">
+                <Icon Name="@s.Icon" Size="17" />
+                <span class="snav-label">@s.Label</span>
+                @if (s.IsNew)
+                {
+                    <span class="snav-note">new</span>
+                }
             </button>
+        }
+        <div class="snav-foot">
+            Chuvadi @AppInfo.Version · chuvadi-pdf @AppInfo.Libraries[0].Version<br />
+            Changes save automatically<br />
+            Stored on this device only
         </div>
+    </nav>
 
-        <div>
-            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">splash screen on launch</div>
-            <button @onclick="ToggleSplash"
-                    style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer">
-                @(_splash ? "On" : "Off") — @(_splash ? "show splash, then dashboard" : "open straight to the dashboard")
-            </button>
-            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
-                Off opens faster. Takes effect on the next launch.
-            </div>
-        </div>
-
-        <div>
-            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">page number controls</div>
-            <div style="display:flex;gap:8px">
-                <button @onclick='() => SetStepper("buttons")' style="@StepBtnStyle(_stepper == "buttons")">± buttons</button>
-                <button @onclick='() => SetStepper("chevrons")' style="@StepBtnStyle(_stepper == "chevrons")">Inline chevrons</button>
-            </div>
-            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
-                Style of the From / To steppers on the Split page.
-            </div>
-        </div>
-
-        <div>
-            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">where files are saved</div>
-            <div style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink);word-break:break-all;background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:var(--chvd-radius);padding:8px 10px;margin-bottom:8px">@SaveFolders.BaseFolder</div>
-            <div style="display:flex;gap:8px;margin-bottom:10px">
-                <button @onclick="ChangeFolder" style="@StepBtnStyle(false)">Change folder…</button>
-                <button @onclick="ResetFolder" style="@StepBtnStyle(false)">Reset to default</button>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:8px">
-                <button @onclick="ToggleMonth" style="@StepBtnStyle(_month)">@(_month ? "✓ " : "")Month subfolder · @DateTime.Now.ToString("yyyy-MM")</button>
-                <button @onclick="ToggleDate" style="@StepBtnStyle(_date)">@(_date ? "✓ " : "")Date subfolder · @DateTime.Now.ToString("yyyy-MM-dd")</button>
-            </div>
-            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
-                Bind, Lift, Scatter and other saves default here. With neither subfolder on, files land directly in the folder.
-            </div>
-        </div>
-
-        <div>
-            <div style="font-family:var(--chvd-mono);font-size:11px;letter-spacing:0.1em;color:var(--chvd-ink-muted);margin-bottom:8px">preferred name</div>
-            <input value="@_name" @oninput="OnNameInput" placeholder="@Profile.Name"
-                   style="font-size:13px;color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);border-radius:var(--chvd-radius);padding:8px 12px;background:var(--chvd-surface-hi);width:100%;box-sizing:border-box" />
-            <div style="font-family:var(--chvd-serif-body);font-size:11px;color:var(--chvd-ink-muted);margin-top:6px">
-                Leave blank to use your computer's name, or clear for a time-only greeting. Stored locally, never sent anywhere.
-            </div>
-        </div>
+    <div class="sbody" @key="_active">
+        @switch (_active)
+        {
+            case "reading":
+                <ReadingSection Rev="_rev" />
+                break;
+            case "saving":
+                <SavingSection Rev="_rev" />
+                break;
+            case "library":
+                <LibrarySection Rev="_rev" />
+                break;
+            case "account":
+                <AccountSection />
+                break;
+            case "kiosk":
+                <KioskSection />
+                break;
+            case "language":
+                <LanguageSection Rev="_rev" />
+                break;
+            case "accessibility":
+                <AccessibilitySection Rev="_rev" />
+                break;
+            case "shortcuts":
+                <ShortcutsSection />
+                break;
+            case "about":
+                <AboutSection OnShowShortcuts='() => Show("shortcuts")' />
+                break;
+            default:
+                <AppearanceSection Rev="_rev" />
+                break;
+        }
     </div>
 </div>
 
 @code {
-    private string _name = string.Empty;
-    private bool _splash;
-    private string _stepper = "buttons";
-    private bool _date;
-    private bool _month;
+    private sealed record Section(string Id, string Icon, string Label, bool IsNew);
+
+    private static readonly IReadOnlyList<Section> Sections = new[]
+    {
+        new Section("appearance", "sliders", "Appearance", false),
+        new Section("reading", "reading-mode", "Reading", false),
+        new Section("saving", "save", "Saving & files", false),
+        new Section("library", "library", "Library & folders", false),
+        new Section("account", "user", "Account & roles", true),
+        new Section("kiosk", "lock", "Kiosk", true),
+        new Section("language", "star", "Language", true),
+        new Section("accessibility", "accessibility", "Accessibility", true),
+        new Section("shortcuts", "menu", "Shortcuts", false),
+        new Section("about", "info", "About", false),
+    };
+
+    /// <summary>Optional deep link: /settings?section=reading.</summary>
+    [SupplyParameterFromQuery(Name = "section")]
+    public string? SectionQuery { get; set; }
+
+    private string _active = "appearance";
+    private int _rev;
+
+    protected override void OnInitialized()
+    {
+        Theme.Changed += OnAnyChanged;
+        SaveFolders.Changed += OnAnyChanged;
+        Prefs.Changed += OnAnyChanged;
+        Watched.Changed += OnAnyChanged;
+        Lib.Changed += OnAnyChanged;
+    }
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(SectionQuery) && Sections.Any(s => s.Id == SectionQuery))
+        {
+            _active = SectionQuery!;
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
         await Profile.HydrateAsync();
-        _splash = string.Equals(await Storage.GetAsync("splash"), "on", StringComparison.OrdinalIgnoreCase);
-        _stepper = string.Equals(await Storage.GetAsync("page-stepper"), "chevrons", StringComparison.OrdinalIgnoreCase)
-            ? "chevrons"
-            : "buttons";
-        _date = SaveFolders.DateFolders;
-        _month = SaveFolders.MonthFolders;
-    }
-
-    private async Task ChangeFolder()
-    {
-        var folder = await Picker.PickFolderAsync();
-        if (folder is not null)
+        if (!Prefs.IsHydrated)
         {
-            await SaveFolders.SetBaseFolderAsync(folder);
+            await Prefs.HydrateAsync();
+        }
+
+        await Watched.HydrateAsync();
+
+        // Library & folders shows per-category counts; scan only if nothing has been scanned yet
+        // (HydrateAsync always rescans, and Home normally did that already).
+        if (Lib.Entries.Count == 0 && !Lib.IsScanning)
+        {
+            _ = Lib.HydrateAsync();
         }
     }
 
-    private Task ResetFolder() => SaveFolders.SetBaseFolderAsync(null);
+    // Changing section re-keys the scroll container, so it starts at the top.
+    private void Show(string id) => _active = id;
 
-    private async Task ToggleDate()
+    private void OnAnyChanged() => InvokeAsync(() =>
     {
-        _date = !_date;
-        await SaveFolders.SetDateFoldersAsync(_date);
-    }
+        _rev++;
+        StateHasChanged();
+    });
 
-    private async Task ToggleMonth()
+    public void Dispose()
     {
-        _month = !_month;
-        await SaveFolders.SetMonthFoldersAsync(_month);
-    }
-
-    private async Task SetStepper(string value)
-    {
-        _stepper = value;
-        await Storage.SetAsync("page-stepper", value);
-    }
-
-    private static string StepBtnStyle(bool active)
-        => "font-size:13px;border-radius:var(--chvd-radius);padding:8px 14px;background:var(--chvd-surface-hi);cursor:pointer;"
-         + (active
-            ? "color:var(--chvd-binding);border:var(--chvd-stroke) solid var(--chvd-binding);"
-            : "color:var(--chvd-ink);border:var(--chvd-stroke) solid var(--chvd-border);");
-
-    private Task ToggleTheme() => Theme.ToggleAsync();
-
-    private async Task ToggleSplash()
-    {
-        _splash = !_splash;
-        await Storage.SetAsync("splash", _splash ? "on" : "off");
-    }
-
-    private async Task OnNameInput(ChangeEventArgs e)
-    {
-        _name = e.Value?.ToString() ?? string.Empty;
-        await Profile.SetPreferredNameAsync(_name);
+        Theme.Changed -= OnAnyChanged;
+        SaveFolders.Changed -= OnAnyChanged;
+        Prefs.Changed -= OnAnyChanged;
+        Watched.Changed -= OnAnyChanged;
+        Lib.Changed -= OnAnyChanged;
     }
 }

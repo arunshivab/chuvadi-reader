@@ -1,0 +1,20 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* A grouped card of setting rows. Full = spans both grid columns. IsNew = "new" chip (not in the old Settings page). *@
+<div class="card @(Full ? "full" : null)">
+    <div class="card-head">
+        <span class="card-title">@Title</span>
+        @if (IsNew)
+        {
+            <span class="new-chip">new</span>
+        }
+    </div>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public bool Full { get; set; }
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

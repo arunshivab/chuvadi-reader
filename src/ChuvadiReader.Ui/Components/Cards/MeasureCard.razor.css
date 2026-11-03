@@ -1,0 +1,63 @@
+/* ── card frame (shared look, repeated per card because scoped CSS can't be shared) ── */
+.chvd-card {
+    width: 280px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--chvd-surface-hi);
+    border: var(--chvd-stroke, 0.5px) solid var(--chvd-border);
+    border-radius: 12px;
+    box-shadow: var(--chvd-shadow-popover, 0 18px 44px rgba(0, 0, 0, 0.24));
+    font-family: var(--chvd-sans-display);
+    font-size: 12.5px;
+    color: var(--chvd-ink);
+}
+.head { display: flex; align-items: baseline; gap: 8px; }
+.title { font-family: var(--chvd-serif-display); font-size: 21px; line-height: 1.1; }
+.meta { margin-left: auto; font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); white-space: nowrap; }
+.close {
+    align-self: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; margin-right: -4px;
+    border: 0; border-radius: var(--chvd-radius-sm, 4px);
+    background: transparent; color: var(--chvd-ink-muted); cursor: pointer;
+}
+.close:hover { background: var(--chvd-binding-soft); color: var(--chvd-ink); }
+button:focus-visible { outline: 2px solid var(--chvd-binding); outline-offset: 1px; }
+
+/* ── measure ── */
+.empty {
+    display: flex; align-items: center; gap: 8px;
+    min-height: 32px;
+    border-top: var(--chvd-stroke, 0.5px) solid var(--chvd-border-soft);
+    color: var(--chvd-ink-muted);
+}
+.grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    margin: 0;
+    padding-top: 10px;
+    border-top: var(--chvd-stroke, 0.5px) solid var(--chvd-border-soft);
+    font-family: var(--chvd-mono);
+    font-size: 11px;
+}
+.grid dt { color: var(--chvd-ink-muted); }
+.grid dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.actions { display: flex; align-items: center; justify-content: space-between; }
+.units {
+    display: inline-flex; padding: 2px; gap: 2px;
+    border-radius: var(--chvd-radius, 6px);
+    background: var(--chvd-surface-lo);
+}
+.units button {
+    height: 22px; min-width: 34px; padding: 0 8px;
+    border: 0; border-radius: var(--chvd-radius-sm, 4px);
+    background: transparent; color: var(--chvd-ink-soft);
+    font-family: var(--chvd-mono); font-size: 10.5px; cursor: pointer;
+}
+.units button.on { background: var(--chvd-surface-hi); color: var(--chvd-ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.link { padding: 0; border: 0; background: none; font: inherit; font-size: 12px; color: var(--chvd-binding); cursor: pointer; }
+.link:hover { text-decoration: underline; }

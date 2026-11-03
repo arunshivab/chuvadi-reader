@@ -87,6 +87,14 @@ public partial class App : Application
             services.AddSingleton<OpenDocumentService>();
             services.AddSingleton<BenchDropService>();
             services.AddSingleton<RedactRequestService>();
+            services.AddSingleton<ShellService>();
+            services.AddSingleton<ChuvadiReader.Core.Storage.PreferencesService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.TextViewService>();
+            services.AddSingleton<MeasureService>();
+            services.AddSingleton<SignatureCheckService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.PasswordService>();
+            services.AddSingleton<ChuvadiReader.Core.Documents.CertificateSignService>();
+            services.AddSingleton<IPrintService, ChuvadiReader.Windows.Platform.WpfPrintService>();
             services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
             services.AddSingleton<IFilePicker, WpfFilePicker>();
             services.AddSingleton<IImageClipboard, WpfImageClipboard>();
@@ -103,10 +111,16 @@ public partial class App : Application
 
             // Match the window background to the saved theme so the pale default
             // doesn't flash before the (dark) WebView content paints on startup.
-            if (string.Equals(storage.GetSync("theme"), "Dark", StringComparison.OrdinalIgnoreCase))
+            // Five themes: each gets its surface-mid colour (tokens.css) as the pre-paint background.
+            var savedTheme = (storage.GetSync("theme") ?? string.Empty).Trim().ToLowerInvariant();
+            _main.Background = savedTheme switch
             {
-                _main.Background = new SolidColorBrush(Color.FromRgb(0x15, 0x11, 0x0B));
-            }
+                "dark" => new SolidColorBrush(Color.FromRgb(0x1B, 0x14, 0x10)),
+                "palm" => new SolidColorBrush(Color.FromRgb(0xEB, 0xE5, 0xC9)),
+                "indigo" => new SolidColorBrush(Color.FromRgb(0xED, 0xF0, 0xF6)),
+                "contrast" => new SolidColorBrush(Color.FromRgb(0xF5, 0xF5, 0xF2)),
+                _ => _main.Background,
+            };
 
             // Splash is opt-in (Settings → off by default). When off, the window
             // appears immediately and the dashboard fills in as it renders, which

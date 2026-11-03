@@ -1,0 +1,91 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject PreferencesService Prefs
+
+<SettingsSection Title="Reading" Sub="How documents open and move.">
+    <SettingsCard Title="Opening">
+        <SettingRow Label="Default zoom" Hint="For a document opened for the first time">
+            <Segmented Options="FitOptions" Value="@PreferencesService.FitKey(Prefs.DefaultFit)" ValueChanged="SetFit" AriaLabel="Default zoom" />
+        </SettingRow>
+        <SettingRow Label="Layout" Soon="true">
+            <Segmented Options="LayoutOptions" Value="Auto" />
+        </SettingRow>
+        <SettingRow Label="Show cover alone in two-page" Soon="true" SoonText="Coming soon as a default — today it is set per document from the View rail">
+            <Toggle Value="false" />
+        </SettingRow>
+        <SettingRow Label="Continuous scroll" Hint="Off = one page at a time" Soon="true" SoonText="Coming soon as a default — today it is set per document from the View rail">
+            <Toggle Value="false" />
+        </SettingRow>
+        <SettingRow Label="Reopen documents at the last page" Soon="true" SoonText="Always on in this version">
+            <Toggle Value="true" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Controls">
+        <SettingRow Label="Page number controls" Hint="Style of the From / To steppers on the Split page">
+            <Segmented Options="StepperOptions" Value="@(Prefs.PageStepper == PageStepperStyle.Chevrons ? "chevrons" : "buttons")" ValueChanged="SetStepper" AriaLabel="Page number controls" />
+        </SettingRow>
+        <SettingRow Label="Desks per row" Hint="Arrange: how many desks sit side by side">
+            <Segmented Options="PerRowOptions" Value="@Prefs.DesksPerRow.ToString()" ValueChanged="v => Prefs.SetDesksPerRowAsync(int.Parse(v))" AriaLabel="Desks per row" />
+        </SettingRow>
+        <SettingRow Label="Ctrl + wheel zooms toward the cursor" Soon="true" SoonText="Always on in this version">
+            <Toggle Value="true" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Tools">
+        <SettingRow Label="Loupe size" Soon="true">
+            <Segmented Options="LoupeSizeOptions" Value="M" />
+        </SettingRow>
+        <SettingRow Label="Loupe magnification" Soon="true">
+            <Segmented Options="LoupeMagOptions" Value="2×" />
+        </SettingRow>
+        <SettingRow Label="Snapshot resolution" Soon="true">
+            <Segmented Options="SnapshotOptions" Value="150" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Page colour (view only)">
+        <SettingRow Label="Default" Hint="Never saved into the file" Soon="true">
+            <Segmented Options="PageColourOptions" Value="White" />
+        </SettingRow>
+        <SettingRow Label="Dim pages in Night paper" Soon="true">
+            <Toggle Value="false" />
+        </SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    [Parameter] public int Rev { get; set; }
+
+    private static readonly IReadOnlyList<SegOption> FitOptions = new[]
+    {
+        new SegOption("width", "Fit width"),
+        new SegOption("page", "Fit page"),
+        new SegOption("actual", "100%"),
+        new SegOption("last", "Last used"),
+    };
+
+    private static readonly IReadOnlyList<SegOption> StepperOptions = new[]
+    {
+        new SegOption("buttons", "± buttons"),
+        new SegOption("chevrons", "Inline chevrons"),
+    };
+
+    private static readonly IReadOnlyList<SegOption> PerRowOptions = SegOption.Of("1", "2", "3");
+    private static readonly IReadOnlyList<SegOption> LayoutOptions = SegOption.Of("Single", "Two-page", "Auto");
+    private static readonly IReadOnlyList<SegOption> LoupeSizeOptions = SegOption.Of("S", "M", "L");
+    private static readonly IReadOnlyList<SegOption> LoupeMagOptions = SegOption.Of("1.5×", "2×", "3×");
+    private static readonly IReadOnlyList<SegOption> SnapshotOptions = new[] { new SegOption("150", "150"), new SegOption("300", "300 dpi") };
+    private static readonly IReadOnlyList<SegOption> PageColourOptions = SegOption.Of("White", "Cream", "Sepia", "Night");
+
+    private Task SetFit(string v) => Prefs.SetDefaultFitAsync(v switch
+    {
+        "page" => ReaderDefaultFit.Page,
+        "actual" => ReaderDefaultFit.Actual,
+        "last" => ReaderDefaultFit.LastUsed,
+        _ => ReaderDefaultFit.Width,
+    });
+
+    private Task SetStepper(string v)
+        => Prefs.SetPageStepperAsync(v == "chevrons" ? PageStepperStyle.Chevrons : PageStepperStyle.Buttons);
+}

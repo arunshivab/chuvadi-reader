@@ -1,0 +1,43 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@*
+    One theme card with a live mini preview of the shell. The preview carries its own
+    data-theme attribute, so tokens.css paints it in that theme whatever the app theme is.
+*@
+<button type="button" class="tc @(Selected ? "on" : null)" aria-pressed="@(Selected ? "true" : "false")"
+        title="@($"Use {Theme.DisplayName()}")" @onclick="OnClick">
+    <span class="prev" data-theme="@Theme.Key()" aria-hidden="true">
+        <span class="p-top"><span class="p-word"></span><span class="p-tab"></span></span>
+        <span class="p-body">
+            <span class="p-left"><span class="p-thumb cur"></span><span class="p-thumb"></span></span>
+            <span class="p-canvas"><span class="p-page"></span><span class="p-strip"></span></span>
+            <span class="p-right"><span class="p-line"></span><span class="p-btn"></span></span>
+        </span>
+    </span>
+    <span class="tc-meta">
+        <span class="tc-name-row">
+            <span class="tc-dot" data-theme="@Theme.Key()"></span>
+            <span class="tc-name">@Theme.DisplayName()</span>
+            @if (Selected)
+            {
+                <span class="tc-check"><ChuvadiReader.Ui.Components.Icon Name="check" Size="14" /></span>
+            }
+        </span>
+        <span class="tc-desc">@Description</span>
+    </span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public ChuvadiTheme Theme { get; set; }
+    [Parameter] public bool Selected { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private string Description => Theme switch
+    {
+        ChuvadiTheme.Dark => "Aged paper by lamplight, for night shifts.",
+        ChuvadiTheme.Palm => "Olai-leaf greens and turmeric gold.",
+        ChuvadiTheme.Indigo => "Cool clinic paper with fountain-pen blue.",
+        ChuvadiTheme.Contrast => "For kiosks and low vision: black ink, solid lines.",
+        _ => "The original. Warm paper, binding red.",
+    };
+}

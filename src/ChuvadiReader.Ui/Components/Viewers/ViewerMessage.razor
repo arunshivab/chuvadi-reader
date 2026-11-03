@@ -1,0 +1,13 @@
+@* Centered state card for the viewers: loading, error, empty. *@
+<div class="vm @(Error ? "vm-err" : null)" role="@(Error ? "alert" : "status")">
+    <Icon Name="@IconName" Size="16" />
+    <span>@Text</span>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string IconName { get; set; } = "info";
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public bool Error { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

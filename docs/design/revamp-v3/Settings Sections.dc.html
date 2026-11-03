@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Tamil.woff2") format("woff2-variations");unicode-range:U+0B82-0BFA;}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<section id="turn-7" style="padding:72px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Settings · the other eight sections</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:52px;line-height:1.02">Every switch, in one place.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">These follow on from Appearance and Saving (<a href="Chuvadi Revamp v3.dc.html#3a">3a</a>). Every section uses the same grouped cards and segmented choices, and changes save as soon as you make them. Options marked <span style="font-family:'IBM Plex Mono';font-size:11px;padding:1px 6px;border-radius:4px;background:#c47416;color:#fbf7ec">new</span> don't exist in the current Settings page.</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:36px">
+    <sc-for list="{{ sections }}" as="s" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">{{ s.id }}</span><span style="font-size:15px">{{ s.title }}</span></div>
+        <div style="width:1040px;height:640px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-rows:minmax(0,1fr);background:#f2ead6">
+          <nav style="background:#e8dcc4;border-right:0.5px solid #c4b497;padding:20px 10px;display:flex;flex-direction:column;gap:2px">
+            <div style="font-family:'Instrument Serif';font-size:26px;padding:0 10px 10px">Settings</div>
+            <sc-for list="{{ s.nav }}" as="n"><div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 10px;border-radius:7px;background:{{ n.bg }};color:{{ n.fg }};font-size:13.5px"><lp-i name="{{ n.icon }}" size="16"></lp-i>{{ n.label }}</div></sc-for>
+          </nav>
+          <div style="padding:24px 30px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+            <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:'Instrument Serif';font-size:30px">{{ s.title }}</span><span style="font-size:13px;color:#3a2f25">{{ s.sub }}</span></div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-content:start">
+              <sc-for list="{{ s.cards }}" as="c">
+                <div style="display:flex;flex-direction:column;gap:4px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;grid-column:{{ c.span }}">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-family:'Instrument Serif';font-size:20px">{{ c.t }}</span><sc-if value="{{ c.isNew }}" hint-placeholder-val="{{ false }}"><span style="font-family:'IBM Plex Mono';font-size:10px;padding:1px 6px;border-radius:4px;background:#c47416;color:#fbf7ec">new</span></sc-if></div>
+                  <sc-for list="{{ c.rows }}" as="r">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:38px;border-top:0.5px solid #ece3cf;font-size:13px">
+                      <span style="display:flex;flex-direction:column;min-width:0"><span>{{ r.l }}</span><span style="font-size:11.5px;color:#8a7c64">{{ r.h }}</span></span>
+                      <sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ true }}"><span style="display:flex;padding:2px;gap:2px;background:#e8dcc4;border-radius:7px;font-size:12px;flex:none"><sc-for list="{{ r.opts }}" as="o"><span style="padding:4px 10px;border-radius:5px;background:{{ o.bg }};color:{{ o.fg }};white-space:nowrap">{{ o.t }}</span></sc-for></span></sc-if>
+                      <sc-if value="{{ r.isToggle }}" hint-placeholder-val="{{ false }}"><span style="width:34px;height:20px;flex:none;border-radius:10px;background:{{ r.bg }};position:relative"><span style="position:absolute;left:{{ r.x }};top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></sc-if>
+                      <sc-if value="{{ r.isValue }}" hint-placeholder-val="{{ false }}"><span style="font-family:'IBM Plex Mono';font-size:11.5px;color:#3a2f25;padding:5px 9px;border:0.5px solid #d9cdb4;border-radius:6px;background:#fff;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis">{{ r.v }}</span></sc-if>
+                      <sc-if value="{{ r.isLink }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;color:#8a3a1c;white-space:nowrap">{{ r.v }}</span></sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const NAV = [['sliders', 'Appearance'], ['reading-mode', 'Reading'], ['save', 'Saving & files'], ['library', 'Library & folders'], ['user', 'Account & roles'], ['lock', 'Kiosk'], ['star', 'Language'], ['accessibility', 'Accessibility'], ['menu', 'Shortcuts'], ['info', 'About']];
+    const nav = (active) => NAV.map(([icon, label]) => ({ icon, label, bg: label === active ? '#fbf7ec' : 'transparent', fg: label === active ? '#8a3a1c' : '#3a2f25' }));
+    const seg = (l, h, opts, on) => ({ l, h, isSeg: true, opts: opts.map((t, i) => ({ t, bg: i === on ? '#fbf7ec' : 'transparent', fg: i === on ? '#8a3a1c' : '#3a2f25' })) });
+    const tog = (l, h, on) => ({ l, h, isToggle: true, bg: on ? '#8a3a1c' : '#d9cdb4', x: on ? '16px' : '2px' });
+    const val = (l, h, v) => ({ l, h, isValue: true, v });
+    const link = (l, h, v) => ({ l, h, isLink: true, v });
+    const card = (t, rows, o = {}) => ({ t, rows, isNew: !!o.isNew, span: o.full ? '1 / -1' : 'auto' });
+    const S = (id, title, sub, cards) => ({ id, title, sub, cards, nav: nav(title) });
+    const sections = [
+      S('7a', 'Reading', 'How documents open and move.', [
+        card('Opening', [seg('Default zoom', '', ['Fit width', 'Fit page', '100%', 'Last used'], 0), seg('Layout', '', ['Single', 'Two-page', 'Auto'], 2), tog('Show cover alone in two-page', '', true), tog('Continuous scroll', 'Off = one page at a time', true), tog('Reopen documents at the last page', '', true)]),
+        card('Tools', [seg('Loupe size', '', ['S', 'M', 'L'], 1), seg('Loupe magnification', '', ['1.5×', '2×', '3×'], 1), seg('Snapshot resolution', '', ['150', '300 dpi'], 0), tog('Page-curl corner', 'Decorative', true), tog('Ctrl + wheel zooms toward the cursor', '', true)]),
+        card('Page colour (view only)', [seg('Default', 'Never saved into the file', ['White', 'Cream', 'Sepia', 'Night'], 0), tog('Dim pages in Night paper', '', true)], { full: true }),
+      ]),
+      S('7b', 'Library & folders', 'Where Chuvadi looks for documents.', [
+        card('Library folder', [val('Folder', '', 'D:\\Records'), link('', '', 'Change folder…'), tog('Category from sub-folder', 'Clinical, Finance, Legal…', true), seg('Default view', '', ['Shelf', 'Table'], 0)]),
+        card('Watched folders', [val('Incoming', 'Scanned 4 min ago', 'D:\\Records\\Incoming'), val('Scans', 'Scanned 1 h ago', '\\\\scanner-w4\\out'), link('', '', '+ Add folder'), seg('Check every', '', ['1 min', '5 min', '15 min'], 1)]),
+        card('Categories', [val('Clinical', '96 documents', '● #b0577f'), val('Finance', '28 documents', '● #3f9e8e'), val('Legal', '19 documents', '● #5b7fb0'), link('', '', 'Edit categories & colours…')]),
+        card('Search', [tog('Index text for fast Library search', 'Stays on this device', true), tog('Include Word & Excel files', '', true, ), tog('Include scanned pages after OCR', '', true), link('Rebuild index', '214 files · 38 MB', 'Rebuild')], { isNew: true }),
+      ]),
+      S('7c', 'Account & roles', 'Who is using Chuvadi, and what they may do.', [
+        card('Signed in', [val('User', 'Hospital ID', 'Arun S. · RC-1142'), val('Role', '', 'Records officer'), seg('Sign-in method', '', ['Hospital ID', 'PIN', 'Smart card'], 0), seg('Lock after idle', '', ['5 min', '15 min', 'Never'], 1)], { isNew: true }),
+        card('Roles', [link('Viewer', 'Read & print', 'Edit'), link('Clerk', '+ Mark, sign, arrange', 'Edit'), link('Records officer', '+ Redact, passwords, audit', 'Edit'), link('Admin', '+ Kiosk & settings', 'Edit')], { isNew: true }),
+        card('Audit trail', [tog('Record redact, sign, bind, print, protect', '', true), seg('Keep for', '', ['90 days', '1 year', '7 years'], 2), link('View the trail', 'Last entry 18:39', 'Open'), link('Export', 'CSV for the records department', 'Export…')], { isNew: true, full: true }),
+      ]),
+      S('7d', 'Kiosk', 'Turn this computer into a self-service station.', [
+        card('Kiosk mode', [tog('Start in kiosk mode', 'Full screen, no title bar, no Settings', false), val('Station name', '', 'Records desk · Ward 4'), seg('Theme', '', ['Same as app', 'High contrast'], 1), seg('Interface size', '', ['125%', '150%', '175%'], 1)], { isNew: true }),
+        card('Safety', [seg('Reset after no touch for', '', ['1 min', '2 min', '5 min'], 1), tog('Close all documents and clear temp files on reset', '', true), val('Allowed folder', 'Nothing outside it opens', 'D:\\Kiosk\\Ward4'), val('Exit PIN', 'Hold the logo 3 s, then PIN', '••••')], { isNew: true }),
+        card('What visitors can do', [tog('Scan a token to open their report', '', true), tog('Open from the allowed folder', '', true), tog('Print', 'Up to 10 pages per visit', true), tog('Mark, arrange or protect', '', false)], { isNew: true }),
+        card('Status bar', [seg('Clock size', '', ['Normal', 'Large', 'Huge'], 2), tog('Show date', '', true), tog('Show station name', '', true)], { isNew: true }),
+      ]),
+      S('7e', 'Language', 'Interface language. Documents keep their own.', [
+        card('Interface', [seg('Language', '', ['English', 'தமிழ்', 'हिन्दी', 'മലയാളം', 'తెలుగు'], 1), tog('Show English under the four verbs', 'படி · Read', true), seg('Numbers', '', ['1 2 3', '௧ ௨ ௩'], 0), seg('Dates', '', ['14 Oct 2026', '14-10-2026', '2026-10-14'], 1)], { isNew: true, full: true }),
+        card('Greeting', [val('Preferred name', 'Blank = computer name', 'Arun'), tog('Show Tamil greeting', 'வணக்கம்', true)]),
+        card('OCR languages', [tog('English', '', true), tog('Tamil', '', true), tog('Hindi', '', false), link('', '', 'More…')], { isNew: true }),
+      ]),
+      S('7f', 'Accessibility', 'Make Chuvadi easier to see, hear and use.', [
+        card('Seeing', [seg('Interface size', '', ['100%', '125%', '150%'], 0), tog('High-contrast theme', '', false), tog('Always show focus rings', 'Not only when using the keyboard', true), tog('Underline links', '', true)], { isNew: true }),
+        card('Moving', [tog('Reduce motion', 'No sliding panels', false), seg('Double-click speed', '', ['Slow', 'Normal'], 1), tog('Larger touch targets (44 px)', 'On by default on touchscreens', true)], { isNew: true }),
+        card('Hearing & reading', [tog('Announce page changes to screen readers', '', true), tog('Read page aloud', 'Uses Windows voices', false), seg('Voice speed', '', ['0.8×', '1×', '1.25×'], 1)], { isNew: true, full: true }),
+      ]),
+      S('7g', 'Shortcuts', 'Every shortcut. Click one to change it.', [
+        card('Everywhere', [val('Find or do anything', '', 'Ctrl K'), val('Find in document', '', 'Ctrl F'), val('Switch mode', 'Read · Mark · Arrange · Protect', '1 2 3 4'), val('Next / previous tab', '', 'Ctrl Tab'), val('Close tab', '', 'Ctrl W'), val('Print', '', 'Ctrl P')]),
+        card('Read', [val('Zoom in / out / 100%', '', '+  −  0'), val('Hand · Marquee · Loupe · Snapshot', '', 'H  Z  L  S'), val('Full screen', '', 'F11'), val('Go to page', '', 'Ctrl G')]),
+        card('Arrange', [val('Undo / redo', '', 'Ctrl Z · Ctrl Y'), val('Select all on desk', '', 'Ctrl A'), val('Rotate right / left', '', 'R · Shift R'), val('Duplicate page', '', 'Ctrl D'), val('Remove page', '', 'Del')]),
+        card('Mark & Protect', [val('Text · Box · Draw · Sign', '', 'T  B  D  G'), val('Highlight selection', '', 'Ctrl Shift H'), val('Save as new PDF', '', 'Ctrl Shift S')]),
+      ]),
+      S('7h', 'About', 'Versions, licences and privacy.', [
+        card('Chuvadi Reader', [val('Version', 'Up to date', '1.0.0'), val('PDF engine', '', 'chuvadi-pdf 3.17.1'), val('Icons', '', 'LiPicons 1.1.0'), val('Typeface', '', 'LiPi Sans 1.0 (OFL)')]),
+        card('Privacy', [val('Network', 'Nothing is sent anywhere', 'Offline'), val('Data folder', '', '%AppData%\\Chuvadi'), link('Clear recent files & cache', '', 'Clear…')]),
+        card('Help', [link('Keyboard shortcuts', '', 'Open'), link('What’s new', '', 'Open'), link('Licences', 'Open-source notices', 'Open'), link('Send diagnostics file', 'Saved to Desktop — you choose who gets it', 'Create…')], { full: true }),
+      ]),
+    ];
+    return { sections };
+  }
+}
+</script>
+</body>
+</html>

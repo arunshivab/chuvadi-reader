@@ -1,0 +1,69 @@
+@*
+    Plain text (.txt, .log …) — D-09 frame 11k: monospace with a line-number gutter; Find highlights
+    the line. Counter unit: line. Text is shown exactly as stored.
+*@
+@inherits ViewerBase
+@inject IServiceProvider Services
+
+<div class="txv">
+    @if (_error is not null)
+    {
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" />
+    }
+    else if (_doc is null)
+    {
+        @if (!string.IsNullOrEmpty(Path)) { <ViewerMessage IconName="clock" Text="Opening…" /> }
+    }
+    else
+    {
+        <SourceLines @ref="_lines" Lines="_doc.Lines" WrapLines="WrapLines" FindQuery="@FindQuery"
+                     TextSizePct="TextSizePct" ReadingWidth="@ReadingWidth"
+                     OnCounter="OnCounter" OnFindCount="OnFindCount" />
+    }
+</div>
+
+@code {
+    private TextDocument? _doc;
+    private string? _error;
+    private string? _loaded;
+    private int _version;
+    private SourceLines? _lines;
+
+    private TextViewService Service =>
+        Services.GetService(typeof(TextViewService)) as TextViewService ?? new TextViewService();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Path == _loaded) return;
+        _loaded = Path;
+        var v = ++_version;
+        _doc = null;
+        _error = null;
+        if (string.IsNullOrEmpty(Path)) return;
+
+        try
+        {
+            var path = Path;
+            var svc = Service;
+            var doc = await Task.Run(() => svc.Load(path));
+            if (v != _version || Disposed) return;
+            _doc = doc;
+            await ReportStatusAsync($"Text · {doc.Lines.Count:N0} line{(doc.Lines.Count == 1 ? "" : "s")} · {doc.EncodingName}");
+        }
+        catch (Exception ex)
+        {
+            if (v != _version) return;
+            _error = Describe(ex, "file");
+            await ReportStatusAsync("Text · couldn't open");
+        }
+        await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
+    }
+
+    public override Task GoToAsync(int index) => _lines?.GoToAsync(index) ?? Task.CompletedTask;
+
+    /// <summary>Accepts "L42" or "42".</summary>
+    public override Task ScrollToAnchorAsync(string anchor) => _lines?.ScrollToAnchorAsync(anchor) ?? Task.CompletedTask;
+
+    /// <summary>The file's text exactly as decoded (line breaks and spacing untouched).</summary>
+    public override string GetAllText() => _doc?.Text ?? "";
+}

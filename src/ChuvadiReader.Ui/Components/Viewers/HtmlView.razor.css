@@ -1,0 +1,27 @@
+/* Sandboxed HTML (Reader Side Rails 11l): the page is the frame, the banner sits at its top. */
+.htv { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--chvd-canvas); }
+.htv > ::deep .sl-scroll { flex: 1 1 auto; }
+
+.htv-stage { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; padding: 20px 16px 24px; box-sizing: border-box; }
+.htv-page {
+    --w: 760px; width: var(--w); max-width: 100%; height: 100%;
+    display: flex; flex-direction: column; box-sizing: border-box;
+    background: var(--chvd-page); box-shadow: var(--chvd-shadow-page);
+    padding-top: 14px;
+}
+.htv-page.w-narrow { --w: 600px; }
+.htv-page.w-wide { --w: 1000px; }
+
+.htv-banner {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+    margin: 0 44px 0; padding: 8px 12px;
+    background: #fbf3e2; border: .5px solid #c47416; border-radius: 7px;
+    font-family: var(--chvd-sans-display); font-size: 12.5px; color: #5a3a10;
+}
+@media (max-width: 640px) { .htv-banner { margin: 0 12px; } }
+.htv-banner-text { flex: 1 1 auto; }
+.htv-load {
+    flex: 0 0 auto; border: none; background: none; padding: 0; cursor: pointer; font: inherit;
+    color: #8a3a1c; text-decoration: underline; text-underline-offset: 2px;
+}
+.htv-frame { flex: 1 1 auto; min-height: 0; width: 100%; border: 0; display: block; background: #fff; }

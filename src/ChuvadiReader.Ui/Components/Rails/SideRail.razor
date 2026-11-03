@@ -1,0 +1,14 @@
+@*
+    A right-hand rail. Kind "tools" (64 px, nearest the page, follows the mode) or "view"
+    (54 px, outermost). Expands leftwards over the canvas on hover to show labels.
+*@
+<aside class="srail srail-@Kind" aria-label="@Heading">
+    <span class="srail-h">@Heading</span>
+    @ChildContent
+</aside>
+
+@code {
+    [Parameter] public string Kind { get; set; } = "tools";
+    [Parameter] public string Heading { get; set; } = "TOOLS";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

@@ -10,38 +10,8 @@
 @inject IEntitlements Entitlements
 @inject IJSRuntime JS
 
-<div class="redact-root">
-    @* ── Top bar ─────────────────────────────────────────────────────────── *@
-    <div class="rd-top">
-        <div class="rd-title">
-            <Icon Name="redact" Size="18" />
-            <span class="rd-title-t">Redact</span>
-            @if (_session is not null)
-            {
-                <span class="rd-doc" title="@_name">@_name</span>
-            }
-        </div>
-
-        @if (_session is not null)
-        {
-            <div class="rd-nav">
-                <button class="ricon" @onclick="() => GoTo(_curPage - 1)" disabled="@(_curPage <= 1)" aria-label="Previous page"><Icon Name="chevron-left" Size="16" /></button>
-                <span class="rd-pagenav">
-                    <input class="rd-pagebox" value="@_pageInput" @onchange="OnJumpChange" inputmode="numeric" aria-label="Page number" />
-                    <span class="rd-pagetotal">/ @_session.Document.PageCount</span>
-                </span>
-                <button class="ricon" @onclick="() => GoTo(_curPage + 1)" disabled="@(_curPage >= _session.Document.PageCount)" aria-label="Next page"><Icon Name="chevron-right" Size="16" /></button>
-                <span class="rd-sep"></span>
-                <button class="ricon" @onclick="ZoomOut" disabled="@(_zoom <= 0.3)" aria-label="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
-                <span class="rd-zoom">@((_zoom * 100).ToString("0"))%</span>
-                <button class="ricon" @onclick="ZoomIn" disabled="@(_zoom >= 4.0)" aria-label="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
-                <span class="rd-sep"></span>
-                <button class="vbtn @(_findOpen ? "on" : null)" @onclick="ToggleFind" title="Find &amp; redact"><Icon Name="search" Size="16" /> Find</button>
-                <button class="vbtn" @onclick="Fetch" title="Open another document"><Icon Name="folder-search" Size="16" /> Fetch…</button>
-            </div>
-        }
-    </div>
-
+<div class="redact-root mview">
+    <div class="rd-col">
     @* ── Redaction rail ──────────────────────────────────────────────────── *@
     @if (_session is not null)
     {
@@ -79,7 +49,6 @@
             }
             <span class="rd-count">@RedactionCount box@(RedactionCount == 1 ? "" : "es")@(AcceptedMatchCount > 0 ? $" · {AcceptedMatchCount} found" : "")</span>
             <button class="rd-btn" @onclick="ClearAll" disabled="@(!HasAnythingToRedact || _saving)">Clear</button>
-            <button class="rd-btn primary" @onclick="Save" disabled="@(!HasAnythingToRedact || _saving)" title="Redaction always saves to a new file">@(_saving ? "Saving…" : "Save redacted PDF →")</button>
         </div>
     }
 
@@ -248,6 +217,31 @@
             }
         </div>
     }
+    </div>
+
+    <div class="mview-rails">
+        <SideRail Kind="tools" Heading="PROTECT">
+            <RailButton Icon="redact" Label="Redact box" Keys="R" Active="!_findOpen" OnClick="() => _findOpen = false" />
+            <RailButton Icon="find-in-page" Label="Find & redact" Active="_findOpen" Disabled="@(_session is null)" OnClick="ToggleFind" />
+            <RailButton Icon="stamp" Label="Stamp" OnClick='() => BackToProtect("stamp")' />
+            <RailButton Icon="watermark" Label="Watermark" OnClick='() => BackToProtect("watermark")' />
+            <RailButton Icon="compress" Label="Flatten" OnClick='() => BackToProtect("flatten")' />
+            <RailButton Icon="doc-lock" Label="Password" OnClick='() => BackToProtect("password")' />
+            <RailButton Icon="certification" Label="Sign with certificate" DisabledReason="@(ChuvadiReader.Core.Documents.CertificateSignService.IsAvailable ? null : ChuvadiReader.Core.Documents.CertificateSignService.WaitingReason)" OnClick='() => BackToProtect("cert")' />
+            <RailSep />
+            <RailButton Icon="folder" Label="Redact another file…" OnClick="Fetch" />
+            <RailButton Icon="close" Label="Clear all boxes" Disabled="@(!HasAnythingToRedact || _saving)" OnClick="ClearAll" />
+            <RailButton Icon="zoom-in" Label="Zoom in" Class="rb-viewfold" Disabled="@(_session is null || _zoom >= 4.0)" OnClick="ZoomIn" />
+            <RailButton Icon="zoom-out" Label="Zoom out" Class="rb-viewfold" Disabled="@(_session is null || _zoom <= 0.3)" OnClick="ZoomOut" />
+            <RailSpacer />
+            <RailButton Icon="download" Label="@(_saving ? "Saving…" : "Save redacted copy")" Primary="true" Disabled="@(!HasAnythingToRedact || _saving)" OnClick="Save" />
+        </SideRail>
+        <SideRail Kind="view" Heading="VIEW">
+            <RailButton Icon="zoom-in" Label="Zoom in" Size="18" Disabled="@(_session is null || _zoom >= 4.0)" OnClick="ZoomIn" />
+            <RailText Title="Zoom">@((_zoom * 100).ToString("0"))%</RailText>
+            <RailButton Icon="zoom-out" Label="Zoom out" Size="18" Disabled="@(_session is null || _zoom <= 0.3)" OnClick="ZoomOut" />
+        </SideRail>
+    </div>
 </div>
 
 @code {
@@ -345,11 +339,14 @@
             return;
         }
 
+        ShellInit();
+
         // Receive a document sent from the Reader, if any.
         if (!string.IsNullOrEmpty(Handoff.PendingPath))
         {
             var path = Handoff.PendingPath!;
             var name = Handoff.PendingName ?? System.IO.Path.GetFileName(path);
+            _findOpen = Handoff.OpenFind;
             Handoff.Clear();
             await OpenAsync(path, name);
         }
@@ -401,6 +398,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        ShellPublish();
         if (_session is null) return;
 
         if (_js is null)
@@ -708,6 +706,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        ShellRelease();
         try { if (_js is not null) await _js.InvokeVoidAsync("dispose"); } catch { }
         try { if (_js is not null) await _js.DisposeAsync(); } catch { }
         _ref?.Dispose();

@@ -1,0 +1,7 @@
+.vm {
+    max-width: 560px; margin: 40px auto; padding: 14px 18px; border-radius: 10px;
+    font-size: 13px; display: flex; gap: 8px; align-items: flex-start;
+    color: var(--chvd-ink-muted); background: var(--chvd-surface-hi); border: 1px solid var(--chvd-border-soft);
+}
+.vm-err { color: var(--chvd-ink); border-color: var(--chvd-error); background: var(--chvd-surface-hi); }
+.vm-err ::deep .cv-icon { color: var(--chvd-error); }

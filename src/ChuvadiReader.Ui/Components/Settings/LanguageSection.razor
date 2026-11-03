@@ -1,0 +1,49 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject UserProfileService Profile
+@inject PreferencesService Prefs
+
+<SettingsSection Title="Language" Sub="Interface language. Documents keep their own.">
+    <SettingsCard Title="Interface" IsNew="true" Full="true">
+        <SettingRow Label="Language" Soon="true" SoonText="Coming soon — Tamil and other interface languages">
+            <Segmented Options="LanguageOptions" Value="English" />
+        </SettingRow>
+        <SettingRow Label="Show English under the four verbs" Hint="படி · Read" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Numbers" Soon="true"><Segmented Options="NumberOptions" Value="1 2 3" /></SettingRow>
+        <SettingRow Label="Dates" Soon="true"><Segmented Options="DateOptions" Value="@DateTime.Now.ToString("d MMM yyyy")" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Greeting">
+        <SettingRow Label="Preferred name" Hint="Leave blank to use your computer's name. Stored locally, never sent anywhere." Stack="true">
+            <input class="name-in" value="@_name" @oninput="OnNameInput" placeholder="@Profile.Name" aria-label="Preferred name" spellcheck="false" />
+        </SettingRow>
+        <SettingRow Label="Show Tamil greeting" Hint="வணக்கம்.">
+            <Toggle Value="Prefs.ShowTamilGreeting" ValueChanged="v => Prefs.SetShowTamilGreetingAsync(v)" AriaLabel="Show Tamil greeting" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="OCR languages" IsNew="true">
+        <SettingRow Label="English" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Tamil" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Hindi" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Soon="true"><RowButton>More…</RowButton></SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    [Parameter] public int Rev { get; set; }
+
+    private static readonly IReadOnlyList<SegOption> LanguageOptions = SegOption.Of("English", "தமிழ்", "हिन्दी", "മലയാളം", "తెలుగు");
+    private static readonly IReadOnlyList<SegOption> NumberOptions = SegOption.Of("1 2 3", "௧ ௨ ௩");
+    private static readonly IReadOnlyList<SegOption> DateOptions = SegOption.Of(
+        DateTime.Now.ToString("d MMM yyyy"), DateTime.Now.ToString("dd-MM-yyyy"), DateTime.Now.ToString("yyyy-MM-dd"));
+
+    // Same behaviour as the old Settings field: starts empty with the current greeting name as
+    // the placeholder; every keystroke saves (blank = fall back to the computer's name).
+    private string _name = string.Empty;
+
+    private async Task OnNameInput(ChangeEventArgs e)
+    {
+        _name = e.Value?.ToString() ?? string.Empty;
+        await Profile.SetPreferredNameAsync(_name);
+    }
+}

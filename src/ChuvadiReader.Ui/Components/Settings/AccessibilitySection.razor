@@ -1,0 +1,46 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject PreferencesService Prefs
+@inject ThemeService Theme
+@inject IJSRuntime JS
+
+<SettingsSection Title="Accessibility" Sub="Make Chuvadi easier to see, hear and use.">
+    <SettingsCard Title="Seeing" IsNew="true">
+        <SettingRow Label="Interface size" Hint="Zooms every screen">
+            <Segmented Options="ScaleOptions" Value="@Prefs.UiScale.ToString()" ValueChanged="v => Prefs.SetUiScaleAsync(int.Parse(v))" AriaLabel="Interface size" />
+        </SettingRow>
+        <SettingRow Label="High-contrast theme" Hint="Black ink, solid lines. Off returns to Cream paper.">
+            <Toggle Value="Theme.Current == ChuvadiTheme.Contrast" ValueChanged="SetContrast" AriaLabel="High-contrast theme" />
+        </SettingRow>
+        <SettingRow Label="Always show focus rings" Hint="Not only when using the keyboard" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Underline links" Soon="true"><Toggle Value="false" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Moving" IsNew="true">
+        <SettingRow Label="Reduce motion" Hint="No sliding or fading panels">
+            <Toggle Value="Prefs.ReduceMotion" ValueChanged="v => Prefs.SetReduceMotionAsync(v)" AriaLabel="Reduce motion" />
+        </SettingRow>
+        <SettingRow Label="Double-click speed" Soon="true"><Segmented Options="ClickOptions" Value="Normal" /></SettingRow>
+        <SettingRow Label="Larger touch targets (44 px)" Hint="On by default on touchscreens" Soon="true"><Toggle Value="false" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Hearing & reading" IsNew="true" Full="true">
+        <SettingRow Label="Announce page changes to screen readers" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Read page aloud" Hint="Uses Windows voices" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Voice speed" Soon="true"><Segmented Options="VoiceOptions" Value="1×" /></SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    [Parameter] public int Rev { get; set; }
+
+    private static readonly IReadOnlyList<SegOption> ScaleOptions = PreferencesService.UiScales.Select(s => new SegOption(s.ToString(), $"{s}%")).ToArray();
+    private static readonly IReadOnlyList<SegOption> ClickOptions = SegOption.Of("Slow", "Normal");
+    private static readonly IReadOnlyList<SegOption> VoiceOptions = SegOption.Of("0.8×", "1×", "1.25×");
+
+    private async Task SetContrast(bool on)
+    {
+        var t = on ? ChuvadiTheme.Contrast : ChuvadiTheme.Light;
+        await Theme.SetAsync(t);
+        await PreferencesInterop.ApplyThemeAsync(JS, t);
+    }
+}

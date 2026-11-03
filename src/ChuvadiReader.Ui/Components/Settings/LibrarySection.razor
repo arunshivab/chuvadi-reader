@@ -1,0 +1,94 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject SaveFolderService SaveFolders
+@inject WatchedFolderService Watched
+@inject CategoryService Categories
+@inject LibraryService Lib
+@inject IFilePicker Picker
+
+<SettingsSection Title="@SectionTitle" Sub="Where Chuvadi looks for documents.">
+    <SettingsCard Title="Library folder">
+        <SettingRow Label="Folder" Hint="The same folder new files are saved to" Stack="true">
+            <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
+            <RowButton IconName="folder" OnClick="ChangeLibraryFolder">Change folder…</RowButton>
+            <RowButton IconName="refresh" OnClick="Rescan" Disabled="Lib.IsScanning">@(Lib.IsScanning ? "Scanning…" : "Scan again")</RowButton>
+        </SettingRow>
+        <SettingRow Label="Category from sub-folder" Hint="Clinical, Finance, Legal…" Soon="true" SoonText="Always on in this version">
+            <Toggle Value="true" />
+        </SettingRow>
+        <SettingRow Label="Default view" Soon="true">
+            <Segmented Options="ViewOptions" Value="Table" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Watched folders">
+        <SettingRow Label="Watched folder" Hint="@($"{Watched.DocumentCount} documents found · scanned {Relative(Watched.LastScanned)}")" Stack="true">
+            <ValueChip Text="@(Watched.FolderPath ?? "—")" Wrap="true" />
+            <RowButton IconName="folder" OnClick="ChangeWatched">Change…</RowButton>
+        </SettingRow>
+        <SettingRow Soon="true" SoonText="Coming soon — one watched folder for now">
+            <RowButton IconName="plus">Add folder</RowButton>
+        </SettingRow>
+        <SettingRow Label="Check every" Soon="true">
+            <Segmented Options="CheckOptions" Value="5 min" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Categories">
+        @foreach (var c in Categories.Categories)
+        {
+            var n = Lib.Entries.Count(e => string.Equals(e.Category, c.Name, StringComparison.OrdinalIgnoreCase));
+            <SettingRow Label="@c.Name" Hint="@($"{n} document{(n == 1 ? "" : "s")}")">
+                <ValueChip Text="@c.Color" Dot="@c.Color" />
+            </SettingRow>
+        }
+        <SettingRow Soon="true">
+            <RowButton>Edit categories &amp; colours…</RowButton>
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Search" IsNew="true">
+        <SettingRow Label="Index text for fast Library search" Hint="Stays on this device" Soon="true">
+            <Toggle Value="false" />
+        </SettingRow>
+        <SettingRow Label="Include Word & Excel files" Soon="true">
+            <Toggle Value="false" />
+        </SettingRow>
+        <SettingRow Label="Include scanned pages after OCR" Soon="true">
+            <Toggle Value="false" />
+        </SettingRow>
+        <SettingRow Label="Rebuild index" Soon="true">
+            <RowButton>Rebuild</RowButton>
+        </SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    [Parameter] public int Rev { get; set; }
+
+    private const string SectionTitle = "Library & folders";
+
+    private static readonly IReadOnlyList<SegOption> ViewOptions = SegOption.Of("Shelf", "Table");
+    private static readonly IReadOnlyList<SegOption> CheckOptions = SegOption.Of("1 min", "5 min", "15 min");
+
+    private async Task ChangeLibraryFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            await SaveFolders.SetBaseFolderAsync(folder); // LibraryService rescans on this change
+        }
+    }
+
+    private Task Rescan() => Lib.ScanAsync();
+
+    private async Task ChangeWatched()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            await Watched.SetFolderAsync(folder);
+        }
+    }
+
+    private static string Relative(DateTimeOffset? when) => ChuvadiReader.Ui.Components.Home.HomeFormat.Relative(when);
+}

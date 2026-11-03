@@ -1,0 +1,192 @@
+@namespace ChuvadiReader.Ui.Components.Cards
+@using System.Globalization
+@inject IServiceProvider Services
+@implements IDisposable
+@*
+    Signatures: verifies every signature in the file (read-only) and lists them, each with a
+    plain-language line and a coloured banner (green = valid). Re-checks when Path changes.
+    Raises OnReport with the result so the host can show SignatureBanner over the page and
+    a status-bar note.
+*@
+
+<section class="chvd-card" aria-label="Signatures">
+    <header class="head">
+        <span class="title">Signatures</span>
+        <span class="meta">@MetaText</span>
+        <button type="button" class="close" title="Close" aria-label="Close" @onclick="OnClose">
+            <Icon Name="close" Size="14" />
+        </button>
+    </header>
+
+    @if (_checking)
+    {
+        <div class="empty"><Icon Name="certification" Size="16" /><span>Checking signatures…</span></div>
+    }
+    else if (_report is null)
+    {
+        <div class="empty"><Icon Name="certification" Size="16" /><span>Open a PDF to check its signatures.</span></div>
+    }
+    else if (_report.Error is not null)
+    {
+        <div class="empty bad"><Icon Name="warning" Size="16" /><span>Couldn't check signatures: @_report.Error</span></div>
+    }
+    else if (!_report.HasSignatures)
+    {
+        <div class="empty"><Icon Name="certification" Size="16" /><span>This file isn't digitally signed.</span></div>
+    }
+    else
+    {
+        <ul class="list" role="list">
+            @for (int i = 0; i < _report.Signatures.Count; i++)
+            {
+                var s = _report.Signatures[i];
+                var index = i;
+                bool open = _expanded.Contains(index);
+                <li class="sig">
+                    <div class="sig-banner @SignatureStyles.Css(s.Status)">
+                        <Icon Name="@SignatureStyles.IconFor(s.Status)" Size="15" />
+                        <span class="who">@s.SignerName</span>
+                        <span class="status">@SignatureStyles.Label(s.Status)</span>
+                    </div>
+                    <span class="summary">@s.Summary</span>
+                    <button type="button" class="link" aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(index)">
+                        @(open ? "Hide details" : "Details")
+                    </button>
+                    @if (open)
+                    {
+                        <dl class="grid">
+                            @if (s.SigningTime is { } t)
+                            {
+                                <dt>signed</dt><dd>@t.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.InvariantCulture)@(s.TimestampValidated ? " · timestamped" : "")</dd>
+                            }
+                            @if (s.Reason is not null)
+                            {
+                                <dt>reason</dt><dd>@s.Reason</dd>
+                            }
+                            @if (s.Location is not null)
+                            {
+                                <dt>place</dt><dd>@s.Location</dd>
+                            }
+                            @if (s.IssuerName is not null)
+                            {
+                                <dt>issuer</dt><dd>@s.IssuerName</dd>
+                            }
+                            @if (s.CertificateValidTo is { } vt)
+                            {
+                                <dt>valid to</dt><dd>@vt.ToLocalTime().ToString("d MMM yyyy", CultureInfo.InvariantCulture)</dd>
+                            }
+                            <dt>covers</dt><dd>@(s.CoversWholeDocument ? "the whole document" : "an earlier version")</dd>
+                            <dt>type</dt><dd>@(s.IsDocumentTimestamp ? "document timestamp" : s.SubFilter)</dd>
+                            <dt>field</dt><dd>@s.FieldName</dd>
+                        </dl>
+                        <span class="note">@s.Detail</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    /// <summary>The file to check.</summary>
+    [Parameter] public string? Path { get; set; }
+
+    [Parameter] public IPdfSession? Session { get; set; }
+
+    [Parameter] public int CurrentPage { get; set; }
+
+    /// <summary>Password, when the file is protected.</summary>
+    [Parameter] public string? Password { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    [Parameter] public EventCallback<string> OnMessage { get; set; }
+
+    /// <summary>Raised with every completed check (for the page banner / status bar).</summary>
+    [Parameter] public EventCallback<SignatureCheckReport> OnReport { get; set; }
+
+    private SignatureCheckService? _service;
+    private SignatureCheckReport? _report;
+    private string? _checkedPath;
+    private bool _checking;
+    private readonly HashSet<int> _expanded = new();
+    private CancellationTokenSource? _cts;
+
+    private string MetaText => _report is { HasSignatures: true } r ? r.Headline : string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.Equals(Path, _checkedPath, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _checkedPath = Path;
+        await CheckAsync();
+    }
+
+    private async Task CheckAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        _expanded.Clear();
+        if (string.IsNullOrEmpty(Path))
+        {
+            _report = null;
+            return;
+        }
+
+        var cts = _cts = new CancellationTokenSource();
+        _checking = true;
+        StateHasChanged();
+        try
+        {
+            _service ??= Services.GetService(typeof(SignatureCheckService)) as SignatureCheckService ?? new SignatureCheckService();
+            var report = await _service.CheckAsync(Path!, Password, null, cts.Token);
+            if (cts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _report = report;
+            if (report.HasSignatures && report.Signatures.Count == 1)
+            {
+                _expanded.Add(0);
+            }
+
+            await OnReport.InvokeAsync(report);
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer check replaced this one.
+        }
+        catch (Exception ex)
+        {
+            _report = new SignatureCheckReport(Array.Empty<SignatureCheckInfo>(), ex.Message);
+            await OnMessage.InvokeAsync("Couldn't check signatures: " + ex.Message);
+        }
+        finally
+        {
+            if (ReferenceEquals(_cts, cts))
+            {
+                _checking = false;
+            }
+        }
+    }
+
+    private void Toggle(int index)
+    {
+        if (!_expanded.Remove(index))
+        {
+            _expanded.Add(index);
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+}

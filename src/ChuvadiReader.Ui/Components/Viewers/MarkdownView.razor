@@ -1,0 +1,190 @@
+@*
+    Markdown — D-09 frame 11j. Rendered by Core's MarkdownRenderer (raw HTML always escaped, links
+    limited to http/https/mailto/#anchors), so the output is placed directly as MarkupString.
+    Counter unit: section (h1–h3); with ShowSource the raw file is shown as numbered lines.
+*@
+@inherits ViewerBase
+@inject IServiceProvider Services
+
+<div class="mdv">
+    @if (_error is not null)
+    {
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" />
+    }
+    else if (_doc is null || _render is null)
+    {
+        @if (!string.IsNullOrEmpty(Path)) { <ViewerMessage IconName="clock" Text="Opening…" /> }
+    }
+    else if (ShowSource)
+    {
+        <SourceLines @ref="_src" Lines="_doc.Lines" WrapLines="WrapLines" FindQuery="@FindQuery"
+                     TextSizePct="TextSizePct" ReadingWidth="@ReadingWidth"
+                     OnCounter="OnCounter" OnFindCount="OnFindCount" />
+    }
+    else
+    {
+        <div class="mdv-scroll" @ref="_scroll" style="--vw-scale:@Css(Scale)">
+            @if (_render.RemoteImages > 0 && !_allowRemote)
+            {
+                <div class="mdv-imgbar @WidthClass">
+                    <Icon Name="file-image" Size="14" />
+                    <span>@_render.RemoteImages remote image@(_render.RemoteImages == 1 ? " isn't" : "s aren't") loaded.</span>
+                    <button type="button" class="mdv-imgbtn" @onclick="LoadImagesAsync">Load images</button>
+                </div>
+            }
+            <article class="mdv-page @WidthClass" @ref="_page">@((MarkupString)_render.Html)</article>
+        </div>
+    }
+</div>
+
+@code {
+    private TextDocument? _doc;
+    private MarkdownRenderResult? _render;
+    private string? _error;
+    private string? _loaded;
+    private int _version;
+    private bool _allowRemote;
+    private bool _wasSource;
+    private string? _query;
+    private bool _attach, _highlight;
+    private int _words;
+    private ElementReference _scroll, _page;
+    private SourceLines? _src;
+
+    private TextViewService Service =>
+        Services.GetService(typeof(TextViewService)) as TextViewService ?? new TextViewService();
+
+    private int Sections => Math.Max(1, _render?.Outline.Count ?? 0);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Path != _loaded)
+        {
+            _loaded = Path;
+            _allowRemote = false;
+            _wasSource = ShowSource;
+            _query = FindQuery;
+            await LoadAsync();
+            return;
+        }
+
+        if (ShowSource != _wasSource)
+        {
+            _wasSource = ShowSource;
+            _query = FindQuery;
+            if (!ShowSource && _render is not null)
+            {
+                _attach = true;
+                _highlight = !string.IsNullOrEmpty(FindQuery);
+                await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
+            }
+            await ReportStatusAsync(StatusText());
+            return;
+        }
+
+        if (FindQuery != _query)
+        {
+            _query = FindQuery;
+            if (!ShowSource) _highlight = true; // SourceLines handles Find itself in source mode
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var v = ++_version;
+        _doc = null;
+        _render = null;
+        _error = null;
+        if (string.IsNullOrEmpty(Path)) return;
+
+        try
+        {
+            var path = Path;
+            var svc = Service;
+            var allow = _allowRemote;
+            var (doc, render) = await Task.Run(() =>
+            {
+                var d = svc.Load(path);
+                return (d, MarkdownRenderer.Render(d.Text, allow));
+            });
+            if (v != _version || Disposed) return;
+            _doc = doc;
+            Apply(render);
+            await ReportOutlineAsync(render.Outline);
+            if (!ShowSource) await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
+            await ReportStatusAsync(StatusText());
+        }
+        catch (Exception ex)
+        {
+            if (v != _version) return;
+            _error = Describe(ex, "file");
+            await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
+            await ReportStatusAsync("Markdown · couldn't open");
+        }
+    }
+
+    private void Apply(MarkdownRenderResult render)
+    {
+        _render = render;
+        _words = render.PlainText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        _attach = true;
+        _highlight = !string.IsNullOrEmpty(FindQuery);
+    }
+
+    private async Task LoadImagesAsync()
+    {
+        if (_doc is null) return;
+        _allowRemote = true;
+        var text = _doc.Text;
+        Apply(await Task.Run(() => MarkdownRenderer.Render(text, allowRemoteImages: true)));
+    }
+
+    private string StatusText()
+    {
+        if (_doc is null) return "Markdown";
+        if (ShowSource) return $"Markdown · source · {_doc.Lines.Count:N0} line{(_doc.Lines.Count == 1 ? "" : "s")}";
+        return $"Markdown · rendered · {_words:N0} word{(_words == 1 ? "" : "s")}";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (ShowSource || _render is null) return;
+        if (_attach)
+        {
+            _attach = false;
+            await JsVoidAsync("attach", _scroll, Self, "sections");
+        }
+        if (_highlight)
+        {
+            _highlight = false;
+            var n = await JsAsync<int>("highlight", _scroll, _page, FindQuery ?? "");
+            await ReportFindCountAsync(n);
+        }
+    }
+
+    protected override Task HandleScrollAsync(int index) =>
+        ShowSource ? Task.CompletedTask : ReportCounterAsync(index, Sections, ViewerCounter.Section);
+
+    public override async Task GoToAsync(int index)
+    {
+        if (ShowSource) { if (_src is not null) await _src.GoToAsync(index); return; }
+        var n = Math.Clamp(index, 1, Sections);
+        await JsVoidAsync("scrollToSection", _scroll, n);
+        await ReportCounterAsync(n, Sections, ViewerCounter.Section);
+    }
+
+    public override async Task ScrollToAnchorAsync(string anchor)
+    {
+        if (ShowSource || string.IsNullOrEmpty(anchor)) return;
+        await JsVoidAsync("scrollToAnchor", _scroll, anchor);
+        var idx = _render?.Outline.ToList().FindIndex(o => o.Anchor == anchor) ?? -1;
+        if (idx >= 0) await ReportCounterAsync(idx + 1, Sections, ViewerCounter.Section);
+    }
+
+    /// <summary>Rendered view: the visible text. Source view: the file exactly as stored.</summary>
+    public override string GetAllText() =>
+        ShowSource ? _doc?.Text ?? "" : _render?.PlainText ?? "";
+
+    protected override ValueTask DisposeCoreAsync() =>
+        ShowSource || _render is null ? ValueTask.CompletedTask : new(JsVoidAsync("detach", _scroll));
+}

@@ -19,7 +19,7 @@ public sealed class ReaderTab
     /// <summary>The open document, or null until the tab is first activated (lazy restore).</summary>
     public IPdfSession? Session { get; set; }
 
-    public bool IsLoaded => Session is not null;
+    public bool IsLoaded => Session is not null || Format.IsViewOnly();
 
     public bool IsLoading { get; set; }
 
@@ -395,6 +395,13 @@ public sealed class TabsService
         {
             tab.Error = $"File not found: {tab.Path}";
             Changed?.Invoke();
+            return;
+        }
+
+        if (tab.Format.IsViewOnly())
+        {
+            // Word / Excel / Markdown / text / HTML tabs are rendered by their own viewers
+            // (D-07, D-09); there is no PDF session to open.
             return;
         }
 

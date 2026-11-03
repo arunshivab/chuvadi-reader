@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#f2ead6;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<div style="max-width:1180px;margin:0 auto;padding:56px 32px 96px;display:flex;flex-direction:column;gap:40px">
+
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Feature audit · every page, every control</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-weight:400;font-size:52px;line-height:1.02">Is everything accounted for?</h1>
+    <p style="margin:0;max-width:820px;font-family:Fraunces;font-size:17px;line-height:1.6;color:#3a2f25;text-wrap:pretty"><b>An honest answer first:</b> in round 1 I read the shell, the dashboard and only part of the Reader, Bench and Redact. That was not enough. For this audit I went through all 13 pages and the Bench's 12 dialogs, and listed every control that a button, menu or shortcut can reach. Each one is mapped below to its new home. I updated the prototype (<a href="Chuvadi Revamp v2.dc.html">Chuvadi Revamp v2</a>) so that every Bench feature is visible somewhere in Arrange.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">
+      <sc-for list="{{ stats }}" as="st" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:2px;padding:12px 16px;min-width:150px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+          <span style="font-family:'Instrument Serif';font-size:34px;line-height:1;color:{{ st.c }}">{{ st.n }}</span>
+          <span style="font-size:12.5px;color:#3a2f25">{{ st.l }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;font-size:12.5px;color:#3a2f25;margin-top:4px">
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#6b7a3e"></span>Shown in the mockup</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#c47416"></span>Placed — has a home, but its dialog or panel isn't drawn yet</span>
+      <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;border:1.5px solid #8a3a1c"></span>Not designed yet</span>
+    </div>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="margin:0;font-family:'Instrument Serif';font-weight:400;font-size:34px">1 · Things I found that are broken or unreachable today</h2>
+    <p style="margin:0;font-size:14.5px;line-height:1.55;color:#3a2f25;max-width:820px">These turned up while I read the code. They are worth fixing now, whatever happens with the redesign.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
+      <sc-for list="{{ bugs }}" as="b" hint-placeholder-count="6">
+        <div style="display:flex;flex-direction:column;gap:6px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="display:flex;color:#a83a2a"><lp-i name="warning" size="16"></lp-i></span><span style="font-size:14.5px;font-weight:600">{{ b.t }}</span></div>
+          <div style="font-size:13.5px;line-height:1.5;color:#3a2f25;text-wrap:pretty">{{ b.d }}</div>
+          <div style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ b.src }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:18px">
+    <h2 style="margin:0;font-family:'Instrument Serif';font-weight:400;font-size:34px">2 · Where every feature goes</h2>
+    <sc-for list="{{ areas }}" as="ar" hint-placeholder-count="4">
+      <div style="display:flex;flex-direction:column;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 18px;border-bottom:0.5px solid #d9cdb4;background:#f2ead6">
+          <span style="font-family:'Instrument Serif';font-size:24px">{{ ar.title }}</span>
+          <span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ ar.src }}</span>
+          <span style="margin-left:auto;font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">{{ ar.tally }}</span>
+        </div>
+        <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1.3fr) 22px;gap:0 16px;padding:6px 18px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:#8a7c64;border-bottom:0.5px solid #e8dcc4">
+          <span>Feature</span><span>Today</span><span>New home</span><span></span>
+        </div>
+        <sc-for list="{{ ar.rows }}" as="rw">
+          <div style="display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1.3fr) 22px;gap:0 16px;align-items:start;padding:8px 18px;border-bottom:0.5px solid #efe6d2;font-size:13px;line-height:1.45">
+            <span style="color:#1a1310;text-wrap:pretty">{{ rw.f }}</span>
+            <span style="color:#8a7c64;text-wrap:pretty">{{ rw.today }}</span>
+            <span style="color:#3a2f25;text-wrap:pretty">{{ rw.home }}</span>
+            <span title="{{ rw.st }}" style="width:11px;height:11px;margin-top:4px;border-radius:50%;background:{{ rw.bg }};border:1.5px solid {{ rw.bd }}"></span>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="margin:0;font-family:'Instrument Serif';font-weight:400;font-size:34px">3 · What the app is missing</h2>
+    <p style="margin:0;font-size:14.5px;line-height:1.55;color:#3a2f25;max-width:820px">Ranked for your context: hospital records, offline use, a future kiosk, and future signed-in users. “Library” notes whether the chuvadi-pdf package already supports it, based on your ROADMAP.</p>
+    <sc-for list="{{ missing }}" as="mg" hint-placeholder-count="3">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:11px;padding:3px 9px;border-radius:4px;background:{{ mg.bg }};color:#fbf7ec">{{ mg.tier }}</span><span style="font-size:13.5px;color:#3a2f25">{{ mg.note }}</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px">
+          <sc-for list="{{ mg.items }}" as="it">
+            <div style="display:flex;flex-direction:column;gap:6px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="display:flex;color:#8a3a1c"><lp-i name="{{ it.icon }}" size="16"></lp-i></span><span style="font-size:14.5px;font-weight:600">{{ it.t }}</span></div>
+              <div style="font-size:13.5px;line-height:1.5;color:#3a2f25;text-wrap:pretty">{{ it.why }}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#8a7c64"><span>Lives in: <b style="color:#3a2f25;font-weight:500">{{ it.where }}</b></span><span>Library: <b style="color:#3a2f25;font-weight:500">{{ it.lib }}</b></span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:10px;padding:18px 20px;border:0.5px dashed #8a3a1c;border-radius:10px">
+    <h2 style="margin:0;font-family:'Instrument Serif';font-weight:400;font-size:28px">What I'd design next</h2>
+    <ol style="margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#3a2f25">
+      <li>The amber “placed” dialogs, in this order: Watermark and Header/footer (shared by Arrange and Protect), Numbering, Impose, Crop and Margins, then Export.</li>
+      <li>A Settings screen, with kiosk and sign-in sections.</li>
+      <li>Text highlight and comments in Mark, plus form filling.</li>
+      <li>The Print dialog.</li>
+      <li>The Library table view, with tags and batch Press.</li>
+    </ol>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const S = 'shown', P = 'placed', G = 'gap';
+    const row = (f, today, home, st) => ({ f, today, home, st,
+      bg: st === S ? '#6b7a3e' : st === P ? '#c47416' : 'transparent', bd: st === G ? '#8a3a1c' : 'transparent' });
+    const A = (title, src, rows) => {
+      const r = rows.map(x => row(...x));
+      const c = (k) => r.filter(x => x.st === k).length;
+      return { title, src, rows: r, tally: `${r.length} · ${c(S)} shown · ${c(P)} placed · ${c(G)} open` };
+    };
+    const areas = [
+      A('Shell & navigation', 'MainLayout.razor · app.css', [
+        ['Document tabs in the title bar (drag to reorder, middle-click to close, restored on launch)', 'Title bar', 'Title bar, with a format icon and a lock badge', S],
+        ['Tab ⋯ menu: close active / others / all', 'Title bar ⋯', 'Right-click a tab, plus Ctrl+W shortcuts', P],
+        ['Open by drag-and-drop', 'Window', 'Same. Dropping on the Arrange shelf adds the file there', P],
+        ['Light / dark theme', 'Title bar', 'Title bar (night paper). Dark mockups are still to do', P],
+        ['Find pill', 'Title bar (decorative)', 'Ctrl K command bar, plus Find in Read', S],
+        ['Left rail: Home, Reader, Bench, Redact, Library, Docs, Sheets, Settings', 'Rail', 'Home = wordmark · Library button · Reader/Bench/Redact = modes · Docs/Sheets = tabs · Settings = gear', S],
+        ['Traffic-light window controls', 'Right side (all builds)', 'Right on Windows, left on Mac', S],
+        ['Status bar', '“offline · ready · version”', 'Offline · user · current activity · date · live clock', S],
+        ['Redact entitlement gate (IEntitlements.CanRedact)', 'Rail item, route, Send button', 'Hides the Protect › Redact tab', P],
+      ]),
+      A('Read — viewing & navigating', 'Reader.razor (toolbar, View drawer, floating bar)', [
+        ['Previous / next page, page-number box', 'Toolbar + floating bar', 'Leaf bar', S],
+        ['Zoom in / out, Ctrl + wheel, zoom presets', 'Toolbar, drawer, floating bar', 'Leaf bar (click the % for presets)', S],
+        ['Fit width · Fit page · Actual size', 'Toolbar, drawer, floating bar', 'Leaf bar, plus View menu (Actual size)', S],
+        ['Single page / two-page', 'Toolbar, drawer, floating bar', 'Leaf bar', S],
+        ['Show cover alone · Continuous scroll', 'Drawer', 'View menu › Layout', S],
+        ['Rotate view, scoped to page / onward / document', 'Toolbar + drawer', 'View menu › Rotate view ▸', S],
+        ['Hand · Marquee zoom · Loupe (lens size, magnification)', 'Toolbar + drawer', 'View menu › Tools (single-key shortcuts)', S],
+        ['Lock scrolling', 'Toolbar', 'View menu › Layout', S],
+        ['Page colour (view only)', 'Toolbar popover', 'View menu › Look ▸', P],
+        ['Page-curl corner', 'Drawer toggle', 'Settings › Reading', G],
+        ['Immersive full screen with hover bar', 'Floating bar', 'Read header button, plus View menu', S],
+        ['Touch pinch-zoom of the canvas only', 'Canvas', 'Unchanged', P],
+        ['Page thumbnails', 'None in the Reader', 'Page ribbon (new)', S],
+        ['Bookmarks: view, go to', 'Panel (library icon)', 'Chapter dividers in the page ribbon', S],
+        ['Bookmarks: add, rename, move, indent, delete, save', 'Bookmarks panel', 'Page ribbon › Edit outline mode', P],
+        ['Find: whole word, n of N, ↑↓, Esc, fills from the selection', 'Find bar', 'Read › Find (Ctrl F)', P],
+        ['Send a page to a desk', 'Hover button on the page', '“To desk” on the page', S],
+        ['Snapshot a region → Save PNG / Copy / Send to desk', 'Toolbar tool + menu', 'View menu › Snapshot, with the same 3-action menu', P],
+        ['XFA “can’t display” message · Flatten XFA', 'Empty state · toolbar', 'Same message · Doc menu › Flatten', S],
+      ]),
+      A('Document actions', 'Reader dialogs (built but unwired) · Bench shelf · Library', [
+        ['Properties (title, author, producer, encryption, XFA…)', 'Reader: no button · Bench shelf ⓘ', 'Doc menu › Properties', S],
+        ['Press: Light / Balanced / Strong / Custom · target size', 'Reader: no button · Bench shelf · Library batch', 'Doc menu · shelf · Library selection', S],
+        ['Export pages as images (SVG / PNG / JPG / BMP, DPI)', 'Reader: no button', 'Doc menu › Export pages as images', S],
+        ['Print', 'Missing (roadmap #52)', 'Doc menu + Read header button', S],
+        ['Show in folder · copy path · tags', 'Library only', 'Doc menu', S],
+      ]),
+      A('Mark — overlays', 'Reader.razor markup rail · signature drawer', [
+        ['Text: Helvetica / Times / Courier, bold, italic, size, colour, rotation', 'Second toolbar row', 'Mark tool column + right margin', S],
+        ['Text: alignment ×4, line height', 'Second toolbar row', 'Right margin', P],
+        ['Image: replace, aspect lock, opacity, rotation, behind content', 'Second toolbar row', 'Right margin (Image)', P],
+        ['Shapes: box, line, ellipse, arrow, freehand · stroke, width, fill, rotation, behind', 'Second toolbar row', 'Tool column + margin (Shape)', P],
+        ['Signature: type (3 styles, ink colour) or upload', 'Drawer', 'Sign tool → margin', P],
+        ['Paste / drop an image onto the page', 'Canvas', 'Same', P],
+        ['Move / resize / delete handles', 'Canvas', 'Same', S],
+        ['Tagged-PDF warning chip', 'Second toolbar row', 'Margin note', G],
+        ['Save (overwrite) · Save as new PDF', 'Second toolbar row', 'Mark header', S],
+      ]),
+      A('Arrange — the shelf', 'Bench.razor (shelf)', [
+        ['Fetch one or many PDFs · add images', 'Shelf + toolbar', 'Shelf › Add files or images', S],
+        ['Drag files in from Explorer', 'Window drop', 'Drop on the shelf', P],
+        ['Collapse / expand a file · Collapse all', 'Shelf', 'Chevron on each file · shelf header icon', S],
+        ['Thumbnail size slider (4 steps)', 'Shelf', 'Shelf header', S],
+        ['Page-range filter (e.g. 1-5, 8) · All', 'Each file', 'Each file', S],
+        ['Search a file → page chips → jump · Only matches', 'Each file', 'Each file (results chips not drawn)', P],
+        ['Reorder files ↑ ↓', 'Each file', 'Each file', S],
+        ['Close a file (refused while desks use it)', 'Each file', 'Each file ×', S],
+        ['Properties · Press per file', 'Each file', 'Each file', S],
+        ['Interleave A + B into a new desk', 'Shelf tool', 'Shelf header icon', S],
+        ['Drag a page, or the file name for all pages', 'Shelf', 'Same', S],
+        ['Hover preview of a shelf page', 'bench.js', 'Same', P],
+      ]),
+      A('Arrange — desks', 'Bench.razor (desk header + ⋯ menu)', [
+        ['Up to 30 desks · Add desk', 'Toolbar + tile', '“Drop here for a new desk” tile', S],
+        ['1 / 2 / 3 desks per row (remembered)', 'Toolbar', 'Arrange header toggle', S],
+        ['Rename · colour', 'Desk header', 'Desk header (dot + name) · ⋯ › Colour', S],
+        ['Badges: WM · HF · № · BM toggle · A4/LTR', 'Desk header', 'Desk header chips', S],
+        ['Select all · Invert', 'Desk header', '⋯ menu, Ctrl+A', S],
+        ['Move desk left / right · Duplicate', 'Desk header', '⋯ menu', S],
+        ['Clear all pages · Delete desk', 'Desk header', '⋯ menu', S],
+        ['Open in Reader · Send to Redact', '⋯ menu', '⋯ › Open in Read / Send to Protect', S],
+        ['Save as template · Apply template', '⋯ menu', '⋯ menu', S],
+      ]),
+      A('Arrange — pages', 'Bench.razor (page strip, dialogs)', [
+        ['Drag to reorder · move between desks · copy from the shelf', 'Desks', 'Same, with a drop marker and ghost', S],
+        ['Click / Shift-click selection', 'Desks', 'Same (✓ badge)', S],
+        ['Hover strip: peek · duplicate · rotate · split here · crop · margins', 'Each page', 'Each page (dark strip)', S],
+        ['Crop: Blank rest / Crop to size / Fit to page / Fit + margin', 'Crop dialog', 'Strip › Crop (dialog not drawn)', P],
+        ['Margins: cm/in, per side, this page / all pages', 'Margins dialog', 'Strip › Margins (dialog not drawn)', P],
+        ['Badges: rotation, crop, margin, source colour', 'Each page', 'Each page', S],
+        ['Provenance label (original page number, blank, image)', 'Each page', 'Each page', S],
+        ['Blank page (with colour) · Image page', 'Desk footer', 'Margin › Pages', S],
+        ['Reverse · Sort by source', 'Desk footer', 'Margin › Pages', S],
+        ['Delete selected · Extract to new desk · Compare 2', 'Desk footer / toolbar', 'Selection bar', S],
+        ['Compare pages side by side', 'Compare dialog', 'Selection › Compare (dialog not drawn)', P],
+      ]),
+      A('Arrange — output', 'Bench.razor (footer + dialogs)', [
+        ['Bind desk · Lift selected', 'Desk footer', 'Margin footer + desk header Bind', S],
+        ['Bind all (one PDF each) · Combine into one', 'Toolbar', 'Bind all split-button', S],
+        ['Scatter (one PDF per page)', 'Desk footer + dialog', 'Margin footer', S],
+        ['Export desk: PDF / PNG / JPG / BMP / SVG, DPI, all / selected', 'Export dialog', 'Margin › Export (dialog not drawn)', P],
+        ['Watermark (font, B/I, size, colour, angle, opacity, scope, preview)', 'Watermark dialog', 'Margin › Whole desk (dialog not drawn)', P],
+        ['Header & footer (Quick / Advanced, page/date/time formats)', 'HF dialog', 'Margin › Whole desk (dialog not drawn)', P],
+        ['Numbering / Bates (prefix, start, pad, 5 positions, first-page rules)', 'Numbering dialog', 'Margin › Number pages (dialog not drawn)', P],
+        ['Normalise size A4 / Letter / Original', 'Desk select', 'Margin › Size', S],
+        ['N-up · Booklet imposition → new desk', 'Impose dialog', 'Margin › Print layout (dialog not drawn)', P],
+        ['Bookmarks on bind (per source, nested)', 'BM chip', 'Desk chip + margin toggle', S],
+        ['Open result after saving', 'Status strip', 'Toast with Open (not drawn)', G],
+      ]),
+      A('Arrange — session & housekeeping', 'Bench.razor (toolbar)', [
+        ['Save / Open bench session (.json)', 'Session ▾', 'Session ▾', S],
+        ['Reset the bench (with confirmation)', 'Toolbar', 'Session ▾ › Reset', S],
+        ['Undo / Redo', 'Toolbar', 'Arrange header', S],
+        ['Shortcuts: Ctrl Z/Y/A, Esc, Del, R / Shift+R, Ctrl D', 'Keyboard', 'Same, listed in Ctrl K', P],
+        ['Busy overlay · error / success strip', 'Overlay + strip', 'Status bar activity + toast', G],
+      ]),
+      A('Protect — redact, stamp, flatten', 'Redact.razor · Reader stamp drawer · Reader flatten', [
+        ['Draw redaction boxes · colour presets + custom', 'Redact page', 'Protect › Redact (colour not drawn)', P],
+        ['Find: case, whole word, page range', 'Find panel', 'Protect › Redact', S],
+        ['Review: ✓ / ✗ per match, in the list and on the page', 'Find panel + page', 'Protect › Redact', S],
+        ['Box · Glyph-only · Replace (locked)', 'Find panel', '“Remove as” segmented control', S],
+        ['Redact checked · Redact all matches', 'Find panel', 'Margin footer', P],
+        ['Financial / Medical / PII / regex presets (gated off)', 'Locked chips', 'Locked chips, kept visible', G],
+        ['Tagged-PDF warning · verify after save', 'Rail', 'Header warning', P],
+        ['Save redacted PDF (always a new file)', 'Rail', 'Protect header', S],
+        ['Watermark + header/footer on the open document, with live preview', 'Reader stamp drawer', 'Protect › Stamp', P],
+        ['Flatten forms & markup', 'Reader toolbar', 'Protect › Flatten · Doc menu', P],
+        ['Password-protect a copy (new)', '—', 'Protect › Password', P],
+      ]),
+      A('Library', 'Library.razor', [
+        ['Search a word across every PDF → open at the page', 'Library', 'Library search (results not drawn)', P],
+        ['Category filters (from folders) + manual tags', 'Chips', 'Chips', S],
+        ['Shelf view (A–Z, thickness = pages, wooden bookends)', 'Library', 'Library', S],
+        ['Table view: name, path, tags, pages, size, updated', 'Library', 'Table toggle (not drawn)', P],
+        ['Add / remove tags per file', 'Table', 'Table + Doc menu › Tags', P],
+        ['Multi-select → batch Press', 'Table', 'Table selection bar', P],
+      ]),
+      A('Home', 'Dashboard.razor', [
+        ['Greeting + Tamil · workspace line', 'Home', 'Home', S],
+        ['Drop / fetch', 'Home', 'Home (now also lists protected files)', S],
+        ['Watched folder: change / add folder', 'Tile', 'Side panel (buttons not drawn)', P],
+        ['Pinned · Recent (with encrypted lock)', 'Tiles', 'Side panel · Recent list', S],
+        ['Storage map by category', 'Tile', 'Library shelf preview', S],
+        ['Tools tile (Reader, Bench, Library, v2 tiles)', 'Tile', 'Removed — replaced by the four modes and Ctrl K', S],
+        ['Resume where you left off (new)', '—', 'Resume cards, with the mode you were in', S],
+      ]),
+      A('Word, Excel, Merge, Split, Settings', 'Docs.razor · Sheets.razor · Merge.razor · Split.razor · Settings.razor', [
+        ['Word: headings, formatting, tables, images, header/footer', 'Docs page', 'Tab (read-only) + Headings ribbon', S],
+        ['Excel: grid, sheets, frozen header rows', 'Sheets page', 'Tab + Grid / As printed', S],
+        ['Convert Word / Excel to PDF (new)', '—', 'Tab header primary button', S],
+        ['Open protected Word / Excel (new)', '—', 'Unlock card in the tab', S],
+        ['Merge: add files / open docs, reorder, merge & save', '/merge (unreachable)', 'Arrange: drop files on one desk → Bind · Ctrl K “Merge”', P],
+        ['Split: every page → files · extract a range', '/split (unreachable)', 'Arrange › Scatter · shelf range → Lift · Ctrl K “Split”', P],
+        ['Settings: theme, splash, stepper style, save folder + month/date subfolders, name', 'Settings page', 'Settings (gear) — not drawn', G],
+      ]),
+    ];
+    const all = areas.flatMap(a => a.rows);
+    const n = (k) => all.filter(r => r.st === k).length;
+    const stats = [
+      { n: String(all.length), l: 'features inventoried', c: '#1a1310' },
+      { n: String(n(S)), l: 'shown in the mockup', c: '#6b7a3e' },
+      { n: String(n(P)), l: 'placed, dialog not drawn yet', c: '#c47416' },
+      { n: String(n(G)), l: 'not designed yet', c: '#8a3a1c' },
+    ];
+    const bugs = [
+      { t: 'Merge and Split pages cannot be reached', d: 'Both pages exist and work, but nothing links to them: no rail item, no dashboard tile, no menu. The “page number controls” setting only affects Split, so that setting does nothing either.', src: 'Merge.razor · Split.razor · MainLayout.razor' },
+      { t: 'Reader Properties, Export and Press are never opened', d: 'Reader has finished dialogs for document properties, export as image and Press, but no button calls ShowProperties / ShowExport / ShowPress.', src: 'Reader.razor L265–406, L994–1130' },
+      { t: 'The Image icon is blank', d: '“image” is not in the LiPicons manifest, so the markup Image tool, “replace image”, and the Open Word / Excel buttons show no icon.', src: 'Icon.razor · LiPicons 1.1.0' },
+      { t: 'Dashboard says “v2” for shipped features', d: 'Redact and Sign are shown disabled with a v2 tag, but both have shipped. Bench and Library use the same icon.', src: 'Dashboard.razor L44–52' },
+      { t: 'Two icons, four destinations', d: 'Reader and Docs both use the PDF icon; Bench and Sheets both use the grid icon. Flatten and Compress share the “collapse” glyph.', src: 'MainLayout.razor · Icon.razor' },
+      { t: 'Theme labels don’t match', d: 'Settings calls the themes “Mono lobby” and “Grid lobby”, but the code and the brand call them cream paper and night paper.', src: 'Settings.razor L17–21' },
+    ];
+    const it = (icon, t, why, where, lib) => ({ icon, t, why, where, lib });
+    const missing = [
+      { tier: 'NOW', bg: '#8a3a1c', note: 'High value, and buildable with what you already have', items: [
+        it('highlight', 'Highlight, underline, strike-through and sticky notes', 'This is what people do most in a PDF reader, and Mark has none of it today. Reviewers of discharge summaries need to point at text.', 'Mark', 'annotation layer — check'),
+        it('checklist-onboard', 'Fill in PDF forms', 'Hospital paperwork is full of AcroForm consents and claims. Today you can only flatten them.', 'Mark › Forms', 'FormFiller.Fill exists (3.14)'),
+        it('print', 'Print', 'Essential for a kiosk, and deferred (#52). It needs a page range, copies, and printer memory.', 'Doc menu · Read header · Ctrl P', 'Host-side (WPF)'),
+        it('lock', 'Kiosk mode', 'Locked full screen, a whitelisted folder only, idle auto-reset that closes tabs and wipes temp files, a large clock, and no Settings access.', 'Settings › Kiosk', 'App-side'),
+        it('compliance-shield', 'Users, roles and an audit trail', 'Sign-in, roles built on your existing IEntitlements seam, and a log of who redacted, signed or bound what.', 'Status bar user · Settings', 'App-side'),
+      ] },
+      { tier: 'NEXT', bg: '#c47416', note: 'Important, but waiting on the library or bigger work', items: [
+        it('ocr', 'OCR for scans', 'Most hospital paper arrives as scans. Without OCR they can’t be searched, found in the Library, or redacted by text.', 'Doc menu › Make searchable', 'Not in the library'),
+        it('doc-lock', 'Password-protect / remove a password', 'Needed for sending records out. There is no clean high-level API yet.', 'Protect › Password', 'LA-26'),
+        it('signature', 'Certificate signatures + validation', 'The current Sign places an image. A legally weighty sign-off needs certificate signatures, plus a panel that shows whether an existing signature is valid.', 'Protect › Sign', 'Ask'),
+        it('split-view', 'Compare two documents', 'Show what changed between v2 and v3 of a policy, beyond comparing two pages side by side.', 'Arrange or Ctrl K', 'Text extraction exists'),
+        it('outline', 'Clickable links and an attachments panel', 'Internal links, a table of contents, and files embedded in a PDF.', 'Read', 'DrawHyperlink exists; reading TBD'),
+      ] },
+      { tier: 'LATER', bg: '#6b7a3e', note: 'Polish that makes it feel finished', items: [
+        it('star', 'Tamil / Indic interface', 'LiPi Sans already covers 10 scripts. The greeting is Tamil, but nothing else is.', 'Settings › Language', 'App-side'),
+        it('eye', 'Accessibility and UI scale', 'Visible keyboard focus, screen-reader labels, high contrast, and a 125–150% scale for kiosk touchscreens.', 'Settings › Display', 'App-side'),
+        it('kit', 'Batch actions in the Library', 'Convert, watermark, press or rename many files at once. Press is the only batch action today.', 'Library selection bar', 'App-side'),
+        it('save', 'Autosave and crash recovery', 'Unsaved marks and bench desks are lost if the app closes.', 'Silent, with a Home resume card', 'App-side'),
+        it('info', 'Edit document properties', 'Fix the title, author and keywords before filing.', 'Doc menu › Properties', 'Library ask #3'),
+      ] },
+    ];
+    return { areas, stats, bugs, missing };
+  }
+}
+</script>
+</body>
+</html>

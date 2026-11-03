@@ -11,6 +11,10 @@ public sealed class RedactRequestService
 
     public string? PendingName { get; private set; }
 
+    /// <summary>Open the Find &amp; redact panel when the redaction view picks up the request
+    /// (Protect › Find &amp; redact). Cleared with the request.</summary>
+    public bool OpenFind { get; set; }
+
     public void Request(string path)
         => Request(path, System.IO.Path.GetFileName(path));
 
@@ -24,5 +28,6 @@ public sealed class RedactRequestService
     {
         PendingPath = null;
         PendingName = null;
+        OpenFind = false;
     }
 }

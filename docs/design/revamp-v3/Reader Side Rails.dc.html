@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+
+<section id="turn-11" style="padding:72px;display:flex;flex-direction:column;gap:44px">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1180px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">D-10 · Reader side rails</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:56px;line-height:1.02">Controls move into the gutters. The page gets the height.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">A portrait page on a landscape screen leaves about 30% empty on each side. The tools now sit in those gutters, and the top is one thin line. The page grows from about 74% to about 90% of the window height. Rails show icons only until you hover, so nothing scrolls. This replaces the mode bar and the floating leaf bar.</p>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:6px">
+      <sc-for list="{{ zones }}" as="z" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+          <span style="font-family:'Instrument Serif';font-size:19px">{{ z.t }}</span>
+          <span style="font-size:12.5px;line-height:1.45;color:#3a2f25">{{ z.d }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:48px;align-items:flex-start">
+    <sc-for list="{{ frames }}" as="f" hint-placeholder-count="7">
+      <div id="{{ f.id }}" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;gap:10px;max-width:{{ f.w }}"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">{{ f.id }}</span><span style="font-family:'Instrument Serif';font-size:24px">{{ f.title }}</span><span style="font-size:13.5px;color:#3a2f25">{{ f.note }}</span></div>
+
+        <div style="position:relative;width:{{ f.w }};height:{{ f.h }};border-radius:10px;overflow:hidden;box-shadow:0 30px 80px rgba(26,19,16,.26),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;flex-direction:column">
+
+          <div style="height:40px;flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;padding:0 12px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0">
+              <span style="font-family:'Instrument Serif';font-style:italic;font-size:19px;flex:none">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span>
+              <span style="width:0.5px;height:18px;background:#d9cdb4;flex:none"></span>
+              <div style="display:flex;gap:4px;min-width:0;overflow:hidden">
+                <sc-for list="{{ f.tabs }}" as="tb">
+                  <span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 6px 0 9px;max-width:190px;flex:none;border-radius:7px;border:0.5px solid {{ tb.bd }};background:{{ tb.bg }};color:{{ tb.fg }};box-shadow:{{ tb.sh }};font-family:'IBM Plex Mono';font-size:11px;white-space:nowrap"><span style="display:flex;color:{{ tb.c }}"><lp-i name="{{ tb.icon }}" size="12"></lp-i></span><span style="overflow:hidden;text-overflow:ellipsis">{{ tb.n }}</span><span style="display:flex;opacity:.5"><lp-i name="close" size="10"></lp-i></span></span>
+                </sc-for>
+                <span style="display:flex;align-items:center;justify-content:center;width:24px;height:26px;flex:none;color:#3a2f25"><lp-i name="plus" size="13"></lp-i></span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:2px;height:28px;padding:0 4px;background:#f2ead6;border:0.5px solid #d9cdb4;border-radius:8px;font-family:'IBM Plex Mono';font-size:12px">
+              <span style="display:flex;width:24px;height:24px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="14"></lp-i></span>
+              <span style="min-width:28px;height:20px;padding:0 6px;display:flex;align-items:center;justify-content:center;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:4px">{{ f.pagerA }}</span>
+              <span style="color:#3a2f25;padding:0 4px">{{ f.pagerB }}</span>
+              <span style="display:flex;width:24px;height:24px;align-items:center;justify-content:center"><lp-i name="chevron-right" size="14"></lp-i></span>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px">
+              <span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:7px;background:{{ f.docBg }};font-size:13px;white-space:nowrap">Document<lp-i name="chevron-down" size="12"></lp-i></span>
+              <span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0.5px solid #c4b497;border-radius:6px;background:#f2ead6;color:#8a7c64;font-size:12px;white-space:nowrap"><lp-i name="search" size="13"></lp-i><span style="font-family:'IBM Plex Mono';font-size:10px;color:#1a1310;background:#e8dcc4;border-radius:3px;padding:1px 5px">Ctrl K</span></span>
+              <span style="display:flex;gap:9px;margin-left:4px"><span style="width:13px;height:13px;border-radius:50%;background:#febc2e"></span><span style="width:13px;height:13px;border-radius:50%;background:#28c840"></span><span style="width:13px;height:13px;border-radius:50%;background:#ff5f57"></span></span>
+            </div>
+          </div>
+
+          <div style="position:relative;flex:1;min-height:0">
+            <div style="position:absolute;top:0;bottom:0;left:{{ f.cl }};right:{{ f.cr }};background:#e8dcc4;overflow:hidden">
+              <sc-if value="{{ f.sigBanner }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:8px;height:32px;padding:0 12px;background:#eef2e4;border:0.5px solid #6b7a3e;border-radius:8px;font-size:12.5px;color:#2f3d14;white-space:nowrap;box-shadow:0 6px 16px rgba(0,0,0,.08)"><lp-i name="certification" size="15"></lp-i><b style="font-weight:600">Signed by Dr A. Shiva</b> · certificate valid · unchanged since 14 Oct 18:31<span style="color:#6b7a3e">Details</span></div>
+              </sc-if>
+              <sc-if value="{{ f.showPage }}" hint-placeholder-val="{{ true }}">
+                <div onMouseEnter="{{ f.onPE }}" onMouseLeave="{{ f.onPL }}" style="position:absolute;left:50%;top:{{ f.pt }};transform:translateX(-50%);width:{{ f.pw }};height:{{ f.ph }};background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:7% 8%;font-size:{{ f.pf }};line-height:1.6;color:#1b1b1b">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #1b1b1b;padding-bottom:.8em"><div><div style="font-size:.78em;letter-spacing:.12em;color:#555">SRI MEENAKSHI HOSPITAL · MADURAI</div><div style="font-size:1.9em;font-weight:600;line-height:1.2">Discharge Summary</div></div><div style="font-size:.85em;text-align:right;color:#333">Department of Medical <span style="position:relative">Oncology<sc-if value="{{ f.hits }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -3px;background:rgba(196,116,22,.32);outline:1.5px solid #c47416"></span></sc-if></span><br>IP No. 2026/10/4471</div></div>
+                  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.7em 1.4em;margin:1.4em 0 1.6em">
+                    <sc-for list="{{ fields }}" as="fd"><div><div style="font-size:.78em;color:#777">{{ fd.k }}</div><span style="position:relative">{{ fd.v }}<sc-if value="{{ fd.red }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ f.redacts }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -4px;background:#111"></span></sc-if></sc-if></span></div></sc-for>
+                  </div>
+                  <div style="font-weight:600;font-size:1.15em;margin-bottom:.3em">Diagnosis</div>
+                  <p style="margin:0 0 1.2em">Carcinoma of the left breast, stage IIA (T2 N0 M0), ER/PR positive, HER2 negative. Post left modified radical mastectomy, on cycle 3 of adjuvant chemotherapy.</p>
+                  <div style="font-weight:600;font-size:1.15em;margin-bottom:.3em">Course in hospital</div>
+                  <p style="margin:0 0 1.2em">Admitted for cycle 3 of AC chemotherapy. <span style="background:{{ f.hl }}">Pre-treatment counts were within range.</span> Treatment was tolerated well with grade 1 nausea managed with ondansetron. No febrile episodes. Reviewed by the <span style="position:relative">Oncology<sc-if value="{{ f.hits }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -3px;background:rgba(196,116,22,.32);outline:1.5px solid #c47416"></span></sc-if></span> nurse specialist on day 4 regarding line care and diet.</p>
+                  <div style="font-weight:600;font-size:1.15em;margin-bottom:.3em">Medication on discharge</div>
+                  <div style="display:flex;flex-direction:column;gap:.35em;margin-bottom:1.2em"><sc-for list="{{ meds }}" as="md"><div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:1em;padding-bottom:.3em;border-bottom:0.5px solid #ddd"><span>{{ md.a }}</span><span>{{ md.b }}</span><span>{{ md.c }}</span></div></sc-for></div>
+                  <div style="font-weight:600;font-size:1.15em;margin-bottom:.3em">Follow-up</div>
+                  <p style="margin:0">Review in <span style="position:relative">Oncology<sc-if value="{{ f.hits }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -3px;background:rgba(196,116,22,.32);outline:1.5px solid #c47416"></span></sc-if></span> OPD on 30 Oct 2026 with CBC, LFT and RFT before cycle 4.</p>
+
+                  <sc-if value="{{ f.marks }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:8%;top:62%;width:52%;padding:.6em .8em;outline:1.5px dashed #8a3a1c;font-family:Helvetica,Arial;font-size:1.25em;color:#1f3b73">Reviewed and approved for discharge.<span style="position:absolute;left:-5px;top:-5px;width:9px;height:9px;background:#fff;border:1.5px solid #8a3a1c"></span><span style="position:absolute;right:-5px;top:-5px;width:9px;height:9px;background:#fff;border:1.5px solid #8a3a1c"></span><span style="position:absolute;left:-5px;bottom:-5px;width:9px;height:9px;background:#fff;border:1.5px solid #8a3a1c"></span><span style="position:absolute;right:-5px;bottom:-5px;width:9px;height:9px;background:#fff;border:1.5px solid #8a3a1c"></span></div>
+                    <div style="position:absolute;right:10%;top:72%;font-family:'Instrument Serif';font-style:italic;font-size:2.8em;color:#1f3b73;transform:rotate(-4deg)">A. Shiva</div>
+                  </sc-if>
+                  <sc-if value="{{ f.redacts }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:8%;bottom:9%;width:40%;height:5%;background:#111;outline:2px solid #8a3a1c;outline-offset:2px"></div>
+                  </sc-if>
+                  <sc-if value="{{ f.measure }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;left:8%;right:8%;top:43%;height:0;border-top:1.5px solid #2c3e8c"><span style="position:absolute;left:-1px;top:-7px;width:1.5px;height:13px;background:#2c3e8c"></span><span style="position:absolute;right:-1px;top:-7px;width:1.5px;height:13px;background:#2c3e8c"></span><span style="position:absolute;left:50%;top:-24px;transform:translateX(-50%);font-family:'IBM Plex Mono';font-size:11px;padding:2px 7px;border-radius:4px;background:#2c3e8c;color:#fff;white-space:nowrap">176.0 mm · 1:1</span></div>
+                  </sc-if>
+                  <sc-if value="{{ f.layerStamp }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;right:9%;top:18%;padding:.3em .8em;border:2px solid #a83a2a;color:#a83a2a;font-family:Helvetica;font-weight:700;font-size:1.3em;letter-spacing:.1em;transform:rotate(-8deg);opacity:.85">VERIFIED · MRD</div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ f.strip }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px;background:#1a1310;border-radius:10px;box-shadow:0 10px 26px rgba(0,0,0,.3);color:#f2ead6;font-size:12px;white-space:nowrap">
+                    <sc-for list="{{ stripItems }}" as="si"><span style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:7px;background:{{ si.bg }}"><lp-i name="{{ si.icon }}" size="14"></lp-i>{{ si.l }}</span></sc-for>
+                  </div>
+                </sc-if>
+              </sc-if>
+
+              <sc-if value="{{ f.isText }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;inset:0;overflow:hidden;display:flex;justify-content:center;padding-top:20px">
+                  <div style="width:{{ f.textW }};min-height:100%;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.2);padding:{{ f.textPad }};display:flex;flex-direction:column;gap:{{ f.textGap }};color:#1b1b1b">
+                    <sc-if value="{{ f.htmlBanner }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px;margin:-8px -12px 8px;padding:8px 12px;background:#fbf3e2;border:0.5px solid #c47416;border-radius:7px;font-family:'LiPi Sans';font-size:12.5px;color:#5a3a10"><lp-i name="lock" size="14"></lp-i><span style="flex:1">Scripts, forms and remote images are blocked. This page can't reach the internet.</span><span style="color:#8a3a1c">Show images once</span></div></sc-if>
+                    <sc-for list="{{ f.textBlocks }}" as="b">
+                      <sc-if value="{{ b.h1 }}" hint-placeholder-val="{{ false }}"><div style="font-family:Georgia,serif;font-size:30px;font-weight:600;line-height:1.2;color:#111">{{ b.t }}</div></sc-if>
+                      <sc-if value="{{ b.h2 }}" hint-placeholder-val="{{ false }}"><div style="font-family:Georgia,serif;font-size:20px;font-weight:600;margin-top:10px;padding-bottom:6px;border-bottom:1px solid #e5e1d8">{{ b.t }}</div></sc-if>
+                      <sc-if value="{{ b.p }}" hint-placeholder-val="{{ false }}"><div style="font-family:Georgia,serif;font-size:14.5px;line-height:1.65;color:#222;text-wrap:pretty">{{ b.t }}</div></sc-if>
+                      <sc-if value="{{ b.li }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:10px;font-family:Georgia,serif;font-size:14.5px;line-height:1.55;color:#222;padding-left:6px"><span style="color:#8a3a1c">•</span><span>{{ b.t }}</span></div></sc-if>
+                      <sc-if value="{{ b.code }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono';font-size:12.5px;line-height:1.6;white-space:pre;padding:10px 12px;background:#f6f4ef;border:0.5px solid #e2ddd2;border-radius:6px;color:#2a2a2a">{{ b.t }}</div></sc-if>
+                      <sc-if value="{{ b.tr }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:10px;padding:6px 8px;border-bottom:1px solid #e5e1d8;font-family:'LiPi Sans';font-size:13px;font-weight:{{ b.fw }};background:{{ b.bg }}"><span>{{ b.a }}</span><span>{{ b.b }}</span><span>{{ b.c }}</span></div></sc-if>
+                      <sc-if value="{{ b.ln }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:44px minmax(0,1fr);font-family:'IBM Plex Mono';font-size:12.5px;line-height:1.75;background:{{ b.bg }}"><span style="text-align:right;padding-right:14px;color:#b0a890;border-right:1px solid #eee">{{ b.n }}</span><span style="padding-left:14px;white-space:pre;color:#2a2a2a;overflow:hidden">{{ b.t }}</span></div></sc-if>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ f.isArrange }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;inset:0;padding:18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-content:start">
+                  <sc-for list="{{ desks }}" as="dk">
+                    <div style="background:#fbf7ec;border:0.5px solid {{ dk.bd }};border-top:3px solid {{ dk.c }};border-radius:9px;box-shadow:{{ dk.ring }}">
+                      <div style="height:40px;display:flex;align-items:center;gap:8px;padding:0 6px 0 12px;border-bottom:0.5px solid #ece3cf"><span style="width:12px;height:12px;border-radius:50%;background:{{ dk.c }}"></span><span style="font-family:'Instrument Serif';font-size:17px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dk.n }}</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">{{ dk.count }}</span><sc-for list="{{ dk.chips }}" as="ch"><span style="font-family:'IBM Plex Mono';font-size:9.5px;padding:1px 5px;border-radius:4px;border:0.5px solid #c4b497;color:#3a2f25">{{ ch }}</span></sc-for><span style="display:flex;width:28px;height:28px;align-items:center;justify-content:center"><lp-i name="more-horizontal" size="16"></lp-i></span></div>
+                      <div style="display:flex;flex-wrap:wrap;gap:12px 10px;padding:12px">
+                        <sc-for list="{{ dk.pages }}" as="pg"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="position:relative;width:60px;height:84px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.16);outline:{{ pg.o }};outline-offset:3px;opacity:{{ pg.op }}"><span style="position:absolute;left:5px;bottom:5px;width:7px;height:7px;border-radius:50%;background:{{ pg.c }}"></span><span style="position:absolute;left:8px;right:8px;top:9px;height:4px;background:#ddd"></span><span style="position:absolute;left:8px;right:14px;top:17px;height:3px;background:#eee"></span><span style="position:absolute;left:8px;right:8px;top:23px;height:3px;background:#eee"></span></div><span style="font-family:'IBM Plex Mono';font-size:10px;color:#3a2f25">{{ pg.l }}</span></div></sc-for>
+                      </div>
+                    </div>
+                  </sc-for>
+                  <div style="height:90px;border:1px dashed #c4b497;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:8px;color:#3a2f25;font-size:13px"><lp-i name="plus" size="15"></lp-i>Drop here for a new desk</div>
+                </div>
+                <div style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:4px 4px 4px 12px;background:#1a1310;border-radius:11px;box-shadow:0 10px 26px rgba(0,0,0,.3);color:#f2ead6;font-size:12px;white-space:nowrap"><span style="font-family:'IBM Plex Mono';font-size:11px;margin-right:6px">2 selected · Desk 1</span><sc-for list="{{ selBar }}" as="sb"><span style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:7px"><lp-i name="{{ sb.icon }}" size="14"></lp-i>{{ sb.l }}</span></sc-for></div>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ f.drawer }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:0;bottom:0;left:{{ f.lw }};width:216px;z-index:2;background:#f2ead6;border-right:0.5px solid #c4b497;display:flex;flex-direction:column">
+                <div style="height:36px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;border-bottom:0.5px solid #d9cdb4;font-size:12px">
+                  <sc-for list="{{ f.drawerTabs }}" as="dt"><span style="padding:9px 0 8px;border-bottom:2px solid {{ dt.bd }};color:{{ dt.fg }}">{{ dt.l }}</span></sc-for>
+                </div>
+                <div style="flex:1;min-height:0;overflow:hidden;padding:12px 0;display:flex;flex-direction:column;align-items:center;gap:10px">
+                  <sc-for list="{{ f.drawerItems }}" as="di">
+                    <sc-if value="{{ di.isChapter }}" hint-placeholder-val="{{ false }}"><span style="align-self:stretch;margin:2px 14px 0;font-family:'Instrument Serif';font-style:italic;font-size:15px;color:#8a3a1c;border-bottom:0.5px solid #d9cdb4;padding-bottom:3px">§ {{ di.l }}</span></sc-if>
+                    <sc-if value="{{ di.isThumb }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:{{ di.w }};height:{{ di.h }};background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.16);outline:{{ di.o }};outline-offset:3px;border-top:{{ di.top }}"></div><span style="font-family:'IBM Plex Mono';font-size:10px;color:#3a2f25">{{ di.l }}</span></div></sc-if>
+                    <sc-if value="{{ di.isSource }}" hint-placeholder-val="{{ false }}"><div style="align-self:stretch;margin:0 10px;display:flex;align-items:center;gap:7px;height:30px;padding:0 6px;border-radius:6px;background:#fbf7ec;border:0.5px solid #d9cdb4;font-size:11.5px"><lp-i name="chevron-down" size="11"></lp-i><span style="width:9px;height:9px;border-radius:50%;background:{{ di.c }}"></span><span style="flex:1;font-family:'IBM Plex Mono';font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ di.l }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ di.n }}</span></div></sc-if>
+                    <sc-if value="{{ di.isGrid }}" hint-placeholder-val="{{ false }}"><div style="display:grid;grid-template-columns:repeat(4,36px);gap:8px"><sc-for list="{{ di.cells }}" as="ce"><span style="width:36px;height:50px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.16);border-bottom:2px solid {{ ce }}"></span></sc-for></div></sc-if>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+
+            <div onMouseEnter="{{ f.onLE }}" onMouseLeave="{{ f.onLL }}" style="position:absolute;top:0;bottom:0;left:0;z-index:3;width:{{ f.lRail }};min-width:{{ f.lw }};display:flex;flex-direction:column;gap:2px;padding:{{ f.rPad }};background:#fbf7ec;border-right:0.5px solid #c4b497;box-shadow:{{ f.leftSh }}">
+              <sc-for list="{{ f.leftItems }}" as="it">
+                <sc-if value="{{ it.sep }}" hint-placeholder-val="{{ false }}"><span style="height:0.5px;background:#d9cdb4;margin:6px 4px"></span></sc-if>
+                <sc-if value="{{ it.spacer }}" hint-placeholder-val="{{ false }}"><span style="flex:1"></span></sc-if>
+                <sc-if value="{{ it.btn }}" hint-placeholder-val="{{ true }}">
+                  <div onClick="{{ it.onClick }}" style="position:relative;cursor:pointer;display:flex;align-items:center;gap:12px;height:{{ it.h }};padding:{{ it.pad }};border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};white-space:nowrap">
+                    <sc-if value="{{ it.active }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:-8px;top:8px;bottom:8px;width:3px;border-radius:0 2px 2px 0;background:#8a3a1c"></span></sc-if>
+                    <lp-i name="{{ it.icon }}" size="20"></lp-i>
+                    <sc-if value="{{ it.open }}" hint-placeholder-val="{{ false }}"><span style="flex:1;font-family:{{ it.ff }};font-style:{{ it.fs }};font-size:{{ it.fz }};min-width:96px">{{ it.label }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ it.k }}</span></sc-if>
+                  </div>
+                </sc-if>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ f.hasView }}" hint-placeholder-val="{{ true }}">
+              <div onMouseEnter="{{ f.onVE }}" onMouseLeave="{{ f.onVL }}" style="position:absolute;top:0;bottom:0;right:0;z-index:5;width:{{ f.vRail }};min-width:54px;display:flex;flex-direction:column;gap:2px;padding:8px 6px;background:#f2ead6;border-left:0.5px solid #d9cdb4;box-shadow:{{ f.viewSh }}">
+                <span style="font-family:'IBM Plex Mono';font-size:8.5px;letter-spacing:.1em;color:#8a7c64;text-align:center;padding:2px 0 6px">VIEW</span>
+                <sc-for list="{{ f.viewItems }}" as="it">
+                  <sc-if value="{{ it.sep }}" hint-placeholder-val="{{ false }}"><span style="height:0.5px;background:#d9cdb4;margin:5px 4px"></span></sc-if>
+                  <sc-if value="{{ it.text }}" hint-placeholder-val="{{ false }}"><span style="height:24px;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:10px;white-space:nowrap;color:#1a1310">{{ it.label }}</span></sc-if>
+                  <sc-if value="{{ it.btn }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:10px;height:36px;padding:0 11px;border-radius:7px;background:{{ it.bg }};color:{{ it.fg }};white-space:nowrap"><lp-i name="{{ it.icon }}" size="18"></lp-i><sc-if value="{{ it.open }}" hint-placeholder-val="{{ false }}"><span style="flex:1;font-size:13px;min-width:110px">{{ it.label }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ it.k }}</span></sc-if></div></sc-if>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <div onMouseEnter="{{ f.onTE }}" onMouseLeave="{{ f.onTL }}" style="position:absolute;top:0;bottom:0;right:{{ f.vw }};z-index:3;width:{{ f.tRail }};min-width:{{ f.tw }};display:flex;flex-direction:column;gap:2px;padding:{{ f.rPad }};background:#fbf7ec;border-left:0.5px solid #c4b497;box-shadow:{{ f.toolSh }}">
+              <span style="font-family:'IBM Plex Mono';font-size:8.5px;letter-spacing:.1em;color:#8a7c64;text-align:center;padding:2px 0 6px">{{ f.toolHead }}</span>
+              <sc-for list="{{ f.toolItems }}" as="it">
+                <sc-if value="{{ it.sep }}" hint-placeholder-val="{{ false }}"><span style="height:0.5px;background:#d9cdb4;margin:5px 4px"></span></sc-if>
+                <sc-if value="{{ it.spacer }}" hint-placeholder-val="{{ false }}"><span style="flex:1"></span></sc-if>
+                <sc-if value="{{ it.btn }}" hint-placeholder-val="{{ true }}"><div onClick="{{ it.onClick }}" style="cursor:pointer;display:flex;align-items:center;gap:10px;height:38px;padding:{{ it.pad }};border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};white-space:nowrap"><lp-i name="{{ it.icon }}" size="19"></lp-i><sc-if value="{{ it.open }}" hint-placeholder-val="{{ false }}"><span style="flex:1;font-size:13px;min-width:120px">{{ it.label }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:{{ it.kc }}">{{ it.k }}</span></sc-if></div></sc-if>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ f.flyText }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:14px;right:{{ f.flyR }};z-index:4;width:270px;display:flex;flex-direction:column;gap:12px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.2);font-size:12.5px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:21px">Text box</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">p 2 · 1 of 3</span></div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);padding:2px;gap:2px;background:#e8dcc4;border-radius:7px"><span style="height:28px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:#fbf7ec;color:#8a3a1c">Helvetica</span><span style="height:28px;display:flex;align-items:center;justify-content:center">Times</span><span style="height:28px;display:flex;align-items:center;justify-content:center">Courier</span></div>
+                <div style="display:flex;gap:6px;align-items:center"><span style="width:30px;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:700">B</span><span style="width:30px;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:Georgia;font-style:italic">I</span><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;font-family:'IBM Plex Mono'">−<span>13 pt</span>+</span></div>
+                <div style="display:flex;gap:4px"><sc-for list="{{ aligns }}" as="al"><span style="flex:1;height:28px;border-radius:5px;display:flex;align-items:center;justify-content:center;background:{{ al.bg }};color:{{ al.fg }};font-size:11px">{{ al.l }}</span></sc-for></div>
+                <div style="display:flex;gap:8px;align-items:center"><span style="color:#3a2f25;width:52px">Colour</span><sc-for list="{{ swatches }}" as="sw"><span style="width:20px;height:20px;border-radius:50%;background:{{ sw.c }};outline:{{ sw.o }};outline-offset:2px"></span></sc-for></div>
+                <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#3a2f25">Rotation</span><span style="font-family:'IBM Plex Mono';padding:4px 8px;border:0.5px solid #c4b497;border-radius:5px;background:#fff">0°</span></div>
+                <label style="display:flex;justify-content:space-between;align-items:center;color:#3a2f25">Place behind page text<span style="width:32px;height:18px;border-radius:9px;background:#d9cdb4;position:relative"><span style="position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:50%;background:#fff"></span></span></label>
+                <div style="display:flex;gap:6px;padding-top:10px;border-top:0.5px solid #d9cdb4"><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:5px"><lp-i name="copy" size="13"></lp-i>Duplicate</span><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;gap:5px;color:#a83a2a"><lp-i name="trash" size="13"></lp-i>Delete</span></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ f.flyRedact }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:14px;right:{{ f.flyR }};z-index:4;width:290px;display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.2);font-size:12.5px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:21px">Find &amp; redact</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">always a new file</span></div>
+                <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;border:0.5px solid #8a3a1c;border-radius:7px;background:#fff"><lp-i name="search" size="14"></lp-i><span style="flex:1">Oncology</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">16 found</span></div>
+                <div style="display:flex;gap:5px;flex-wrap:wrap"><span style="padding:3px 8px;border-radius:12px;border:0.5px solid #c4b497">Aa</span><span style="padding:3px 8px;border-radius:12px;border:0.5px solid #8a3a1c;background:rgba(138,58,28,.12);color:#8a3a1c">Whole word</span><span style="padding:3px 8px;border-radius:12px;border:0.5px solid #8a3a1c;background:rgba(138,58,28,.12);color:#8a3a1c">All pages</span><span style="padding:3px 8px;border-radius:12px;border:0.5px dashed #c4b497;color:#8a7c64;display:flex;align-items:center;gap:4px"><lp-i name="lock" size="10"></lp-i>Presets</span></div>
+                <div style="display:flex;flex-direction:column">
+                  <sc-for list="{{ matches }}" as="mt"><div style="display:flex;align-items:center;gap:8px;min-height:32px;border-top:0.5px solid #ece3cf"><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64;width:22px">p{{ mt.p }}</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#3a2f25">{{ mt.s }}</span><span style="width:22px;height:22px;border-radius:5px;background:{{ mt.bg }};color:#fbf7ec;border:0.5px solid #1a1310;display:flex;align-items:center;justify-content:center"><lp-i name="check" size="12"></lp-i></span></div></sc-for>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(2,1fr);padding:2px;gap:2px;background:#e8dcc4;border-radius:7px"><span style="height:28px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:#fbf7ec;color:#8a3a1c">Black box</span><span style="height:28px;display:flex;align-items:center;justify-content:center">Text only</span></div>
+                <div style="display:flex;gap:6px"><span style="flex:1;height:32px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center">Redact 14 checked</span><span style="flex:1;height:32px;border-radius:6px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-weight:500">Save copy</span></div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ f.flyLayers }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:14px;right:{{ f.flyR }};z-index:4;width:270px;display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.2);font-size:12.5px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:21px">Layers</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">4 in this file</span></div>
+                <sc-for list="{{ layers }}" as="ly"><div style="display:flex;align-items:center;gap:10px;height:32px;border-top:0.5px solid #ece3cf"><span style="display:flex;color:{{ ly.c }}"><lp-i name="{{ ly.icon }}" size="15"></lp-i></span><span style="flex:1;color:{{ ly.fg }}">{{ ly.n }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ ly.t }}</span></div></sc-for>
+                <span style="font-size:11.5px;color:#8a7c64;line-height:1.45">Hiding a layer only changes the view. Print and Save keep the layers as the file sets them.</span>
+                <div style="display:flex;flex-direction:column;gap:6px;padding-top:10px;border-top:0.5px solid #d9cdb4">
+                  <span style="font-family:'Instrument Serif';font-size:18px">Measure</span>
+                  <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-family:'IBM Plex Mono';font-size:11px"><span style="color:#8a7c64">distance</span><span>176.0 mm</span><span style="color:#8a7c64">scale</span><span>1 : 1 (from file)</span><span style="color:#8a7c64">angle</span><span>0.0°</span></div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+
+          <div style="height:26px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25;white-space:nowrap;overflow:hidden">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#6b7a3e"></span>offline · on this device</span>
+            <span style="width:0.5px;height:12px;background:#c4b497"></span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:16px;height:16px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-size:8px">AS</span>Arun S. · Sangam</span>
+            <span style="width:0.5px;height:12px;background:#c4b497"></span>
+            <span style="color:#8a7c64;overflow:hidden;text-overflow:ellipsis">{{ f.status }}</span>
+            <span style="margin-left:auto;font-weight:500">18:40:12</span>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { mode: 'read', card: null, lOpen: false, tOpen: false, vOpen: false, pageHover: false };
+  renderVals() {
+    const R = '#8a3a1c', M = '#c47416', O = '#6b7a3e';
+    const sep = { sep: true }, sp = { spacer: true };
+    const modeDefs = [['read', 'reading-mode', 'Read', '1'], ['mark', 'edit', 'Mark', '2'], ['arrange', 'grid-view', 'Arrange', '3'], ['protect', 'redact', 'Protect', '4']];
+    const globals = [['folder', 'Open', 'Ctrl O'], ['find-in-page', 'Find', 'Ctrl F'], ['library', 'Library', ''], ['home', 'Home', '']];
+    const left = (mode, open, compact) => [
+      ...modeDefs.map(([id, icon, label, k]) => ({ btn: true, icon, label, k, open, active: id === mode, h: compact ? '40px' : '46px', bg: id === mode ? 'rgba(138,58,28,.12)' : 'transparent', fg: id === mode ? R : '#3a2f25', ff: "'Instrument Serif'", fs: 'italic', fz: '19px' })),
+      sep,
+      ...globals.map(([icon, label, k]) => ({ btn: true, icon, label, k, open, h: '40px', bg: 'transparent', fg: '#3a2f25', ff: "'LiPi Sans'", fs: 'normal', fz: '13.5px' })),
+      sp,
+      { btn: true, icon: 'settings', label: 'Settings', k: '', open, h: '40px', bg: 'transparent', fg: '#3a2f25', ff: "'LiPi Sans'", fs: 'normal', fz: '13.5px' },
+    ];
+    const T = (icon, label, k, on, kc) => ({ btn: true, icon, label, k: k || '', bg: on === 'primary' ? R : on ? 'rgba(138,58,28,.12)' : 'transparent', fg: on === 'primary' ? '#fbf7ec' : on ? R : '#3a2f25', kc: on === 'primary' ? '#f2ead6' : (kc || '#8a7c64') });
+    const toolsBy = {
+      read: [T('page-single', 'Pages & outline', '', 1), T('bookmark', 'Add bookmark', 'Ctrl B'), T('snapshot', 'Snapshot', 'S'), T('skin-layer', 'Layers', ''), T('measure-tool', 'Measure', 'M'), T('certification', 'Signatures', ''), sep, T('print', 'Print', 'Ctrl P'), T('eye', 'Immersive', 'F11')],
+      readLayers: [T('page-single', 'Pages & outline', ''), T('bookmark', 'Add bookmark', 'Ctrl B'), T('snapshot', 'Snapshot', 'S'), T('skin-layer', 'Layers', '', 1), T('measure-tool', 'Measure', 'M', 1), T('certification', 'Signatures', ''), sep, T('print', 'Print', 'Ctrl P'), T('eye', 'Immersive', 'F11')],
+      mark: [T('text-box', 'Text', 'T', 1), T('file-image', 'Image', 'I'), T('shape-rect', 'Rectangle', 'B'), T('shape-ellipse', 'Ellipse', 'E'), T('arrow-anno', 'Line & arrow', 'L'), T('freehand', 'Draw', 'D'), T('signature', 'Signature', 'G'), T('highlight', 'Highlight', 'H'), T('sticky-note', 'Note', 'N'), sep, T('undo', 'Undo', 'Ctrl Z'), T('redo', 'Redo', 'Ctrl Y'), sp, T('save', 'Save', 'Ctrl S'), T('download', 'Save as new PDF', '⇧ S', 'primary')],
+      arrange: [T('shelf', 'Shelf', '', 1), T('folder', 'Fetch file', ''), T('plus', 'Add desk', ''), T('page-add', 'Blank page', ''), sep, T('undo', 'Undo', 'Ctrl Z'), T('redo', 'Redo', 'Ctrl Y'), T('save', 'Session…', ''), T('close', 'Reset bench', ''), sp, T('doc-merge', 'Combine into one', ''), T('doc-merge', 'Bind all', '', 'primary')],
+      protect: [T('redact', 'Redact box', 'R'), T('find-in-page', 'Find & redact', 'Ctrl F', 1), T('stamp', 'Stamp', ''), T('watermark', 'Watermark', ''), T('compress', 'Flatten', ''), T('doc-lock', 'Password', ''), T('certification', 'Sign with certificate', ''), sp, T('download', 'Save redacted copy', '', 'primary')],
+    };
+    const tools = (key, open) => toolsBy[key].map(x => x.btn ? { ...x, open } : x);
+    const V = (icon, label, k, on) => ({ btn: true, icon, label, k: k || '', bg: on ? 'rgba(138,58,28,.12)' : 'transparent', fg: on ? R : '#3a2f25' });
+    const viewRead = (open) => [V('zoom-in', 'Zoom in', '+'), { text: true, label: '92%' }, V('zoom-out', 'Zoom out', '−'), sep, V('fit-width', 'Fit width', 'W'), V('fit-page', 'Fit page', 'P', 1), sep, V('page-single', 'Single page', ''), V('page-facing', 'Two-page', ''), V('page-cover', 'Cover alone', ''), sep, V('rotate-cw', 'Rotate view', 'Ctrl ]'), V('hand', 'Hand', 'H'), V('loupe', 'Loupe', 'L')].map(x => x.btn ? { ...x, open } : x);
+    const viewArrange = (open) => [{ text: true, label: '/ row' }, V('page-single', '1 desk per row', ''), V('page-facing', '2 desks per row', '', 1), V('grid-view', '3 desks per row', ''), sep, V('zoom-in', 'Larger pages', ''), V('zoom-out', 'Smaller pages', ''), sep, V('list-view', 'Collapse shelf', '')].map(x => x.btn ? { ...x, open } : x);
+    const tab = (n, icon, c, on) => ({ n, icon, c, bd: on ? R : '#d9cdb4', bg: on ? '#fbf7ec' : '#e8dcc4', fg: on ? '#1a1310' : '#8a7c64', sh: on ? 'inset 0 -2px 0 ' + R : 'none' });
+    const tabs = [tab('discharge-summary.pdf', 'file-pdf', R, 1), tab('lab-report-meena-r.pdf', 'file-pdf', R), tab('ot-checklist-v3.docx', 'file-word', '#1f3b73'), tab('bed-census.xlsx', 'file-excel', O)];
+    const sh = '8px 0 28px rgba(26,19,16,.16)', shR = '-8px 0 28px rgba(26,19,16,.16)';
+    const thumbs = (cur, w, h) => [{ isChapter: true, l: 'Summary' }, ...[1, 2].map(i => ({ isThumb: true, l: String(i), w, h, o: i === cur ? '2px solid ' + R : 'none', top: 'none' })), { isChapter: true, l: 'Medication' }, ...[3, 4].map(i => ({ isThumb: true, l: String(i), w, h, o: 'none', top: 'none' }))];
+    const base = { w: '1440px', h: '900px', lw: '62px', cl: '62px', cr: '118px', vw: '54px', flyR: '130px', pt: '22px', pw: '556px', ph: '786px', pf: '9.6px', showPage: true, isArrange: false, hasView: true, drawer: false, strip: false, marks: false, redacts: false, hits: false, measure: false, layerStamp: false, sigBanner: false, flyText: false, flyRedact: false, flyLayers: false, hl: 'transparent', leftSh: 'none', toolSh: 'none', viewSh: 'none', docBg: 'transparent', tabs, toolHead: 'TOOLS', pagerA: '2', pagerB: '/ 13' };
+    const frames = [
+      { ...base, id: '11a', title: 'Read · at rest', note: 'Icons only. The page uses 90% of the height. The page number is always in the top bar.', leftItems: left('read', false), toolItems: tools('read', false), viewItems: viewRead(false), status: 'Read · fit page · 92%' },
+      { ...base, id: '11b', title: 'Read · hovering', note: 'Hover the left bar to see labels and shortcuts. Hover a page for the strip under it.', leftItems: left('read', true), leftSh: sh, toolItems: tools('read', false), viewItems: viewRead(false), drawer: false, drawerTabs: [{ l: 'Pages', bd: R, fg: R }, { l: 'Outline', bd: 'transparent', fg: '#8a7c64' }, { l: 'Attachments', bd: 'transparent', fg: '#8a7c64' }], drawerItems: thumbs(2, '84px', '118px'), strip: true, status: 'Read · page 2 · hover strip' },
+      { ...base, id: '11c', title: 'Read · drawer + View rail', note: 'Pages & outline opens a drawer beside the left bar, with bookmarks as chapter breaks. The outer View rail is the same in every mode.', leftItems: left('read', false), toolItems: tools('read', false), viewItems: viewRead(true), viewSh: shR, drawer: true, drawerTabs: [{ l: 'Pages', bd: R, fg: R }, { l: 'Outline', bd: 'transparent', fg: '#8a7c64' }, { l: 'Attachments', bd: 'transparent', fg: '#8a7c64' }], drawerItems: thumbs(2, '84px', '118px'), status: 'Read · View rail' },
+      { ...base, id: '11d', title: 'Mark', note: 'The Tools rail becomes the markup set. Selecting an object opens its settings card beside the rail. Save is at the foot of the rail.', leftItems: left('mark', false), toolItems: tools('mark', true), toolSh: shR, flyR: '300px', viewItems: viewRead(false), marks: true, hl: 'rgba(232,190,60,.5)', flyText: false, status: 'Mark · Text · 2 unsaved', pagerA: '2' },
+      { ...base, id: '11e', title: 'Mark · object selected', note: 'Rail back to icons; the text box settings card floats over the right gutter, never over the page.', leftItems: left('mark', false), toolItems: tools('mark', false), viewItems: viewRead(false), marks: true, hl: 'rgba(232,190,60,.5)', flyText: true, status: 'Mark · text box selected · 2 unsaved' },
+      { ...base, id: '11f', title: 'Arrange', note: 'Shelf is a drawer; desks fill the canvas, all visible. The Tools rail holds desk actions and Bind all; the View rail sets desks per row.', leftItems: left('arrange', false), toolItems: tools('arrange', false), viewItems: viewArrange(false), showPage: false, isArrange: true, drawer: true, drawerTabs: [{ l: 'Shelf · 3 files', bd: R, fg: R }], drawerItems: [{ isSource: true, l: 'discharge-summary.pdf', n: '8/12', c: R }, { isGrid: true, cells: [R, R, R, R, R, R, R, R] }, { isSource: true, l: 'referral-pack.pdf', n: '5/5', c: M }, { isGrid: true, cells: [M, M, M, M, M] }, { isSource: true, l: 'port-site.jpg', n: 'img', c: O }], cl: '278px', pagerA: '3', pagerB: 'desks · 20 pages', status: 'Arrange · 3 desks · 20 pages · 2 selected' },
+      { ...base, id: '11g', title: 'Protect', note: 'Redaction, stamp, watermark, flatten, password and signing in one rail. Find & redact opens as a card.', leftItems: left('protect', false), toolItems: tools('protect', false), viewItems: viewRead(false), hits: true, redacts: true, flyRedact: true, status: 'Protect · 2 boxes · 16 matches · 14 checked' },
+      { ...base, id: '11h', title: 'Read · Layers, Measure, signature check', note: 'The three library-ready features from Phase 3, all on the existing rails.', leftItems: left('read', false), toolItems: tools('readLayers', false), viewItems: viewRead(false), measure: true, layerStamp: true, sigBanner: true, flyLayers: true, status: 'Read · measuring · 1 signature valid' },
+      { ...base, id: '11i', title: 'Narrow / portrait window', note: 'Below 1000 px: rails shrink to 48 px, the View rail folds into one View button, tabs collapse.', w: '820px', h: '1060px', lw: '50px', cl: '50px', cr: '54px', vw: '0px', flyR: '62px', pw: '700px', ph: '990px', pt: '2px', pf: '12px', hasView: false, leftItems: left('read', false, true), toolItems: [...tools('read', false), sep, { ...V('fit-page', 'View', ''), open: false }], tabs: [tab('discharge-summary.pdf', 'file-pdf', R, 1), { n: '+3', icon: 'copy', c: '#3a2f25', bd: '#d9cdb4', bg: '#e8dcc4', fg: '#3a2f25', sh: 'none' }], status: 'Read · fit width' },
+    ];
+    // ---- live, clickable frame ----
+    const s = this.state, set = (o) => () => this.setState(o);
+    const f11c = frames.find(x => x.id === '11c'), f11f = frames.find(x => x.id === '11f');
+    const modeIds = { Read: 'read', Mark: 'mark', Arrange: 'arrange', Protect: 'protect' };
+    const defCard = { read: null, mark: 'text', arrange: 'shelf', protect: 'redact' };
+    const cardOf = { 'Text': 'text', 'Find & redact': 'redact', 'Layers': 'layers', 'Measure': 'layers', 'Pages & outline': 'pages', 'Shelf': 'shelf' };
+    const toolKey = s.mode === 'read' ? 'read' : s.mode;
+    const liveTools = tools(toolKey, s.tOpen).map(x => {
+      if (!x.btn) return x;
+      const c = cardOf[x.label], prim = x.bg === R;
+      const act = c && c === s.card;
+      return { ...x, bg: prim ? R : act ? 'rgba(138,58,28,.12)' : 'transparent', fg: prim ? '#fbf7ec' : act ? R : '#3a2f25', onClick: c ? () => this.setState(st => ({ card: st.card === c ? null : c })) : undefined };
+    });
+    const liveLeft = left(s.mode, s.lOpen).map(x => x.btn && modeIds[x.label] ? { ...x, onClick: () => this.setState({ mode: modeIds[x.label], card: defCard[modeIds[x.label]] }) } : x);
+    const arr = s.mode === 'arrange', rd = s.mode === 'read', mk = s.mode === 'mark', pr = s.mode === 'protect';
+    const live = { ...base, id: 'live', title: 'Live prototype', note: 'Click a mode on the left and a tool on the right; hover the rails and the page.',
+      leftItems: liveLeft, toolItems: liveTools, viewItems: arr ? viewArrange(s.vOpen) : viewRead(s.vOpen),
+      showPage: !arr, isArrange: arr, marks: mk, hl: mk ? 'rgba(232,190,60,.5)' : 'transparent', hits: pr, redacts: pr,
+      flyText: mk && s.card === 'text', flyRedact: pr && s.card === 'redact', flyLayers: rd && s.card === 'layers', measure: rd && s.card === 'layers', layerStamp: rd && s.card === 'layers', sigBanner: rd && s.card === 'layers',
+      drawer: (rd && s.card === 'pages') || (arr && s.card === 'shelf'),
+      drawerTabs: arr ? f11f.drawerTabs : f11c.drawerTabs, drawerItems: arr ? f11f.drawerItems : f11c.drawerItems,
+      cl: arr && s.card === 'shelf' ? '278px' : '62px', strip: s.pageHover && !arr,
+      leftSh: s.lOpen ? sh : 'none', toolSh: s.tOpen ? shR : 'none', viewSh: s.vOpen ? shR : 'none', flyR: s.tOpen ? '320px' : '130px',
+      pagerA: arr ? '3' : '2', pagerB: arr ? 'desks · 20 pages' : '/ 13',
+      status: ({ read: 'Read · fit page · 92%', mark: 'Mark · Text · 2 unsaved', arrange: 'Arrange · 3 desks · 20 pages · 2 selected', protect: 'Protect · 2 boxes · 16 matches' })[s.mode],
+      onLE: set({ lOpen: true }), onLL: set({ lOpen: false }), onTE: set({ tOpen: true }), onTL: set({ tOpen: false }), onVE: set({ vOpen: true }), onVL: set({ vOpen: false }), onPE: set({ pageHover: true }), onPL: set({ pageHover: false }) };
+    frames.unshift(live);
+    // ---- HTML / Markdown / TXT viewers (D-09: view in WebView, read-only) ----
+    const dimLeft = () => left('read', false).map(x => x.btn && ['Mark', 'Arrange', 'Protect'].includes(x.label) ? { ...x, fg: '#c4b497' } : x);
+    const textTools = (k) => [T('list-view', 'Outline', '', k === 'out'), T('find-in-page', 'Find', 'Ctrl F'), T('copy', 'Copy all', ''), T('print', 'Print', 'Ctrl P'), sep, T('eye', 'Source / rendered', 'Ctrl U', k === 'src'), sp, T('file-pdf', 'Convert to PDF', 'via Layout', 'primary')];
+    const textView = [V('zoom-in', 'Larger text', '+'), { text: true, label: '110%' }, V('zoom-out', 'Smaller text', '−'), sep, V('fit-width', 'Reading width', '', 1), V('page-single', 'Wrap lines', ''), sep, V('hand', 'Hand', 'H')];
+    const tTab = (n, icon, c, on) => tab(n, icon, c, on);
+    const md = [{ h1: 1, t: 'Ward 4 — night handover' }, { p: 1, t: 'Read this at the start of every night shift. Updated by the charge nurse each morning.' }, { h2: 1, t: 'Before 22:00' }, { li: 1, t: 'Check the drug trolley count against the register.' }, { li: 1, t: 'Confirm IV lines due for change tonight (see the VIP chart).' }, { li: 1, t: 'Print tomorrow’s OT list from Chuvadi › Library › OT.' }, { h2: 1, t: 'Escalation' }, { tr: 1, a: 'Situation', b: 'Call', c: 'Within', fw: 600, bg: '#f6f4ef' }, { tr: 1, a: 'VIP score ≥ 2', b: 'IV team', c: '1 hour', fw: 400, bg: 'transparent' }, { tr: 1, a: 'Temp ≥ 38.3 °C on chemo', b: 'Oncology SR', c: '15 min', fw: 400, bg: 'transparent' }, { h2: 1, t: 'Bed board export' }, { code: 1, t: 'chuvadi export --sheet "Census" --as pdf\n  --out D:\\Records\\Ward4\\census-$(date).pdf' }];
+    const txt = ['LAB INTERFACE LOG  ·  analyser HM-02', '----------------------------------------------', '2026-10-14 06:02:11  RECV  sample 4471-A  EDTA', '2026-10-14 06:02:14  RUN   CBC panel', '2026-10-14 06:04:52  RES   HGB 11.2 g/dL   L', '2026-10-14 06:04:52  RES   WBC 5.4 x10^3/uL', '2026-10-14 06:04:52  RES   PLT 210 x10^3/uL', '2026-10-14 06:04:53  SEND  -> HIS  ok (212 ms)', '2026-10-14 06:10:40  RECV  sample 4472-B  SST', '2026-10-14 06:10:43  RUN   RFT panel', '2026-10-14 06:13:20  RES   CREAT 0.8 mg/dL', '2026-10-14 06:13:20  WARN  K+ haemolysed — repeat', '2026-10-14 06:13:21  SEND  -> HIS  ok (198 ms)', '2026-10-14 06:20:02  IDLE', '', '# end of shift block'].map((t, i) => ({ ln: 1, n: String(i + 1), t, bg: i === 11 ? 'rgba(196,116,22,.18)' : 'transparent' }));
+    const html = [{ h1: 1, t: 'Infection control — hand hygiene' }, { p: 1, t: 'Policy IC-04 · version 3 · approved 02 Sep 2026 by the Infection Control Committee.' }, { h2: 1, t: '1. The five moments' }, { li: 1, t: 'Before touching a patient' }, { li: 1, t: 'Before a clean or aseptic procedure' }, { li: 1, t: 'After body-fluid exposure risk' }, { li: 1, t: 'After touching a patient' }, { li: 1, t: 'After touching patient surroundings' }, { h2: 1, t: '2. Audit' }, { p: 1, t: 'Each ward is audited monthly. Scores below 85% are escalated to the nursing superintendent within one week.' }];
+    frames.push(
+      { ...base, id: '11j', title: 'Markdown · rendered', note: 'D-09: HTML, Markdown and TXT open in the WebView. Read-only; Mark/Arrange/Protect stay dimmed until converted. The page number becomes a section counter.', leftItems: dimLeft(), toolItems: textTools('out'), viewItems: textView, showPage: false, isText: true, textW: '720px', textPad: '44px 56px', textGap: '12px', textBlocks: md, tabs: [tTab('night-handover.md', 'file', '#3a2f25', 1), tTab('lab-hm02.log.txt', 'file', '#3a2f25'), tTab('ic-04-hand-hygiene.html', 'file', '#2c3e8c')], pagerA: '§ 2', pagerB: '/ 4', status: 'Markdown · rendered · 186 words · view-only' },
+      { ...base, id: '11k', title: 'Plain text', note: 'Monospace with line numbers; Find highlights the line. Wrap lines is in the View rail.', leftItems: dimLeft(), toolItems: textTools(''), viewItems: textView, showPage: false, isText: true, textW: '820px', textPad: '22px 0', textGap: '0px', textBlocks: txt, tabs: [tTab('night-handover.md', 'file', '#3a2f25'), tTab('lab-hm02.log.txt', 'file', '#3a2f25', 1), tTab('ic-04-hand-hygiene.html', 'file', '#2c3e8c')], pagerA: 'L 12', pagerB: '/ 16', status: 'Plain text · UTF-8 · LF · 16 lines · find “haemolysed” 1 of 1' },
+      { ...base, id: '11l', title: 'HTML · sandboxed', note: 'Rendered in a locked-down WebView: no scripts, no network, no forms. Remote images on request only.', leftItems: dimLeft(), toolItems: textTools(''), viewItems: textView, showPage: false, isText: true, htmlBanner: true, textW: '760px', textPad: '30px 56px', textGap: '12px', textBlocks: html, tabs: [tTab('night-handover.md', 'file', '#3a2f25'), tTab('lab-hm02.log.txt', 'file', '#3a2f25'), tTab('ic-04-hand-hygiene.html', 'file', '#2c3e8c', 1)], pagerA: '§ 1', pagerB: '/ 2', status: 'HTML · sandboxed · offline · 2 images blocked' }
+    );
+    frames.forEach(f => {
+      const narrow = f.w === '820px';
+      const lOpen = f.leftItems.some(x => x.open), tOpen = f.toolItems.some(x => x.open), vOpen = (f.viewItems || []).some(x => x.open);
+      f.lw = narrow ? '48px' : '62px'; f.tw = narrow ? '48px' : '64px';
+      f.lRail = lOpen ? 'auto' : f.lw; f.tRail = tOpen ? 'auto' : f.tw; f.vRail = vOpen ? 'auto' : '54px';
+      f.rPad = narrow ? '8px 4px' : '8px';
+      f.vw = f.hasView ? '54px' : '0px';
+      if (!f.isArrange) f.cl = f.lw;
+      f.cr = narrow ? '48px' : '118px';
+      const lp = narrow ? '0 10px' : '0 13px', tp = narrow ? '0 10px' : '0 14px';
+      f.leftItems = f.leftItems.map(x => x.btn ? { ...x, pad: lp } : x);
+      f.toolItems = f.toolItems.map(x => x.btn ? { ...x, pad: tp } : x);
+    });
+    return {
+      frames,
+      zones: [
+        { t: 'Top bar', d: 'Tabs · ‹ 2 / 13 › · Document ▾ (Properties, Export, Compress, Merge, Split, Print). Always visible.' },
+        { t: 'Left bar', d: 'Read · Mark · Arrange · Protect, then Open, Find, Library, Home, Settings. Never changes.' },
+        { t: 'Right · Tools', d: 'Nearest the page; follows the mode. Light in Read, markup in Mark, desk actions in Arrange.' },
+        { t: 'Right · View', d: 'Outermost; fixed set: zoom, fit, single/two-page, rotate, hand, loupe.' },
+        { t: 'Under the page', d: 'On hover: rotate this page, to desk, snapshot, bookmark, peek.' },
+      ],
+      fields: [{ k: 'Patient', v: 'Meena Rajendran', red: true }, { k: 'MRN', v: '00418-22-7731', red: true }, { k: 'Age / Sex', v: '54 / F' }, { k: 'Admitted', v: '09-10-2026' }, { k: 'Discharged', v: '14-10-2026' }, { k: 'Consultant', v: 'Dr A. Shiva' }],
+      meds: [{ a: 'Ondansetron 8 mg', b: '1-0-1', c: '5 days' }, { a: 'Pantoprazole 40 mg', b: '1-0-0', c: '14 days' }, { a: 'Dexamethasone 4 mg', b: '1-0-1', c: '3 days' }],
+      stripItems: [['rotate-cw', 'Rotate page'], ['grid-view', 'To desk'], ['snapshot', 'Snapshot'], ['bookmark', 'Bookmark'], ['eye', 'Peek']].map(([icon, l], i) => ({ icon, l, bg: i === 1 ? '#3a2f25' : 'transparent' })),
+      desks: [
+        { n: 'Desk 1 · discharge-summary', count: '8 pg', c: R, bd: R, ring: '0 0 0 1px ' + R, chips: ['WM', '№'], pages: [1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ l: 'p ' + i, c: R, o: i === 3 || i === 4 ? '2px solid ' + R : 'none', op: 1 })) },
+        { n: 'Desk 2 · referral pack', count: '7 pg', c: M, bd: '#c4b497', ring: 'none', chips: ['HF'], pages: [['p 1', M], ['p 2', M], ['p 9', R], ['p 3', M], ['p 4', M], ['p 5', M], ['img', O]].map(([l, c]) => ({ l, c, o: 'none', op: 1 })) },
+        { n: 'Desk 3 · annexure', count: '5 pg', c: O, bd: '#c4b497', ring: 'none', chips: [], pages: [['p 10', R], ['p 11', R], ['p 12', R], ['blank', '#c4b497'], ['p 5', M]].map(([l, c]) => ({ l, c, o: 'none', op: 1 })) },
+      ],
+      selBar: [['rotate-cw', 'Rotate'], ['copy', 'Duplicate'], ['plus', 'To new desk'], ['split-view', 'Compare'], ['download', 'Lift'], ['trash', 'Remove']].map(([icon, l]) => ({ icon, l })),
+      aligns: ['Left', 'Centre', 'Right', 'Justify'].map((l, i) => ({ l, bg: i === 0 ? 'rgba(138,58,28,.12)' : '#f2ead6', fg: i === 0 ? R : '#3a2f25' })),
+      swatches: ['#1f3b73', '#1a1310', R, '#a83a2a', O].map((c, i) => ({ c, o: i === 0 ? '2px solid ' + R : 'none' })),
+      matches: [['1', 'Department of Medical Oncology', 1], ['1', '…reviewed by the Oncology nurse…', 1], ['1', 'Review in Oncology OPD…', 1], ['3', 'Oncology day-care unit', 0], ['7', 'cc: Oncology records', 1]].map(([p, s, on]) => ({ p, s, bg: on ? '#1a1310' : 'transparent' })),
+      layers: [['eye', 'Page content', 'base', '#1a1310', '#1a1310'], ['eye', 'MRD stamp', 'OCG', '#1a1310', '#1a1310'], ['eye-off', 'Draft watermark', 'OCG · hidden', '#8a7c64', '#8a7c64'], ['eye', 'Form fields', 'OCG', '#1a1310', '#1a1310']].map(([icon, n, t, c, fg]) => ({ icon, n, t, c, fg })),
+    };
+  }
+}
+</script>
+</body>
+</html>

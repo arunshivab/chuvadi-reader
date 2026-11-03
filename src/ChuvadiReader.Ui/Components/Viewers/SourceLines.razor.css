@@ -1,0 +1,33 @@
+/* Numbered lines on a white page (Reader Side Rails 11k): 44 px gutter, mono 12.5 / 1.75. */
+.sl-scroll {
+    height: 100%; min-height: 0; overflow: auto;
+    background: var(--chvd-canvas);
+    padding: 20px 16px 32px; box-sizing: border-box;
+}
+.sl-page {
+    --w: 820px;
+    margin: 0 auto; box-sizing: border-box;
+    background: var(--chvd-page); color: #2a2a2a;
+    box-shadow: var(--chvd-shadow-page);
+    padding: 22px 0;
+    font-family: var(--chvd-mono); font-size: calc(12.5px * var(--vw-scale, 1)); line-height: 1.75;
+    tab-size: 4;
+}
+.sl-page.w-narrow { --w: 640px; }
+.sl-page.w-wide { --w: 1100px; }
+.sl-page.wrap { width: var(--w); max-width: 100%; }
+/* No wrap: the page grows to the longest line (measured in ch) so it doesn't jitter while virtualizing. */
+.sl-page.nowrap { width: max(min(var(--w), 100%), calc(44px + 30px + var(--sl-chars, 0) * 1ch)); }
+
+.sl-ln { display: grid; grid-template-columns: 44px minmax(0, 1fr); }
+.sl-page.nowrap .sl-ln { height: var(--ln-h, 22px); }
+.sl-page.wrap .sl-ln { min-height: var(--ln-h, 22px); }
+.sl-n {
+    text-align: right; padding-right: 14px; color: #b0a890; border-right: 1px solid #eee;
+    user-select: none; font-variant-numeric: tabular-nums;
+}
+.sl-t { padding-left: 14px; padding-right: 16px; white-space: pre; }
+.sl-page.wrap .sl-t { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.sl-ln.hit { background: rgba(196, 116, 22, .18); }
+.sl-hit { background: rgba(196, 116, 22, .45); color: inherit; border-radius: 2px; }

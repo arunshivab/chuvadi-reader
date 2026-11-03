@@ -34,6 +34,56 @@ public interface IPdfSession : IDisposable
     /// <summary>Drop the rendered-page cache (keeps the document open). Used for
     /// background tabs so many open PDFs don't pin a lot of memory.</summary>
     void DropRenderCache();
+
+    // ── Layers (optional content) ─────────────────────────────────────────────
+    // Default implementations keep every other IPdfSession implementer compiling;
+    // they describe a document without layers.
+
+    /// <summary>The document's layers (optional-content groups) in declaration order, with
+    /// their file-default state and the state this view currently shows. Empty when the
+    /// document has none. Layers that share a name are listed once (the library toggles
+    /// layers by name, so they always move together).</summary>
+    IReadOnlyList<PdfLayerInfo> Layers => Array.Empty<PdfLayerInfo>();
+
+    /// <summary>True when the renderer honours <see cref="SetLayerVisible"/> for this session.</summary>
+    bool CanToggleLayers => false;
+
+    /// <summary>Bumped every time something invalidates the rendered pages (a layer toggle).
+    /// Callers that hold their own copies of page SVG compare it to know they must re-render.</summary>
+    int RenderGeneration => 0;
+
+    /// <summary>Shows or hides a layer in this view only — the file is never changed. Clears
+    /// the render cache, bumps <see cref="RenderGeneration"/> and raises
+    /// <see cref="RenderInvalidated"/>. Unknown ids and locked layers are ignored.</summary>
+    void SetLayerVisible(string layerId, bool visible) { }
+
+    /// <summary>Drops every view override so the layers show as the file sets them.</summary>
+    void ResetLayerVisibility() { }
+
+    /// <summary>Raised after the render cache was invalidated by a view change (layer toggle).</summary>
+    event EventHandler? RenderInvalidated { add { } remove { } }
+}
+
+/// <summary>One layer (PDF optional-content group) as the Layers card shows it.</summary>
+/// <param name="Id">Stable key for <see cref="IPdfSession.SetLayerVisible"/> (the layer name —
+/// the library keys visibility overrides by name).</param>
+/// <param name="Name">Human-readable layer name (/Name).</param>
+/// <param name="IsVisibleByDefault">Visible in the file's default configuration (/D /ON /OFF).</param>
+/// <param name="IsVisible">Visible in this view right now (default state + any override).</param>
+/// <param name="IsLocked">Listed in /D /Locked — the file asks viewers not to let users toggle it.</param>
+/// <param name="Intents">The layer's intents, e.g. "View", "Design". Empty when unspecified.</param>
+/// <param name="GroupCount">How many groups in the file carry this name (usually 1).</param>
+public sealed record PdfLayerInfo(
+    string Id,
+    string Name,
+    bool IsVisibleByDefault,
+    bool IsVisible,
+    bool IsLocked,
+    IReadOnlyList<string> Intents,
+    int GroupCount = 1)
+{
+    /// <summary>True when the view differs from the file's default for this layer.</summary>
+    public bool IsOverridden => IsVisible != IsVisibleByDefault;
 }
 
 /// <summary>

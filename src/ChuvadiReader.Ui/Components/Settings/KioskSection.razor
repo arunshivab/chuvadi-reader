@@ -1,0 +1,38 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* Kiosk mode is not built yet: every row is visible and greyed out. *@
+<SettingsSection Title="Kiosk" Sub="Turn this computer into a self-service station.">
+    <SettingsCard Title="Kiosk mode" IsNew="true">
+        <SettingRow Label="Start in kiosk mode" Hint="Full screen, no title bar, no Settings" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Station name" Soon="true"><ValueChip Text="—" /></SettingRow>
+        <SettingRow Label="Theme" Soon="true"><Segmented Options="ThemeOptions" Value="High contrast" /></SettingRow>
+        <SettingRow Label="Interface size" Soon="true"><Segmented Options="SizeOptions" Value="150%" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Safety" IsNew="true">
+        <SettingRow Label="Reset after no touch for" Soon="true"><Segmented Options="ResetOptions" Value="2 min" /></SettingRow>
+        <SettingRow Label="Close all documents and clear temp files on reset" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Allowed folder" Hint="Nothing outside it opens" Soon="true"><ValueChip Text="—" /></SettingRow>
+        <SettingRow Label="Exit PIN" Hint="Hold the logo 3 s, then PIN" Soon="true"><ValueChip Text="••••" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="What visitors can do" IsNew="true">
+        <SettingRow Label="Scan a token to open their report" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Open from the allowed folder" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Print" Hint="Up to 10 pages per visit" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Mark, arrange or protect" Soon="true"><Toggle Value="false" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Status bar" IsNew="true">
+        <SettingRow Label="Clock size" Soon="true"><Segmented Options="ClockOptions" Value="Huge" /></SettingRow>
+        <SettingRow Label="Show date" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Show station name" Soon="true"><Toggle Value="false" /></SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    private static readonly IReadOnlyList<SegOption> ThemeOptions = SegOption.Of("Same as app", "High contrast");
+    private static readonly IReadOnlyList<SegOption> SizeOptions = SegOption.Of("125%", "150%", "175%");
+    private static readonly IReadOnlyList<SegOption> ResetOptions = SegOption.Of("1 min", "2 min", "5 min");
+    private static readonly IReadOnlyList<SegOption> ClockOptions = SegOption.Of("Normal", "Large", "Huge");
+}

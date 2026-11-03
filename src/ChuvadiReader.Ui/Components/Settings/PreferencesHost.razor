@@ -1,0 +1,36 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@implements IDisposable
+@inject PreferencesService Prefs
+@inject IJSRuntime JS
+
+@*
+    Renderless. Drop <PreferencesHost /> once into the shell (MainLayout). On first render it
+    hydrates PreferencesService and applies UI scale + reduce motion to <html>; afterwards it
+    re-applies whenever a preference changes (Settings saves immediately). The theme is applied
+    by the shell itself from ThemeService (use Theme.Current.Key()).
+*@
+
+@code {
+    protected override void OnInitialized() => Prefs.Changed += OnPrefsChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        if (Prefs.IsHydrated)
+        {
+            await PreferencesInterop.ApplyAsync(JS, Prefs);
+        }
+        else
+        {
+            await Prefs.HydrateAsync(); // raises Changed → applies
+        }
+    }
+
+    private void OnPrefsChanged() => _ = InvokeAsync(() => PreferencesInterop.ApplyAsync(JS, Prefs));
+
+    public void Dispose() => Prefs.Changed -= OnPrefsChanged;
+}

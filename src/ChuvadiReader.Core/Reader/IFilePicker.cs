@@ -26,4 +26,7 @@ public interface IFilePicker
     /// <summary>Shows a multi-select open dialog for images (PNG/JPG/etc.); returns the
     /// chosen paths (empty if cancelled).</summary>
     Task<IReadOnlyList<string>> PickImagesAsync(CancellationToken ct = default);
+
+    /// <summary>Pick a certificate file (.pfx / .p12) for signing. Hosts without a picker return null.</summary>
+    Task<string?> PickCertificateAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
 }

@@ -9,7 +9,10 @@
         /* First-paint background so there's no white flash before the app styles load.
            Matches the window (light parchment); dark theme overrides once applied. */
         html, body { margin: 0; background: #F2EAD6; }
-        html[data-theme="dark"], html[data-theme="dark"] body { background: #0e0a07; }
+        html[data-theme="dark"], html[data-theme="dark"] body { background: #100b08; }
+        html[data-theme="palm"], html[data-theme="palm"] body { background: #ebe5c9; }
+        html[data-theme="indigo"], html[data-theme="indigo"] body { background: #edf0f6; }
+        html[data-theme="contrast"], html[data-theme="contrast"] body { background: #f5f5f2; }
     </style>
 
     <link rel="preload" href="_content/ChuvadiReader.Ui/lipi-sans/fonts/LiPi-Sans-Latin.woff2" as="font" type="font/woff2" crossorigin />
@@ -19,6 +22,8 @@
     <link rel="stylesheet" href="_content/ChuvadiReader.Ui/lipi-sans/lipi-sans.css" />
     <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/tokens.css" />
     <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/app.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/shell.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/prefs.css" />
     <link rel="stylesheet" href="ChuvadiReader.Windows.styles.css" />
 </head>
 <body>

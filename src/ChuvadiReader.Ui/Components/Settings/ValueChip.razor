@@ -1,0 +1,21 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* Read-only value in mono (folder paths, versions, key chords). *@
+<span class="val @(Wrap ? "wrap" : null)" title="@(Title ?? Text)">
+    @if (!string.IsNullOrEmpty(Dot))
+    {
+        <span class="dot" style="background:@Dot"></span>
+    }
+    @Text
+</span>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    /// <summary>Optional colour swatch before the text (category colour).</summary>
+    [Parameter] public string? Dot { get; set; }
+
+    /// <summary>Let long values (paths) wrap instead of being cut with an ellipsis.</summary>
+    [Parameter] public bool Wrap { get; set; }
+}

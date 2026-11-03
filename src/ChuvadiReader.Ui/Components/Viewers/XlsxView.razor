@@ -1,0 +1,340 @@
+@*
+    Excel (.xlsx), view-only (D-07). XlsxViewService's sheets as a grid: column letters, row numbers,
+    column widths, cell styles, frozen header rows, sheet tabs along the bottom, and the Grid / As
+    printed toggle (As printed waits for the Layout library). Password-protected workbooks show the
+    unlock card; the password lives only in this component. Counter unit: sheet.
+*@
+@inherits ViewerBase
+@inject XlsxViewService Xlsx
+
+<div class="xv">
+    @if (_locked)
+    {
+        <UnlockCard Kind="workbook" Error="@_unlockError" Busy="_busy" OnUnlock="UnlockAsync" />
+    }
+    else if (_error is not null)
+    {
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" />
+    }
+    else if (_wb is null)
+    {
+        @if (!string.IsNullOrEmpty(Path)) { <ViewerMessage IconName="clock" Text="Opening…" /> }
+    }
+    else
+    {
+        var s = _wb.Sheets[_active];
+        var lastRow = Math.Min(Math.Max(s.LastRow + 2, 24), 5000);
+        var lastCol = Math.Min(Math.Max(s.LastCol + 1, 12), 256);
+        <div class="xv-gridwrap" @ref="_scroll">
+            <table class="xv-grid" style="zoom:@Css(Scale)">
+                <thead>
+                    <tr>
+                        <th class="xv-corner"></th>
+                        @for (int c = 1; c <= lastCol; c++)
+                        {
+                            <th class="xv-colhdr" style="@ColWidthStyle(s, c)">@ColLetter(c)</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int r = 1; r <= lastRow; r++)
+                    {
+                        <tr>
+                            <th class="xv-rowhdr">@r</th>
+                            @for (int c = 1; c <= lastCol; c++)
+                            {
+                                var cell = Cell(r, c);
+                                <td class="xv-cell @(cell is null ? "empty" : null) @(s.FreezeRows > 0 && r <= s.FreezeRows ? "frozen-row" : null) @(cell is not null && _hits.Contains((r, c)) ? "hit" : null)"
+                                    style="@CellStyle(cell)">@cell?.Text</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="xv-bar">
+            <div class="xv-tabs" role="tablist" aria-label="Sheets">
+                @for (int i = 0; i < _wb.Sheets.Count; i++)
+                {
+                    var idx = i;
+                    <button type="button" role="tab" aria-selected="@(idx == _active ? "true" : "false")"
+                            class="xv-tab @(idx == _active ? "on" : null)" @onclick="() => SelectAsync(idx)">
+                        @_wb.Sheets[idx].Name
+                        @if (_sheetHits.Length > idx && _sheetHits[idx] > 0)
+                        {
+                            <span class="xv-tab-hits" title="@_sheetHits[idx] matching cells">@_sheetHits[idx]</span>
+                        }
+                    </button>
+                }
+            </div>
+            <div class="xv-mode" role="group" aria-label="View">
+                <button type="button" class="xv-mode-btn on" aria-pressed="true"><Icon Name="grid-view" Size="13" /> Grid</button>
+                <span title="Coming with the Layout library">
+                    <button type="button" class="xv-mode-btn" disabled aria-pressed="false"><Icon Name="print" Size="13" /> As printed</button>
+                </span>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private WorkbookView? _wb;
+    private string? _error;
+    private string? _loaded;
+    private string? _password;      // in memory for this tab only
+    private bool _locked, _busy;
+    private string? _unlockError;
+    private int _version;
+    private int _active;
+    private Dictionary<(int, int), SheetCell> _index = new();
+    private HashSet<(int, int)> _hits = new();
+    private int[] _sheetHits = Array.Empty<int>();
+    private string? _query;
+    private bool _scrollToHit;
+    private ElementReference _scroll;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Path != _loaded)
+        {
+            _loaded = Path;
+            _password = null;
+            _locked = false;
+            _unlockError = null;
+            _query = Q(FindQuery);
+            await LoadAsync();
+            return;
+        }
+        if (Q(FindQuery) != _query)
+        {
+            _query = Q(FindQuery);
+            await ApplyFindAsync(jumpToHits: true);
+        }
+    }
+
+    private static string? Q(string? q) => string.IsNullOrEmpty(q) ? null : q;
+
+    /// <summary>Reloads the current file from disk (e.g. the host picked the same path again).</summary>
+    public Task ReloadAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var v = ++_version;
+        _wb = null;
+        _error = null;
+        _index = new();
+        _hits = new();
+        _sheetHits = Array.Empty<int>();
+        if (string.IsNullOrEmpty(Path)) { _locked = false; return; }
+
+        if (!Path.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+        {
+            _locked = false;
+            _error = "That isn't an Excel workbook. Please choose a .xlsx file.";
+            await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
+            return;
+        }
+
+        var path = Path;
+        var pw = _password;
+        try
+        {
+            _busy = true;
+            var wb = await Task.Run(() => Xlsx.Load(path, pw));
+            if (v != _version || Disposed) return;
+            _locked = false;
+            _unlockError = null;
+            _wb = wb;
+            _active = 0;
+            Reindex();
+        }
+        catch (DocumentViewException ex) when (ex.Reason == ViewErrorReason.PasswordProtected)
+        {
+            if (v != _version) return;
+            _locked = true;
+            _unlockError = pw is null ? null : "That password didn't work. Try again.";
+            _password = null;
+        }
+        catch (Exception ex)
+        {
+            if (v != _version) return;
+            if (pw is not null)
+            {
+                _locked = true; // a wrong password can surface as a read failure
+                _unlockError = $"Couldn't open it with that password: {ex.Message}";
+                _password = null;
+            }
+            else
+            {
+                _locked = false;
+                _error = Describe(ex, "workbook");
+            }
+        }
+        finally
+        {
+            if (v == _version) _busy = false;
+        }
+
+        if (_wb is null)
+        {
+            await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
+            await ReportCounterAsync(1, 1, ViewerCounter.Sheet, force: true);
+            await ReportStatusAsync(_locked ? "Excel · password-protected" : "Excel · couldn't open");
+            return;
+        }
+
+        await ReportOutlineAsync(_wb.Sheets
+            .Select((sh, i) => new ViewerOutlineEntry(sh.Name, 1, SheetAnchor(i + 1))).ToList());
+        await ReportCounterAsync(1, _wb.Sheets.Count, ViewerCounter.Sheet, force: true);
+        await ReportStatusAsync($"{_wb.Sheets.Count} sheet{(_wb.Sheets.Count == 1 ? "" : "s")}");
+        if (_query is not null) await ApplyFindAsync(jumpToHits: true);
+    }
+
+    private static string SheetAnchor(int n) => "sheet-" + n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private async Task UnlockAsync(string password)
+    {
+        _password = password;
+        _unlockError = null;
+        await LoadAsync();
+    }
+
+    private async Task SelectAsync(int i)
+    {
+        if (_wb is null || i < 0 || i >= _wb.Sheets.Count) return;
+        _active = i;
+        Reindex();
+        await ReportCounterAsync(i + 1, _wb.Sheets.Count, ViewerCounter.Sheet);
+        if (_query is not null) { MarkActiveHits(); _scrollToHit = _hits.Count > 0; }
+    }
+
+    // Find: count matching cells per sheet; if the active sheet has none, switch to the first that has.
+    private async Task ApplyFindAsync(bool jumpToHits)
+    {
+        if (_wb is null) { await ReportFindCountAsync(0); return; }
+        _sheetHits = new int[_wb.Sheets.Count];
+        int total = 0;
+        if (_query is not null)
+        {
+            for (int i = 0; i < _wb.Sheets.Count; i++)
+            {
+                int n = 0;
+                foreach (var c in _wb.Sheets[i].Cells)
+                    if (c.Text.Contains(_query, StringComparison.OrdinalIgnoreCase)) n++;
+                _sheetHits[i] = n;
+                total += n;
+            }
+            if (jumpToHits && _sheetHits[_active] == 0 && total > 0)
+            {
+                _active = Array.FindIndex(_sheetHits, n => n > 0);
+                Reindex();
+                await ReportCounterAsync(_active + 1, _wb.Sheets.Count, ViewerCounter.Sheet);
+            }
+        }
+        MarkActiveHits();
+        _scrollToHit = _hits.Count > 0;
+        await ReportFindCountAsync(total);
+    }
+
+    private void MarkActiveHits()
+    {
+        _hits = new();
+        if (_wb is null || _query is null) return;
+        foreach (var c in _wb.Sheets[_active].Cells)
+            if (c.Text.Contains(_query, StringComparison.OrdinalIgnoreCase)) _hits.Add((c.Row, c.Col));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_scrollToHit && _wb is not null)
+        {
+            _scrollToHit = false;
+            await JsVoidAsync("scrollToSelector", _scroll, "td.hit");
+        }
+    }
+
+    public override Task GoToAsync(int index) => SelectAsync(index - 1);
+
+    /// <summary>Anchors are "sheet-N" (from the outline) or a sheet name.</summary>
+    public override Task ScrollToAnchorAsync(string anchor)
+    {
+        if (_wb is null || string.IsNullOrEmpty(anchor)) return Task.CompletedTask;
+        if (anchor.StartsWith("sheet-", StringComparison.Ordinal)
+            && int.TryParse(anchor.AsSpan(6), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var n))
+            return SelectAsync(n - 1);
+        var byName = _wb.Sheets.ToList().FindIndex(sh => sh.Name == anchor);
+        return byName >= 0 ? SelectAsync(byName) : Task.CompletedTask;
+    }
+
+    /// <summary>Every sheet as tab-separated rows (cell text as displayed), sheets separated by a
+    /// blank line and headed by their name when there is more than one.</summary>
+    public override string GetAllText()
+    {
+        if (_wb is null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var sh in _wb.Sheets)
+        {
+            if (_wb.Sheets.Count > 1)
+            {
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(sh.Name).Append('\n');
+            }
+            if (sh.IsEmpty) continue;
+            var map = new Dictionary<(int, int), SheetCell>(sh.Cells.Count);
+            foreach (var c in sh.Cells) map[(c.Row, c.Col)] = c;
+            for (int r = sh.FirstRow; r <= sh.LastRow; r++)
+            {
+                for (int c = sh.FirstCol; c <= sh.LastCol; c++)
+                {
+                    if (c > sh.FirstCol) sb.Append('\t');
+                    if (map.TryGetValue((r, c), out var cell)) sb.Append(cell.Text);
+                }
+                sb.Append('\n');
+            }
+        }
+        return sb.ToString();
+    }
+
+    private void Reindex()
+    {
+        _index = new();
+        if (_wb is null) return;
+        foreach (var c in _wb.Sheets[_active].Cells) _index[(c.Row, c.Col)] = c;
+    }
+
+    private SheetCell? Cell(int r, int c) => _index.TryGetValue((r, c), out var v) ? v : null;
+
+    private static string ColLetter(int col)
+    {
+        // 1 → A, 26 → Z, 27 → AA …
+        var sb = new System.Text.StringBuilder();
+        while (col > 0)
+        {
+            int rem = (col - 1) % 26;
+            sb.Insert(0, (char)('A' + rem));
+            col = (col - 1) / 26;
+        }
+        return sb.ToString();
+    }
+
+    private static string? ColWidthStyle(SheetView s, int col) =>
+        s.ColWidths.TryGetValue(col, out var w) ? $"width:{(w * 7).ToString(System.Globalization.CultureInfo.InvariantCulture)}px" : null;
+
+    private static string? CellStyle(SheetCell? c)
+    {
+        if (c is null) return null;
+        var sb = new System.Text.StringBuilder();
+        sb.Append("text-align:").Append(c.Align.ToLowerInvariant() switch { "center" => "center", "right" => "right", _ => "left" }).Append(';');
+        sb.Append("vertical-align:").Append(c.VAlign.ToLowerInvariant() switch { "top" => "top", "center" or "middle" => "middle", _ => "bottom" }).Append(';');
+        if (c.Bold) sb.Append("font-weight:700;");
+        if (c.Italic) sb.Append("font-style:italic;");
+        if (c.Underline) sb.Append("text-decoration:underline;");
+        if (c.FontName is { } fn) sb.Append($"font-family:'{fn}';");
+        if (c.FontSizePt is { } fz) sb.Append($"font-size:{fz.ToString(System.Globalization.CultureInfo.InvariantCulture)}pt;");
+        if (c.Wrap) sb.Append("white-space:normal;");
+        if (c.Color is { } col) sb.Append($"color:{col};");
+        if (c.Fill is { } fill) sb.Append($"background-color:{fill};");
+        return sb.ToString();
+    }
+}

@@ -1,0 +1,25 @@
+@namespace ChuvadiReader.Ui.Components.Cards
+@*
+    The strip above the page ("Signed by Dr A. Shiva · certificate valid · unchanged since…").
+    Green for valid, amber for unknown trust / changed after signing, red for broken.
+*@
+
+@if (Signature is { } s)
+{
+    <div class="sig-banner @SignatureStyles.Css(s.Status)" role="status">
+        <Icon Name="@SignatureStyles.IconFor(s.Status)" Size="15" />
+        <span class="text">@s.Summary</span>
+        @if (OnDetails.HasDelegate)
+        {
+            <button type="button" class="details" @onclick="OnDetails">Details</button>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>The signature to show (typically the last one, which covers the most).</summary>
+    [Parameter] public SignatureCheckInfo? Signature { get; set; }
+
+    /// <summary>When set, a "Details" link opens the Signatures card.</summary>
+    [Parameter] public EventCallback OnDetails { get; set; }
+}

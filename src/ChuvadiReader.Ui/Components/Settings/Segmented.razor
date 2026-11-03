@@ -1,0 +1,32 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* Segmented choice (one of N). Saves on click; disabled when the row is "coming soon". *@
+<span class="seg" role="radiogroup" aria-label="@AriaLabel">
+    @foreach (var o in Options)
+    {
+        var on = string.Equals(o.Value, Value, StringComparison.Ordinal);
+        <button type="button" class="seg-opt @(on ? "on" : null)" role="radio" aria-checked="@(on ? "true" : "false")"
+                disabled="@IsDisabled" @onclick="() => Pick(o.Value)">@o.Label</button>
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<SegOption> Options { get; set; } = Array.Empty<SegOption>();
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [CascadingParameter(Name = "RowSoon")] public bool RowSoon { get; set; }
+
+    private bool IsDisabled => Disabled || RowSoon;
+
+    private async Task Pick(string value)
+    {
+        if (IsDisabled || string.Equals(value, Value, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await ValueChanged.InvokeAsync(value);
+    }
+}

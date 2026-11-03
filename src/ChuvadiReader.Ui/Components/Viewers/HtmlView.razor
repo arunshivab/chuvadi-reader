@@ -1,0 +1,228 @@
+@*
+    HTML — D-09 frame 11l, defense in depth:
+      1. Core's HtmlSanitizer (allow-list; scripts, handlers, forms, frames, unsafe URLs, remote
+         images and url()/expression/@import CSS removed);
+      2. rendered in <iframe sandbox=""> — no allow-scripts, allow-forms, allow-same-origin or
+         allow-popups, so the frame is a unique opaque origin that can run nothing and open nothing;
+      3. a CSP meta first in the srcdoc: default-src 'none'; style-src 'unsafe-inline'; img-src data:
+         (https: is added to img-src only after the user clicks "Load images").
+    Because the frame is cross-origin to the app by design, the app cannot script into it: Find is
+    applied by the sanitizer (marks in the srcdoc), and section go-to/scroll tracking are not
+    available in the rendered view (they work in Source view).
+*@
+@inherits ViewerBase
+@inject IServiceProvider Services
+
+<div class="htv">
+    @if (_error is not null)
+    {
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" />
+    }
+    else if (_doc is null || _result is null)
+    {
+        @if (!string.IsNullOrEmpty(Path)) { <ViewerMessage IconName="clock" Text="Opening…" /> }
+    }
+    else if (ShowSource)
+    {
+        <SourceLines @ref="_src" Lines="_doc.Lines" WrapLines="WrapLines" FindQuery="@FindQuery"
+                     TextSizePct="TextSizePct" ReadingWidth="@ReadingWidth"
+                     OnCounter="OnCounter" OnFindCount="OnFindCount" />
+    }
+    else
+    {
+        <div class="htv-stage">
+            <div class="htv-page @WidthClass">
+                <div class="htv-banner" role="status" title="@BlockedSummary">
+                    <Icon Name="lock" Size="14" />
+                    <span class="htv-banner-text">
+                        @if (_allowRemote)
+                        {
+                            @:Remote images are shown for this view. Scripts and forms stay blocked.
+                        }
+                        else
+                        {
+                            @:Scripts, forms and remote images are blocked. This page can't reach the internet.
+                        }
+                    </span>
+                    @if (!_allowRemote && _result.Blocked.RemoteImages > 0)
+                    {
+                        <button type="button" class="htv-load" @onclick="LoadImagesAsync">Load images</button>
+                    }
+                </div>
+                <iframe class="htv-frame" sandbox="@SandboxNone" referrerpolicy="no-referrer" loading="eager"
+                        title="@(_result.Title ?? "HTML document") (sandboxed)" srcdoc="@_srcdoc"></iframe>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    // sandbox="" — an empty token list: no allow-scripts, allow-forms, allow-same-origin, allow-popups,
+    // allow-top-navigation … Passed as an explicit empty string so it renders as sandbox="".
+    private const string SandboxNone = "";
+
+    private TextDocument? _doc;
+    private HtmlSanitizeResult? _result;
+    private string _srcdoc = "";
+    private string? _error;
+    private string? _loaded;
+    private int _version;
+    private bool _allowRemote;
+    private bool _wasSource;
+    private string? _query;
+    private double _scale = -1;
+    private SourceLines? _src;
+
+    private TextViewService Service =>
+        Services.GetService(typeof(TextViewService)) as TextViewService ?? new TextViewService();
+
+    private int Sections => Math.Max(1, _result?.Outline.Count ?? 0);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Path != _loaded)
+        {
+            _loaded = Path;
+            _allowRemote = false;
+            _wasSource = ShowSource;
+            _query = Q(FindQuery);
+            _scale = Scale;
+            await LoadAsync();
+            return;
+        }
+        if (_doc is null) return;
+
+        bool rebuild = false;
+        if (Q(FindQuery) != _query) { _query = Q(FindQuery); rebuild = true; }
+        if (Math.Abs(Scale - _scale) > 0.0001) { _scale = Scale; rebuild = true; }
+        if (rebuild) await SanitizeAsync();
+
+        if (ShowSource != _wasSource)
+        {
+            _wasSource = ShowSource;
+            if (!ShowSource)
+            {
+                await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
+                await ReportFindCountAsync(_result?.HighlightCount ?? 0);
+            }
+            await ReportStatusAsync(StatusText());
+        }
+    }
+
+    private static string? Q(string? q) => string.IsNullOrEmpty(q) ? null : q;
+
+    private async Task LoadAsync()
+    {
+        var v = ++_version;
+        _doc = null;
+        _result = null;
+        _srcdoc = "";
+        _error = null;
+        if (string.IsNullOrEmpty(Path)) return;
+        try
+        {
+            var path = Path;
+            var svc = Service;
+            var doc = await Task.Run(() => svc.Load(path));
+            if (v != _version || Disposed) return;
+            _doc = doc;
+            await SanitizeAsync();
+            if (v != _version || _result is null) return;
+            await ReportOutlineAsync(_result.Outline);
+            if (!ShowSource) await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
+            await ReportStatusAsync(StatusText());
+        }
+        catch (Exception ex)
+        {
+            if (v != _version) return;
+            _error = Describe(ex, "page");
+            await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
+            await ReportStatusAsync("HTML · couldn't open");
+        }
+    }
+
+    private async Task SanitizeAsync()
+    {
+        if (_doc is null) return;
+        var text = _doc.Text;
+        var allow = _allowRemote;
+        var q = _query;
+        var css = BaseCss(_scale);
+        var (result, srcdoc) = await Task.Run(() =>
+        {
+            var r = HtmlSanitizer.Sanitize(text, allow, q);
+            return (r, HtmlSanitizer.BuildSrcDoc(r.BodyHtml, allow, css, r.Title));
+        });
+        _result = result;
+        _srcdoc = srcdoc;
+        if (!ShowSource) await ReportFindCountAsync(result.HighlightCount);
+    }
+
+    private async Task LoadImagesAsync()
+    {
+        _allowRemote = true;
+        await SanitizeAsync();
+        await ReportStatusAsync(StatusText());
+    }
+
+    private string StatusText()
+    {
+        if (_doc is null || _result is null) return "HTML";
+        if (ShowSource) return $"HTML · source · {_doc.Lines.Count:N0} line{(_doc.Lines.Count == 1 ? "" : "s")}";
+        if (_allowRemote) return "HTML · sandboxed · remote images on";
+        var n = _result.Blocked.RemoteImages;
+        return n > 0 ? $"HTML · sandboxed · offline · {n} image{(n == 1 ? "" : "s")} blocked" : "HTML · sandboxed · offline";
+    }
+
+    private string BlockedSummary
+    {
+        get
+        {
+            if (_result is null) return "";
+            var b = _result.Blocked;
+            var parts = new List<string>();
+            void Add(int n, string what) { if (n > 0) parts.Add($"{n} {what}"); }
+            Add(b.Scripts, b.Scripts == 1 ? "script" : "scripts");
+            Add(b.EventHandlers, b.EventHandlers == 1 ? "event handler" : "event handlers");
+            Add(b.UnsafeUrls, b.UnsafeUrls == 1 ? "unsafe link" : "unsafe links");
+            Add(b.Embeds, b.Embeds == 1 ? "frame or embed" : "frames or embeds");
+            Add(b.Forms, b.Forms == 1 ? "form control" : "form controls");
+            Add(b.RemoteImages, b.RemoteImages == 1 ? "remote image" : "remote images");
+            Add(b.Styles, b.Styles == 1 ? "unsafe style" : "unsafe styles");
+            Add(b.Other, b.Other == 1 ? "other item" : "other items");
+            return parts.Count == 0 ? "Nothing needed blocking in this page." : "Removed: " + string.Join(", ", parts) + ".";
+        }
+    }
+
+    // Trusted base styles inside the frame (the page is white in every theme, like paper).
+    private static string BaseCss(double scale) =>
+        "html{background:#fff;color:#1b1b1b}" +
+        "body{margin:0;padding:22px 56px 40px;font-family:Georgia,'Times New Roman',serif;" +
+        $"font-size:{(14.5 * scale).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}px;line-height:1.65;overflow-wrap:break-word}}" +
+        "@media (max-width:640px){body{padding:18px 20px 32px}}" +
+        "h1,h2,h3,h4{font-family:Georgia,'Times New Roman',serif;font-weight:600;color:#111;line-height:1.25}" +
+        "h1{font-size:2.07em;margin:0 0 .5em}h2{font-size:1.38em;margin:1.3em 0 .55em;padding-bottom:6px;border-bottom:1px solid #e5e1d8}" +
+        "img{max-width:100%;height:auto}table{border-collapse:collapse}td,th{border:1px solid #e5e1d8;padding:6px 8px;vertical-align:top}" +
+        "pre,code,kbd,samp{font-family:'IBM Plex Mono',Consolas,monospace;font-size:.87em}" +
+        "pre{background:#f6f4ef;border:.5px solid #e2ddd2;border-radius:6px;padding:10px 12px;overflow:auto}" +
+        "a{color:#2c3e8c}blockquote{margin:0 0 1em;padding:.1em 1em;border-left:3px solid #d9cdb4;color:#4a4238}" +
+        $"mark.{HtmlSanitizer.HitClass}{{background:rgba(196,116,22,.38);color:inherit;border-radius:2px}}" +
+        $".{HtmlSanitizer.ImagePlaceholderClass}{{display:inline-block;padding:1px 8px;border:1px dashed #c4b497;border-radius:4px;" +
+        "color:#8a7c64;background:#faf7f0;font:12px system-ui,sans-serif}";
+
+    // The rendered frame is opaque to the app (sandbox without allow-same-origin), so section
+    // navigation only works in Source view.
+    public override async Task GoToAsync(int index)
+    {
+        if (ShowSource && _src is not null) await _src.GoToAsync(index);
+    }
+
+    public override async Task ScrollToAnchorAsync(string anchor)
+    {
+        if (ShowSource && _src is not null) await _src.ScrollToAnchorAsync(anchor);
+    }
+
+    /// <summary>Rendered view: the page's visible text. Source view: the file exactly as stored.</summary>
+    public override string GetAllText() =>
+        ShowSource ? _doc?.Text ?? "" : _result?.PlainText ?? "";
+}

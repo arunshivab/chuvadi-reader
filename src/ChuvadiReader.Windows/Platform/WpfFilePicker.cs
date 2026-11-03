@@ -28,10 +28,15 @@ public sealed class WpfFilePicker : IFilePicker
             {
                 Title = "Open a document",
                 Filter =
+                    "All supported (*.pdf;*.docx;*.xlsx;*.md;*.markdown;*.txt;*.log;*.html;*.htm)|" +
+                    "*.pdf;*.docx;*.xlsx;*.md;*.markdown;*.txt;*.log;*.html;*.htm|" +
                     "Documents (*.pdf;*.docx;*.xlsx)|*.pdf;*.docx;*.xlsx|" +
                     "PDF (*.pdf)|*.pdf|" +
                     "Word (*.docx)|*.docx|" +
                     "Excel (*.xlsx)|*.xlsx|" +
+                    "Markdown (*.md;*.markdown)|*.md;*.markdown|" +
+                    "Text (*.txt;*.log)|*.txt;*.log|" +
+                    "HTML (*.html;*.htm)|*.html;*.htm|" +
                     "All files (*.*)|*.*",
                 CheckFileExists = true,
             };
@@ -107,6 +112,29 @@ public sealed class WpfFilePicker : IFilePicker
             {
                 Title = "Open bench session",
                 Filter = "Chuvadi session (*.json)|*.json|All files (*.*)|*.*",
+                CheckFileExists = true,
+            };
+
+            return dlg.ShowDialog() == true ? dlg.FileName : null;
+        });
+
+        return Task.FromResult(picked);
+    }
+
+    public Task<string?> PickCertificateAsync(CancellationToken ct = default)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        var picked = dispatcher.Invoke(() =>
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Choose a signing certificate",
+                Filter = "Certificate with private key (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*",
                 CheckFileExists = true,
             };
 

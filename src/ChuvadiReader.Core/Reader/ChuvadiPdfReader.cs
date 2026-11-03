@@ -110,24 +110,172 @@ public sealed class ChuvadiPdfSession : IPdfSession
     private const int HeavySvgBytes = 6_000_000;
     private const double RasterDpi = 150d;
 
-    private readonly SvgRenderer _svgRenderer;
+    private readonly bool _transparentBackground;
+    private SvgRenderer _svgRenderer;
     private readonly Dictionary<int, string> _svgCache = new();
     private PdfDocument? _document;
+
+    // Layers: the file's groups (read once, lazily) and this view's overrides (name → visible).
+    // Overrides only ever reach the renderers — the document itself is never modified.
+    private List<LayerEntry>? _layerEntries;
+    private readonly Dictionary<string, bool> _layerOverrides = new(StringComparer.Ordinal);
+    private int _renderGeneration;
 
     public ChuvadiPdfSession(PdfDocument document, PdfDocumentVm vm, bool transparentBackground = false)
     {
         _document = document;
         Document = vm;
-        // The library now defaults the SVG page background to opaque white. The reader
-        // opts out (null) so a CSS page tint can show through; the bench/export keep white.
-        _svgRenderer = new SvgRenderer(new SvgExportOptions
-        {
-            TextStrategy = SvgTextStrategy.Selectable,
-            Background = transparentBackground ? (ColorF?)null : ColorF.White,
-        });
+        _transparentBackground = transparentBackground;
+        _svgRenderer = CreateSvgRenderer();
     }
 
     public PdfDocumentVm Document { get; }
+
+    /// <summary>The open library document, for Core services that work on the same handle
+    /// (e.g. <see cref="MeasureService"/>). Null once disposed.</summary>
+    internal PdfDocument? PdfDocument => _document;
+
+    public event EventHandler? RenderInvalidated;
+
+    public int RenderGeneration => _renderGeneration;
+
+    public bool CanToggleLayers => _document is not null && LayerEntries.Count > 0;
+
+    public IReadOnlyList<PdfLayerInfo> Layers =>
+        LayerEntries.Select(e => new PdfLayerInfo(
+                e.Name, e.Name, e.DefaultVisible, IsLayerShown(e), e.Locked, e.Intents, e.Count))
+            .ToList();
+
+    public void SetLayerVisible(string layerId, bool visible)
+    {
+        var entry = LayerEntries.FirstOrDefault(e => string.Equals(e.Name, layerId, StringComparison.Ordinal));
+        if (entry is null || entry.Locked || IsLayerShown(entry) == visible)
+        {
+            return;
+        }
+
+        // Store only real deviations from the file's default, so "back to default" leaves no override.
+        if (visible == entry.DefaultVisible)
+        {
+            _layerOverrides.Remove(entry.Name);
+        }
+        else
+        {
+            _layerOverrides[entry.Name] = visible;
+        }
+
+        InvalidateRender();
+    }
+
+    public void ResetLayerVisibility()
+    {
+        if (_layerOverrides.Count == 0)
+        {
+            return;
+        }
+
+        _layerOverrides.Clear();
+        InvalidateRender();
+    }
+
+    private bool IsLayerShown(LayerEntry e) =>
+        _layerOverrides.TryGetValue(e.Name, out var v) ? v : e.DefaultVisible;
+
+    private void InvalidateRender()
+    {
+        _svgRenderer = CreateSvgRenderer();
+        _svgCache.Clear();
+        _renderGeneration++;
+        RenderInvalidated?.Invoke(this, EventArgs.Empty);
+    }
+
+    private IReadOnlyDictionary<string, bool>? CurrentOverrides =>
+        _layerOverrides.Count == 0 ? null : new Dictionary<string, bool>(_layerOverrides, StringComparer.Ordinal);
+
+    private SvgRenderer CreateSvgRenderer() =>
+        // The library now defaults the SVG page background to opaque white. The reader
+        // opts out (null) so a CSS page tint can show through; the bench/export keep white.
+        new(new SvgExportOptions
+        {
+            TextStrategy = SvgTextStrategy.Selectable,
+            Background = _transparentBackground ? (ColorF?)null : ColorF.White,
+            LayerVisibility = CurrentOverrides,
+        });
+
+    private List<LayerEntry> LayerEntries => _layerEntries ??= ReadLayers(_document);
+
+    private sealed record LayerEntry(string Name, bool DefaultVisible, bool Locked, IReadOnlyList<string> Intents, int Count);
+
+    /// <summary>Reads the layers once: names/default state/intents from the library's
+    /// <see cref="OptionalContentReader"/>, plus the /D /Locked array (which the library
+    /// doesn't surface) straight from /OCProperties. Never throws — a damaged
+    /// /OCProperties just yields no layers.</summary>
+    private static List<LayerEntry> ReadLayers(PdfDocument? document)
+    {
+        var result = new List<LayerEntry>();
+        if (document is null)
+        {
+            return result;
+        }
+
+        try
+        {
+            var groups = OptionalContentReader.GetGroups(document);
+            if (groups.Count == 0)
+            {
+                return result;
+            }
+
+            var locked = ReadLockedLayerNames(document);
+            foreach (var g in groups.GroupBy(g => g.Name ?? string.Empty, StringComparer.Ordinal))
+            {
+                var first = g.First();
+                result.Add(new LayerEntry(
+                    g.Key,
+                    first.IsVisibleByDefault,
+                    locked.Contains(g.Key),
+                    first.Intents ?? Array.Empty<string>(),
+                    g.Count()));
+            }
+        }
+        catch
+        {
+            result.Clear();
+        }
+
+        return result;
+    }
+
+    private static HashSet<string> ReadLockedLayerNames(PdfDocument document)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            var objects = document.Objects;
+            var ocProps = objects.ResolveDictionaryEntry<PdfDictionary>(document.Catalog, PdfName.Intern("OCProperties"));
+            var d = ocProps is null ? null : objects.ResolveDictionaryEntry<PdfDictionary>(ocProps, PdfName.Intern("D"));
+            var lockedArr = d is null ? null : objects.ResolveDictionaryEntry<PdfArray>(d, PdfName.Intern("Locked"));
+            if (lockedArr is null)
+            {
+                return names;
+            }
+
+            foreach (var item in lockedArr)
+            {
+                if (objects.Resolve(item) is PdfDictionary ocg
+                    && objects.ResolveDictionaryEntry<PdfString>(ocg, PdfName.Intern("Name")) is { } name)
+                {
+                    names.Add(name.ToTextString());
+                }
+            }
+        }
+        catch
+        {
+            // Locked is advisory; failing to read it just means nothing is locked.
+        }
+
+        return names;
+    }
 
     public bool TryGetRenderedSvg(int pageNumber, out string svg) => _svgCache.TryGetValue(pageNumber, out svg!);
 
@@ -176,7 +324,13 @@ public sealed class ChuvadiPdfSession : IPdfSession
     {
         var buffer = new PageRasterizer(
                 _document!.Objects,
-                new RenderOptions { Dpi = RasterDpi, Background = ColorF.White, AntiAlias = true })
+                new RenderOptions
+                {
+                    Dpi = RasterDpi,
+                    Background = ColorF.White,
+                    AntiAlias = true,
+                    LayerVisibility = CurrentOverrides,
+                })
             .Rasterize(page);
 
         using var ms = new MemoryStream();

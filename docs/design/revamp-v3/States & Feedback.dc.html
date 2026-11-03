@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<section id="turn-8" style="padding:72px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">First run · empty · errors · feedback</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:52px;line-height:1.02">The moments in between.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">How the app talks when there's nothing to show, when something goes wrong, and while it's working. Rules: say what happened in plain words, offer the next step, never blame the user, and always mention that the original file is safe.</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:32px">
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8a</span><span style="font-size:15px">First run · three questions, all skippable</span></div>
+      <div id="8a" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;align-items:center;justify-content:center">
+        <div style="width:560px;display:flex;flex-direction:column;gap:18px">
+          <span style="font-family:'Instrument Serif';font-style:italic;font-size:30px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span>
+          <span style="font-family:'Instrument Serif';font-size:38px;line-height:1.05">Welcome. Where do your documents live?</span>
+          <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fbf7ec;border:0.5px solid #8a3a1c;border-radius:9px"><lp-i name="folder" size="18"></lp-i><span style="flex:1;font-family:'IBM Plex Mono';font-size:12.5px">D:\Records</span><span style="font-size:13px;color:#8a3a1c">Choose…</span></div>
+          <div style="display:flex;gap:10px;align-items:center;font-size:13.5px;color:#3a2f25">Call me<span style="padding:6px 12px;border:0.5px solid #c4b497;border-radius:7px;background:#fff;color:#1a1310">Arun</span>· Paper<span style="width:22px;height:22px;border-radius:50%;background:#fbf7ec;outline:2px solid #8a3a1c;outline-offset:2px"></span><span style="width:22px;height:22px;border-radius:50%;background:#241b15"></span><span style="width:22px;height:22px;border-radius:50%;background:#ebe5c9"></span><span style="width:22px;height:22px;border-radius:50%;background:#edf0f6"></span><span style="width:22px;height:22px;border-radius:50%;background:#fff;border:1.5px solid #000"></span></div>
+          <div style="display:flex;align-items:center;gap:12px"><span style="height:40px;padding:0 20px;border-radius:8px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-weight:500">Start reading</span><span style="font-size:13px;color:#3a2f25">Skip — I'll set this later</span><span style="margin-left:auto;font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">nothing leaves this device</span></div>
+        </div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8b</span><span style="font-size:15px">Home with nothing yet</span></div>
+      <div id="8b" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;padding:40px 48px;display:flex;flex-direction:column;gap:20px">
+        <span style="font-family:'Instrument Serif';font-size:40px;line-height:1">Good morning. <span style="font-family:'Tiro Tamil';font-size:32px;color:#8a3a1c">வணக்கம்.</span></span>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:1px dashed #c4b497;border-radius:12px;background:#fbf7ec">
+          <span style="color:#8a3a1c"><lp-i name="upload" size="34"></lp-i></span>
+          <span style="font-family:'Instrument Serif';font-size:28px">Drop your first document here</span>
+          <span style="font-size:13.5px;color:#3a2f25">PDF, Word, Excel or an image — even password-protected ones.</span>
+          <div style="display:flex;gap:10px;margin-top:6px"><span style="height:36px;padding:0 16px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-size:13px">Open a file…</span><span style="height:36px;padding:0 16px;border-radius:7px;border:0.5px solid #c4b497;display:flex;align-items:center;font-size:13px">Choose a library folder</span></div>
+        </div>
+        <span style="font-size:12.5px;color:#8a7c64">Tip: Ctrl K finds any file or action. Try typing “merge”.</span>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8c</span><span style="font-size:15px">Library with no folder · empty shelves</span></div>
+      <div id="8c" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;padding:32px 40px;display:flex;flex-direction:column;gap:18px">
+        <span style="font-family:'Instrument Serif';font-size:34px">Library</span>
+        <div style="display:flex;flex-direction:column;gap:20px;opacity:.55"><sc-for list="{{ emptyShelves }}" as="e"><div style="display:flex;align-items:flex-end;gap:14px"><div style="width:30px;height:120px;border-radius:3px 0 0 3px;background:linear-gradient(95deg,#4b3a28,#5c4a34 45%,#473626)"></div><div style="flex:1;display:flex;flex-direction:column"><div style="height:120px;display:flex;align-items:flex-end;gap:10px"><sc-for list="{{ e }}" as="b"><span style="width:{{ b }};height:110px;border:1px dashed #b9ab8a;border-radius:2px"></span></sc-for></div><div style="height:6px;background:linear-gradient(180deg,#c4b497,#fbf7ec);border-radius:2px"></div></div></div></sc-for></div>
+        <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px"><lp-i name="library" size="22"></lp-i><div style="display:flex;flex-direction:column;flex:1"><span style="font-size:14.5px;font-weight:600">Your shelves are empty</span><span style="font-size:12.5px;color:#3a2f25">Pick the folder where records are kept. Its sub-folders become shelves.</span></div><span style="height:34px;padding:0 14px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-size:13px">Choose folder…</span></div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8d</span><span style="font-size:15px">Arrange with an empty shelf and desk</span></div>
+      <div id="8d" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:grid;grid-template-columns:200px minmax(0,1fr)">
+        <aside style="background:#f2ead6;border-right:0.5px solid #d9cdb4;padding:16px 12px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.14em;color:#8a7c64">SHELF</span><div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border:1px dashed #c4b497;border-radius:10px;text-align:center;padding:12px;font-size:12.5px;color:#3a2f25"><lp-i name="shelf" size="24"></lp-i>Drop PDFs or images here to use their pages<span style="height:30px;padding:0 12px;border-radius:6px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;margin-top:4px">Add files…</span></div></aside>
+        <div style="padding:18px;display:flex;flex-direction:column;gap:14px"><div style="background:#fbf7ec;border:0.5px solid #c4b497;border-top:3px solid #8a3a1c;border-radius:8px"><div style="height:42px;display:flex;align-items:center;padding:0 14px;font-family:'Instrument Serif';font-size:18px;border-bottom:0.5px solid #e8dcc4">Desk 1</div><div style="height:150px;margin:14px;border:1px dashed #c4b497;border-radius:8px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:13px;color:#3a2f25"><lp-i name="arrow-left" size="16"></lp-i>Drag pages from the shelf · or add a blank page / image</div></div><span style="font-size:12.5px;color:#8a7c64">Each desk becomes its own PDF when you bind it.</span></div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8e</span><span style="font-size:15px">Can't open · damaged file and XFA form</span></div>
+      <div id="8e" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:22px">
+        <sc-for list="{{ errors }}" as="er" hint-placeholder-count="2"><div style="display:flex;flex-direction:column;gap:12px;padding:22px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px"><span style="width:44px;height:44px;border-radius:50%;background:{{ er.bg }};color:{{ er.c }};display:flex;align-items:center;justify-content:center"><lp-i name="{{ er.icon }}" size="22"></lp-i></span><span style="font-family:'Instrument Serif';font-size:24px;line-height:1.1">{{ er.t }}</span><span style="font-size:13px;line-height:1.5;color:#3a2f25">{{ er.d }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ er.file }}</span><div style="margin-top:auto;display:flex;flex-direction:column;gap:8px"><sc-for list="{{ er.acts }}" as="a"><span style="height:36px;border-radius:7px;border:{{ a.bd }};background:{{ a.bg }};color:{{ a.fg }};display:flex;align-items:center;justify-content:center;font-size:13px">{{ a.t }}</span></sc-for></div></div></sc-for>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8f</span><span style="font-size:15px">Messages after an action: success, partial, error</span></div>
+      <div id="8f" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+        <sc-for list="{{ toasts }}" as="tt" hint-placeholder-count="3"><div style="width:560px;display:flex;align-items:center;gap:12px;padding:12px 12px 12px 16px;background:{{ tt.bg }};color:{{ tt.fg }};border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.22);border-left:4px solid {{ tt.bar }}"><span style="display:flex;color:{{ tt.bar }}"><lp-i name="{{ tt.icon }}" size="18"></lp-i></span><div style="display:flex;flex-direction:column;flex:1;min-width:0"><span style="font-size:13.5px;font-weight:500">{{ tt.t }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ tt.d }}</span></div><sc-for list="{{ tt.acts }}" as="a"><span style="height:30px;padding:0 10px;border-radius:6px;background:{{ a.bg }};display:flex;align-items:center;font-size:12.5px;white-space:nowrap">{{ a.t }}</span></sc-for></div></sc-for>
+        <span style="font-size:12px;color:#3a2f25">Bottom-right, above the status bar. Success messages fade after 6 s; errors stay until closed. Every one is also logged in Ctrl K › Recent activity.</span>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8g</span><span style="font-size:15px">Long work in progress · bind all, press, OCR</span></div>
+      <div id="8g" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:flex;flex-direction:column">
+        <div style="flex:1;display:flex;align-items:center;justify-content:center">
+          <div style="width:440px;display:flex;flex-direction:column;gap:14px;padding:20px 22px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 20px 50px rgba(0,0,0,.18)">
+            <span style="font-family:'Instrument Serif';font-size:24px">Binding 3 desks</span>
+            <sc-for list="{{ jobs }}" as="j"><div style="display:flex;flex-direction:column;gap:5px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>{{ j.n }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:{{ j.c }}">{{ j.s }}</span></div><span style="height:5px;border-radius:3px;background:#e8dcc4;overflow:hidden"><span style="display:block;height:100%;width:{{ j.p }};background:{{ j.c }}"></span></span></div></sc-for>
+            <div style="display:flex;gap:8px"><span style="font-size:12px;color:#8a7c64;align-self:center">You can keep working, this carries on in the background.</span><span style="margin-left:auto;height:32px;padding:0 12px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;font-size:12.5px">Hide</span><span style="height:32px;padding:0 12px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;font-size:12.5px;color:#a83a2a">Stop</span></div>
+          </div>
+        </div>
+        <div style="height:30px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25"><span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:#6b7a3e"></span>offline · on this device</span><span style="width:0.5px;height:14px;background:#c4b497"></span><span style="display:flex;align-items:center;gap:8px;color:#8a3a1c">Binding 2 of 3<span style="width:90px;height:4px;border-radius:2px;background:#e8dcc4;overflow:hidden"><span style="display:block;width:55%;height:100%;background:#8a3a1c"></span></span></span><span style="margin-left:auto;font-weight:500">18:40:12</span></div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8h</span><span style="font-size:15px">Pages still rendering · large file opening</span></div>
+      <div id="8h" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:grid;grid-template-columns:130px minmax(0,1fr)">
+        <aside style="background:#f2ead6;border-right:0.5px solid #d9cdb4;padding:14px 0;display:flex;flex-direction:column;align-items:center;gap:12px"><sc-for list="{{ skel }}" as="k"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:64px;height:90px;background:{{ k.bg }};box-shadow:0 1px 4px rgba(0,0,0,.12)"></div><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ k.n }}</span></div></sc-for></aside>
+        <div style="display:flex;flex-direction:column;align-items:center;padding-top:20px;gap:10px;position:relative">
+          <div style="width:330px;height:466px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.22);padding:32px;display:flex;flex-direction:column;gap:10px"><span style="height:12px;width:50%;background:#ece8e0;border-radius:3px"></span><span style="height:7px;background:#f2efe9;border-radius:3px"></span><span style="height:7px;background:#f2efe9;border-radius:3px"></span><span style="height:7px;width:80%;background:#f2efe9;border-radius:3px"></span><span style="height:90px;background:#f6f4ef;border-radius:3px;margin-top:6px"></span></div>
+          <div style="position:absolute;top:220px;display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;font-size:13px;box-shadow:0 10px 24px rgba(0,0,0,.14)"><span style="width:16px;height:16px;border-radius:50%;border:2px solid #d9cdb4;border-top-color:#8a3a1c"></span>Drawing page 1 of 640…<span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">the rest load as you scroll</span></div>
+        </div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8i</span><span style="font-size:15px">Closing a tab with unsaved marks</span></div>
+      <div id="8i" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:rgba(26,19,16,.34);display:flex;align-items:center;justify-content:center">
+        <div style="width:460px;display:flex;flex-direction:column;gap:14px;padding:22px 24px;background:#fbf7ec;border-radius:12px;box-shadow:0 30px 70px rgba(0,0,0,.35)">
+          <span style="width:40px;height:40px;border-radius:50%;background:rgba(196,116,22,.16);color:#c47416;display:flex;align-items:center;justify-content:center"><lp-i name="edit" size="20"></lp-i></span>
+          <span style="font-family:'Instrument Serif';font-size:26px;line-height:1.1">Keep your marks on discharge-summary.pdf?</span>
+          <span style="font-size:13.5px;line-height:1.5;color:#3a2f25">2 marks and 1 signature haven't been saved. The original file has not been changed.</span>
+          <div style="display:flex;gap:8px;margin-top:4px"><span style="height:38px;padding:0 14px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center;font-size:13px;color:#a83a2a">Close without saving</span><span style="margin-left:auto;height:38px;padding:0 14px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center;font-size:13px">Cancel</span><span style="height:38px;padding:0 16px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-size:13px;font-weight:500">Save as new PDF</span></div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#8a7c64"><span style="width:14px;height:14px;border:1px solid #c4b497;border-radius:3px;background:#fff"></span>Keep marks as a draft and ask me next time I open this file</label>
+        </div>
+      </div></div>
+
+    <div style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">8j</span><span style="font-size:15px">Blocked actions explain themselves</span></div>
+      <div id="8j" style="width:760px;height:500px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;padding:28px;display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ blocked }}" as="b" hint-placeholder-count="4"><div style="display:flex;gap:14px;align-items:flex-start;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px"><span style="height:30px;padding:0 10px;border-radius:6px;background:#e8dcc4;color:#8a7c64;display:flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap;flex:none"><lp-i name="{{ b.icon }}" size="14"></lp-i>{{ b.btn }}</span><div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:13.5px;font-weight:600">{{ b.t }}</span><span style="font-size:12.5px;line-height:1.45;color:#3a2f25">{{ b.d }}</span></div></div></sc-for>
+      </div></div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const emptyShelves = [['40px', '52px', '34px', '60px', '44px'], ['50px', '38px', '64px', '42px']];
+    const P = (t) => ({ t, bd: 'none', bg: '#8a3a1c', fg: '#fbf7ec' }), Sx = (t) => ({ t, bd: '0.5px solid #c4b497', bg: 'transparent', fg: '#1a1310' });
+    const errors = [
+      { icon: 'warning', bg: 'rgba(168,58,42,.12)', c: '#a83a2a', t: 'This PDF is damaged', d: 'The file ends early, maybe because a download or copy didn’t finish. Chuvadi can try to rebuild it as a new copy.', file: 'scan-0931.pdf · 2.4 MB', acts: [P('Try to repair (new copy)'), Sx('Show in folder')] },
+      { icon: 'info', bg: 'rgba(196,116,22,.14)', c: '#c47416', t: 'This is a dynamic XFA form', d: 'Its pages exist only inside an Adobe form layer, so there is nothing to draw. Fill it in Acrobat, or flatten it if it has saved data.', file: 'claim-form-2026.pdf · XFA', acts: [P('Flatten to a static PDF'), Sx('Open in another app')] },
+    ];
+    const A = (t, bg) => ({ t, bg });
+    const toasts = [
+      { icon: 'check-circle', t: 'Saved discharge-summary (marked).pdf', d: 'D:\\Records\\Chuvadi\\2026-10', bg: '#1a1310', fg: '#fbf7ec', bar: '#a8bb6e', acts: [A('Open', '#3a2f25'), A('Show in folder', 'transparent')] },
+      { icon: 'warning', t: 'Bound 2 of 3 desks', d: 'Desk 3 · annexure: page 2 is from a file that was moved', bg: '#1a1310', fg: '#fbf7ec', bar: '#e0a050', acts: [A('Find file…', '#3a2f25'), A('Details', 'transparent')] },
+      { icon: 'redact', t: 'Redaction blocked on a tagged PDF', d: 'Text would still be readable underneath. Nothing was saved.', bg: '#fbf7ec', fg: '#1a1310', bar: '#a83a2a', acts: [A('Why?', '#e8dcc4'), A('×', 'transparent')] },
+    ];
+    const jobs = [{ n: 'Desk 1 · discharge-summary', s: 'done · 12 pp', p: '100%', c: '#6b7a3e' }, { n: 'Desk 2 · referral pack', s: '3 of 5 pages', p: '55%', c: '#8a3a1c' }, { n: 'Desk 3 · annexure', s: 'waiting', p: '0%', c: '#8a7c64' }];
+    const skel = [{ n: '1', bg: '#fff' }, { n: '2', bg: '#fff' }, { n: '3', bg: '#f6f4ef' }, { n: '4', bg: '#efece6' }];
+    const blocked = [
+      { icon: 'close', btn: 'Close file', t: '“lab-report.pdf” is still used on 2 desks', d: 'Clear those pages first, or close it anyway and remove its pages from every desk.' },
+      { icon: 'redact', btn: 'Regex presets', t: 'Pattern redaction needs a library update', d: 'Searching by pattern is not reliable yet, so it is switched off to keep data safe. Use text search instead.' },
+      { icon: 'doc-merge', btn: 'Bind', t: 'Nothing on this desk yet', d: 'Drag pages from the shelf, or add a blank page.' },
+      { icon: 'plus', btn: 'Add desk', t: 'You have 30 desks — the maximum', d: 'Bind or remove a desk to make room.' },
+    ];
+    return { emptyShelves, errors, toasts, jobs, skel, blocked };
+  }
+}
+</script>
+</body>
+</html>

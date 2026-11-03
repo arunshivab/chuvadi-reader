@@ -1,0 +1,188 @@
+@namespace ChuvadiReader.Ui.Components.Cards
+@inject IServiceProvider Services
+@implements IDisposable
+@*
+    Print: page range (All / Current / Custom "1-3, 5"), copies, fit to page → IPrintService,
+    which shows the native dialog. Greyed out where the host has no print service.
+*@
+
+<section class="chvd-card @(Available ? null : "unavailable")" aria-label="Print"
+         title="@(Available ? null : UnavailableText)">
+    <header class="head">
+        <span class="title">Print</span>
+        <span class="meta">@MetaText</span>
+        <button type="button" class="close" title="Close" aria-label="Close" @onclick="OnClose">
+            <Icon Name="close" Size="14" />
+        </button>
+    </header>
+
+    <fieldset class="body" disabled="@(!Available || _printing)">
+        <div class="seg" role="radiogroup" aria-label="Pages">
+            <button type="button" role="radio" aria-checked="@(Mode == RangeMode.All ? "true" : "false")" class="@(Mode == RangeMode.All ? "on" : null)" @onclick="() => Mode = RangeMode.All">All</button>
+            <button type="button" role="radio" aria-checked="@(Mode == RangeMode.Current ? "true" : "false")" class="@(Mode == RangeMode.Current ? "on" : null)" @onclick="() => Mode = RangeMode.Current">Current</button>
+            <button type="button" role="radio" aria-checked="@(Mode == RangeMode.Custom ? "true" : "false")" class="@(Mode == RangeMode.Custom ? "on" : null)" @onclick="() => Mode = RangeMode.Custom">Custom</button>
+        </div>
+
+        @if (Mode == RangeMode.Custom)
+        {
+            <label class="field">
+                <span class="input @(RangeError is null ? null : "bad")">
+                    <input type="text" placeholder="1-3, 5" spellcheck="false" aria-label="Pages to print"
+                           @bind="CustomRange" @bind:event="oninput" />
+                </span>
+                @if (RangeError is not null && CustomRange.Trim().Length > 0)
+                {
+                    <span class="error">@RangeError</span>
+                }
+            </label>
+        }
+
+        <div class="row">
+            <span>Copies</span>
+            <span class="stepper">
+                <button type="button" aria-label="Fewer copies" @onclick="() => Copies = Math.Max(1, Copies - 1)">−</button>
+                <span class="count">@Copies</span>
+                <button type="button" aria-label="More copies" @onclick="() => Copies = Math.Min(99, Copies + 1)">+</button>
+            </span>
+        </div>
+        <label class="row">Fit to page
+            <button type="button" role="switch" class="switch" aria-checked="@(FitToPage ? "true" : "false")" @onclick="() => FitToPage = !FitToPage"><span></span></button>
+        </label>
+        <span class="note">Prints the layers as the file sets them. The printer dialog opens next.</span>
+    </fieldset>
+
+    <div class="footer">
+        @if (_printing)
+        {
+            <button type="button" class="secondary" @onclick="Cancel"><Icon Name="close" Size="15" />Cancel printing</button>
+        }
+        else
+        {
+            <button type="button" class="primary" disabled="@(!CanPrint)" title="@(Available ? null : UnavailableText)" @onclick="PrintAsync">
+                <Icon Name="print" Size="16" />@ButtonText
+            </button>
+        }
+    </div>
+</section>
+
+@code {
+    private const string UnavailableText = "Printing isn't available on this platform";
+
+    public enum RangeMode { All, Current, Custom }
+
+    /// <summary>The file to print.</summary>
+    [Parameter] public string? Path { get; set; }
+
+    /// <summary>Supplies the page count for range checking.</summary>
+    [Parameter] public IPdfSession? Session { get; set; }
+
+    /// <summary>Zero-based page in view (for "Current").</summary>
+    [Parameter] public int CurrentPage { get; set; }
+
+    /// <summary>Password for a protected file.</summary>
+    [Parameter] public string? Password { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>Success/error toasts.</summary>
+    [Parameter] public EventCallback<string> OnMessage { get; set; }
+
+    private IPrintService? _print;
+    private CancellationTokenSource? _cts;
+    private bool _printing;
+
+    private RangeMode Mode { get; set; } = RangeMode.All;
+    private string CustomRange { get; set; } = string.Empty;
+    private int Copies { get; set; } = 1;
+    private bool FitToPage { get; set; } = true;
+
+    private IPrintService PrintService =>
+        _print ??= Services.GetService(typeof(IPrintService)) as IPrintService ?? new NoopPrintService();
+
+    private bool Available => PrintService.IsAvailable && !string.IsNullOrEmpty(Path);
+
+    private int? PageCount => Session?.Document.PageCount;
+
+    private string RangeText => Mode switch
+    {
+        RangeMode.All => "all",
+        RangeMode.Current => "current",
+        _ => CustomRange,
+    };
+
+    /// <summary>Pages that will print, or null when the count isn't known.</summary>
+    private IReadOnlyList<int>? SelectedPages =>
+        PageCount is int n && PageRangeParser.TryParse(RangeText, n, CurrentPage, out var pages, out _) ? pages : null;
+
+    private string? RangeError
+    {
+        get
+        {
+            if (Mode != RangeMode.Custom || PageCount is not int n) return null;
+            if (CustomRange.Trim().Length == 0) return "Type pages, e.g. 1-3, 5";
+            return PageRangeParser.TryParse(CustomRange, n, CurrentPage, out _, out var error) ? null : error;
+        }
+    }
+
+    private bool CanPrint => Available && !_printing && RangeError is null;
+
+    private string MetaText => PageCount is int n ? (n == 1 ? "1 page" : $"{n} pages") : string.Empty;
+
+    private string ButtonText
+    {
+        get
+        {
+            if (SelectedPages is { } p)
+            {
+                return p.Count == 1 ? "Print 1 page" : $"Print {p.Count} pages";
+            }
+
+            return "Print";
+        }
+    }
+
+    private async Task PrintAsync()
+    {
+        if (!CanPrint)
+        {
+            return;
+        }
+
+        _cts?.Dispose();
+        var cts = _cts = new CancellationTokenSource();
+        _printing = true;
+        try
+        {
+            var result = await PrintService.PrintAsync(Path!, new PrintRequest
+            {
+                PageRange = RangeText,
+                CurrentPage = CurrentPage,
+                Copies = Copies,
+                FitToPage = FitToPage,
+                Password = Password,
+            }, cts.Token);
+
+            if (result.Outcome != PrintOutcome.Cancelled && !string.IsNullOrEmpty(result.Message))
+            {
+                await OnMessage.InvokeAsync(result.Message!);
+            }
+        }
+        catch (Exception ex)
+        {
+            await OnMessage.InvokeAsync("Couldn't print: " + ex.Message);
+        }
+        finally
+        {
+            _printing = false;
+        }
+    }
+
+    private void Cancel() => _cts?.Cancel();
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+}

@@ -1,0 +1,257 @@
+@*
+    Word (.docx), view-only (D-07). Renders DocxViewService's block model on a paper sheet: header
+    and footer bands, headings, paragraphs, lists, quotes, tables, images, landscape pages.
+    Password-protected files show the unlock card; the password lives only in this component.
+    Counter unit: section (Title + Heading 1–3).
+*@
+@inherits ViewerBase
+@inject DocxViewService Docx
+
+<div class="dv">
+    @if (_locked)
+    {
+        <UnlockCard Kind="document" Error="@_unlockError" Busy="_busy" OnUnlock="UnlockAsync" />
+    }
+    else if (_error is not null)
+    {
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" />
+    }
+    else if (_view is null)
+    {
+        @if (!string.IsNullOrEmpty(Path)) { <ViewerMessage IconName="clock" Text="Opening…" /> }
+    }
+    else
+    {
+        <div class="dv-stage" @ref="_scroll">
+            <article class="dv-sheet @(_view.Landscape ? "ls" : null)" @ref="_page" style="zoom:@Css(Scale)">
+                @if (_view.Header.Count > 0)
+                {
+                    <div class="dv-hf dv-header">
+                        @foreach (var b in _view.Header) { <DocBlockView Block="b" /> }
+                    </div>
+                }
+                @foreach (var item in _items)
+                {
+                    @if (item.Section > 0)
+                    {
+                        <div class="dv-sec" data-sec="@item.Section" data-anchor="@Anchor(item.Section)"><DocBlockView Block="item.Block" /></div>
+                    }
+                    else
+                    {
+                        <DocBlockView Block="item.Block" />
+                    }
+                }
+                @if (_view.Footer.Count > 0)
+                {
+                    <div class="dv-hf dv-footer">
+                        @foreach (var b in _view.Footer) { <DocBlockView Block="b" /> }
+                    </div>
+                }
+            </article>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly record struct Item(WordBlock Block, int Section);
+
+    private WordView? _view;
+    private List<Item> _items = new();
+    private List<ViewerOutlineEntry> _outline = new();
+    private string? _error;
+    private string? _loaded;
+    private string? _password;      // in memory for this tab only
+    private bool _locked, _busy;
+    private string? _unlockError;
+    private int _version;
+    private string? _query;
+    private bool _attach, _highlight;
+    private ElementReference _scroll, _page;
+
+    private int Sections => Math.Max(1, _outline.Count);
+
+    private static string Anchor(int section) => "s" + section.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Path != _loaded)
+        {
+            _loaded = Path;
+            _password = null;
+            _locked = false;
+            _unlockError = null;
+            _query = FindQuery;
+            await LoadAsync();
+            return;
+        }
+        if (FindQuery != _query)
+        {
+            _query = FindQuery;
+            _highlight = _view is not null;
+        }
+    }
+
+    /// <summary>Reloads the current file from disk (e.g. the host picked the same path again).</summary>
+    public Task ReloadAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var v = ++_version;
+        _view = null;
+        _error = null;
+        _items = new();
+        _outline = new();
+        if (string.IsNullOrEmpty(Path)) { _locked = false; return; }
+
+        if (!Path.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+        {
+            _locked = false;
+            _error = "That isn't a Word document. Please choose a .docx file.";
+            await ReportOutlineAsync(_outline);
+            return;
+        }
+
+        var path = Path;
+        var pw = _password;
+        try
+        {
+            _busy = true;
+            var view = await Task.Run(() => Docx.Load(path, pw));
+            if (v != _version || Disposed) return;
+            _locked = false;
+            _unlockError = null;
+            Build(view);
+        }
+        catch (DocumentViewException ex) when (ex.Reason == ViewErrorReason.PasswordProtected)
+        {
+            if (v != _version) return;
+            _locked = true;
+            _unlockError = pw is null ? null : "That password didn't work. Try again.";
+            _password = null;
+        }
+        catch (Exception ex)
+        {
+            if (v != _version) return;
+            if (pw is not null)
+            {
+                _locked = true; // a wrong password can surface as a read failure
+                _unlockError = $"Couldn't open it with that password: {ex.Message}";
+                _password = null;
+            }
+            else
+            {
+                _locked = false;
+                _error = Describe(ex, "document");
+            }
+        }
+        finally
+        {
+            if (v == _version) _busy = false;
+        }
+
+        await ReportOutlineAsync(_outline);
+        await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
+        await ReportStatusAsync(_view is null
+            ? (_locked ? "Word · password-protected" : "Word · couldn't open")
+            : $"{_view.PageSize}{(_view.Landscape ? " · landscape" : "")} · {_view.Blocks.Count} blocks");
+    }
+
+    private void Build(WordView view)
+    {
+        var items = new List<Item>(view.Blocks.Count);
+        var outline = new List<ViewerOutlineEntry>();
+        foreach (var b in view.Blocks)
+        {
+            if (b is WordHeading h)
+            {
+                var title = string.Concat(h.Runs.Select(r => r.Text)).Trim();
+                if (title.Length > 0)
+                {
+                    outline.Add(new ViewerOutlineEntry(title, Math.Clamp(h.Level, 1, 3), Anchor(outline.Count + 1)));
+                    items.Add(new Item(b, outline.Count));
+                    continue;
+                }
+            }
+            items.Add(new Item(b, 0));
+        }
+        _view = view;
+        _items = items;
+        _outline = outline;
+        _attach = true;
+        _highlight = !string.IsNullOrEmpty(FindQuery);
+    }
+
+    private async Task UnlockAsync(string password)
+    {
+        _password = password;
+        _unlockError = null;
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_view is null) return;
+        if (_attach)
+        {
+            _attach = false;
+            await JsVoidAsync("attach", _scroll, Self, "sections");
+        }
+        if (_highlight)
+        {
+            _highlight = false;
+            var n = await JsAsync<int>("highlight", _scroll, _page, FindQuery ?? "");
+            await ReportFindCountAsync(n);
+        }
+    }
+
+    protected override Task HandleScrollAsync(int index) => ReportCounterAsync(index, Sections, ViewerCounter.Section);
+
+    public override async Task GoToAsync(int index)
+    {
+        var n = Math.Clamp(index, 1, Sections);
+        await JsVoidAsync("scrollToSection", _scroll, n);
+        await ReportCounterAsync(n, Sections, ViewerCounter.Section);
+    }
+
+    public override async Task ScrollToAnchorAsync(string anchor)
+    {
+        if (string.IsNullOrEmpty(anchor)) return;
+        await JsVoidAsync("scrollToAnchor", _scroll, anchor);
+        var idx = _outline.FindIndex(o => o.Anchor == anchor);
+        if (idx >= 0) await ReportCounterAsync(idx + 1, Sections, ViewerCounter.Section);
+    }
+
+    /// <summary>Body text: one line per paragraph/heading, table cells tab-separated.</summary>
+    public override string GetAllText()
+    {
+        if (_view is null) return "";
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in _view.Blocks) AppendText(b, sb);
+        return sb.ToString();
+    }
+
+    private static void AppendText(WordBlock b, System.Text.StringBuilder sb)
+    {
+        switch (b)
+        {
+            case WordHeading h: sb.Append(string.Concat(h.Runs.Select(r => r.Text))).Append('\n'); break;
+            case WordPara p: sb.Append(string.Concat(p.Runs.Select(r => r.Text))).Append('\n'); break;
+            case WordTableBlock t:
+                foreach (var row in t.Rows)
+                {
+                    sb.Append(string.Join('\t', row.Cells.Select(CellText))).Append('\n');
+                }
+                break;
+        }
+    }
+
+    private static string CellText(WordCell c)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in c.Content) AppendText(b, sb);
+        return sb.ToString().TrimEnd('\n').Replace('\n', ' ');
+    }
+
+    protected override ValueTask DisposeCoreAsync() =>
+        _view is null ? ValueTask.CompletedTask : new(JsVoidAsync("detach", _scroll));
+}

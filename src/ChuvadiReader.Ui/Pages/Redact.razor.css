@@ -3,12 +3,15 @@
    are replicated here. Visual language matches the Reader. */
 
 .redact-root {
+    /* D-10 Protect › redaction: [strip + canvas + find panel] [Tools rail][View rail] */
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-direction: column;
-    height: 100%;
+    flex-direction: row;
     min-height: 0;
-    background: var(--chvd-surface-mid);
+    background: var(--chvd-canvas);
 }
+.rd-col { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; }
 
 /* ── Top bar ─────────────────────────────────────────────────────────────── */
 .rd-top {
@@ -101,7 +104,7 @@
 .rd-btn.primary { background: var(--chvd-binding); color: #fff; border-color: var(--chvd-binding); }
 
 /* ── Canvas ──────────────────────────────────────────────────────────────── */
-.rd-desk {
+.rd-desk { border-left: none !important; border-right: none !important;
     flex: 1; min-height: 0;
     overflow-y: auto; overflow-x: auto;
     background: var(--chvd-surface-lo);

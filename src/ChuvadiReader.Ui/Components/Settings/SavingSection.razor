@@ -1,0 +1,56 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject SaveFolderService SaveFolders
+@inject IFilePicker Picker
+
+<SettingsSection Title="@SectionTitle" Sub="Where new files go, and what they are called.">
+    <SettingsCard Title="Where files are saved">
+        <SettingRow Label="Save folder" Hint="Bind, Lift, Scatter and other saves default here" Stack="true">
+            <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
+            <RowButton IconName="folder" OnClick="ChangeFolder">Change folder…</RowButton>
+            <RowButton OnClick="ResetFolder" Title="@SaveFolderService.DefaultBaseFolder()">Reset to default</RowButton>
+        </SettingRow>
+        <SettingRow Label="Month subfolder" Hint="@DateTime.Now.ToString("yyyy-MM")">
+            <Toggle Value="SaveFolders.MonthFolders" ValueChanged="v => SaveFolders.SetMonthFoldersAsync(v)" AriaLabel="Month subfolder" />
+        </SettingRow>
+        <SettingRow Label="Date subfolder" Hint="@DateTime.Now.ToString("yyyy-MM-dd")">
+            <Toggle Value="SaveFolders.DateFolders" ValueChanged="v => SaveFolders.SetDateFoldersAsync(v)" AriaLabel="Date subfolder" />
+        </SettingRow>
+        <p class="note">With neither subfolder on, files land directly in the folder. With both on they nest: month, then date.</p>
+    </SettingsCard>
+
+    <SettingsCard Title="When saving">
+        <SettingRow Label="When I press Save" Hint="Marks, stamps and flatten" Soon="true">
+            <Segmented Options="SaveOptions" Value="New copy" />
+        </SettingRow>
+        <SettingRow Label="Name new files" Soon="true">
+            <Segmented Options="NameOptions" Value="-marked" />
+        </SettingRow>
+        <SettingRow Label="Keep recent files list" Soon="true" SoonText="Always on in this version">
+            <Segmented Options="OnOffOptions" Value="On" />
+        </SettingRow>
+        <SettingRow Label="Autosave drafts" Hint="Recover unsaved marks after a crash" Soon="true">
+            <Toggle Value="false" />
+        </SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    [Parameter] public int Rev { get; set; }
+
+    private const string SectionTitle = "Saving & files";
+
+    private static readonly IReadOnlyList<SegOption> SaveOptions = SegOption.Of("Ask", "New copy", "Overwrite");
+    private static readonly IReadOnlyList<SegOption> NameOptions = SegOption.Of("-marked", "(copy)", "Ask");
+    private static readonly IReadOnlyList<SegOption> OnOffOptions = SegOption.Of("On", "Off");
+
+    private async Task ChangeFolder()
+    {
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            await SaveFolders.SetBaseFolderAsync(folder);
+        }
+    }
+
+    private Task ResetFolder() => SaveFolders.SetBaseFolderAsync(null);
+}

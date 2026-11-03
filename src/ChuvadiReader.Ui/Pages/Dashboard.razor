@@ -1,116 +1,217 @@
 @page "/"
+@using ChuvadiReader.Ui.Components.Home
 @implements IDisposable
 @inject NavigationManager Nav
+@inject ShellService Shell
 @inject RecentFilesService Recents
 @inject PinnedService Pins
 @inject WatchedFolderService Watched
 @inject UserProfileService Profile
 @inject IFilePicker Picker
-@inject OpenDocumentService OpenDoc
+@inject TabsService Tabs
 @inject LibraryService Lib
 @inject CategoryService Categories
+@inject SaveFolderService SaveFolders
+@inject PreferencesService Prefs
 
-<PageTitle>Chuvadi · Dashboard</PageTitle>
+<PageTitle>Chuvadi · Home</PageTitle>
 
-<div class="dash">
+<div class="home">
 
-    <section class="greet">
-        <div class="eyebrow"><Icon Name="clock" Size="12" /> @DateTime.Now.ToString("dddd").ToLowerInvariant() · @DateTime.Now.ToString("HH:mm") · workspace ready</div>
-        <h1 class="greet-line">@Greeting@(NameSuffix) <span class="ta">வணக்கம்.</span></h1>
-        <div class="greet-blurb">@Recents.Items.Count documents in your library · @Recents.EncryptedCount encrypted · nothing leaves this device.</div>
-    </section>
+    <div class="main">
+        <section class="greet">
+            <div class="eyebrow"><Icon Name="clock" Size="12" /> @DayLine · workspace ready</div>
+            <h1 class="greet-line" tabindex="-1">
+                <span>@Greeting</span>
+                @if (Prefs.ShowTamilGreeting)
+                {
+                    <span class="ta" lang="ta">வணக்கம்.</span>
+                }
+            </h1>
+            <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · nothing leaves this device.</p>
+        </section>
 
-    <div class="grid">
-
-        <button class="tile drop" @onclick="OpenFile">
-            <Icon Name="upload" Size="28" />
-            <div class="drop-title">Drop a document, or click to fetch</div>
-            <div class="chips"><span class="chip">pdf</span><span class="chip">docx</span><span class="chip">xlsx</span></div>
-        </button>
-
-        <div class="tile">
-            <div class="tile-eye"><Icon Name="folder-search" Size="13" /> watched folder</div>
-            <div class="path">@Watched.FolderPath</div>
-            <div class="sub">@Watched.DocumentCount documents found · scanned @Relative(Watched.LastScanned)</div>
-            <div class="mini-actions">
-                <button class="mini accent">change</button>
-                <button class="mini"><Icon Name="plus" Size="11" /> add folder</button>
+        @if (IsFirstRun)
+        {
+            <div class="drop first">
+                <span class="drop-ic"><Icon Name="upload" Size="34" /></span>
+                <span class="drop-title">Drop your first document here</span>
+                <span class="drop-sub">PDF, Word or Excel — even password-protected ones.</span>
+                <span class="first-actions">
+                    <button type="button" class="btn primary" @onclick="OpenFile">Open a file…</button>
+                    <button type="button" class="btn" @onclick="ChooseLibraryFolder">Choose a library folder</button>
+                </span>
             </div>
-        </div>
+            <p class="tip">Tip: Ctrl K finds any file or action. Try typing “merge”.</p>
+        }
+        else
+        {
+            <button type="button" class="drop" @onclick="OpenFile" title="Drop a file anywhere on the window, or click to choose one">
+                <span class="drop-ic"><Icon Name="upload" Size="28" /></span>
+                <span class="drop-title">Drop a document, or click to open</span>
+                <span class="chips">
+                    <span class="chip on">pdf</span>
+                    <span class="chip">docx</span>
+                    <span class="chip">xlsx</span>
+                    <span class="chip">md · txt · html</span>
+                    <span class="chip">password-protected too</span>
+                </span>
+            </button>
+        }
 
-        <div class="tile span-all">
-            <div class="tile-eye"><Icon Name="tools" Size="13" /> tools</div>
-            <div class="tools">
-                <button class="act" @onclick='() => Nav.NavigateTo("/reader")'><Icon Name="file-pdf" Size="19" /><span>Reader</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/bench")'><Icon Name="grid-view" Size="19" /><span>Bench</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/library")'><Icon Name="library" Size="19" /><span>Library</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/merge")'><Icon Name="merge" Size="19" /><span>Merge</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/split")'><Icon Name="split" Size="19" /><span>Split</span></button>
-                <button class="act" @onclick="OpenFile" title="Open a PDF, then Compress (Press) in the toolbar"><Icon Name="compress" Size="19" /><span>Compress</span></button>
-                <button class="act" @onclick='() => Nav.NavigateTo("/redact")'><Icon Name="redact" Size="19" /><span>Redact</span></button>
-                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="edit" Size="19" /><span>Sign</span></button>
-                <button class="act v2" disabled><span class="v2tag">v2</span><Icon Name="ocr" Size="19" /><span>OCR</span></button>
-            </div>
-        </div>
+        @if (ResumeTabs.Count > 0)
+        {
+            <section class="block">
+                <h2 class="eye">Pick up where you left off</h2>
+                <div class="resume">
+                    @foreach (var t in ResumeTabs)
+                    {
+                        <button type="button" class="rcard" @key="t.Id" @onclick="() => OpenTab(t)" title="@t.Path">
+                            <span class="mini-page" aria-hidden="true">
+                                <span class="mp-head fmt-@FmtClass(t.Format)"></span>
+                                <span class="mp-line"></span><span class="mp-line"></span><span class="mp-line short"></span>
+                                <span class="mp-block"></span><span class="mp-line"></span>
+                            </span>
+                            <span class="rc-text">
+                                <span class="rc-name">@t.FileName</span>
+                                <span class="rc-where">@WhereStopped(t)</span>
+                                <span class="rc-mode">@ModeWord(t)<span class="rc-when">@WhenFor(t.Path)</span></span>
+                            </span>
+                        </button>
+                    }
+                </div>
+            </section>
+        }
 
-        <div class="tile span-all smap">
-            <div class="tile-eye"><Icon Name="grid-view" Size="13" /> storage map <span class="lib-folder">@Categories.BaseFolder</span> <span class="lib-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span></div>
+        @if (Recents.Items.Count > 0)
+        {
+            <section class="block">
+                <h2 class="eye">Recent</h2>
+                <div class="recent">
+                    @foreach (var r in Recents.Items.Take(RecentCount))
+                    {
+                        <button type="button" class="rrow" @onclick="() => OpenRecent(r)" title="@r.Path">
+                            <span class="r-ic fmt-@FmtClass(r.Format)"><Icon Name="@r.Format.IconName()" Size="16" /></span>
+                            <span class="r-name">@r.FileName</span>
+                            <span class="r-lock">
+                                @if (r.IsEncrypted)
+                                {
+                                    <Icon Name="lock" Size="11" /><span>encrypted</span>
+                                }
+                            </span>
+                            <span class="r-when">@HomeFormat.Relative(r.LastOpened)</span>
+                        </button>
+                    }
+                </div>
+            </section>
+        }
 
+        <section class="block smap">
+            <h2 class="eye smap-head">
+                <span>Storage map</span>
+                <span class="smap-folder" title="@Categories.BaseFolder">@Categories.BaseFolder</span>
+                <span class="smap-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+            </h2>
             <div class="smap-grid">
                 @foreach (var c in Categories.Categories)
                 {
                     var stat = StatFor(c.Name);
-                    <button class="scat" @onclick="() => OpenCategory(c.Name)">
-                        <div class="scat-top"><span class="scat-dot" style="background:@c.Color"></span><span class="scat-name">@c.Name</span></div>
-                        <div class="scat-meta">@stat.Count doc@(stat.Count == 1 ? "" : "s") · @Size(stat.Bytes)</div>
-                        <div class="scat-bar"><div class="scat-fill" style="width:@stat.Pct%;background:@c.Color"></div></div>
+                    <button type="button" class="scat" @onclick="() => OpenCategory(c.Name)" title="Open @c.Name in the Library">
+                        <span class="scat-top"><span class="scat-dot" style="background:@c.Color"></span><span class="scat-name">@c.Name</span></span>
+                        <span class="scat-meta">@stat.Count doc@(stat.Count == 1 ? "" : "s") · @HomeFormat.Size(stat.Bytes)</span>
+                        <span class="scat-bar"><span class="scat-fill" style="width:@(stat.Pct)%;background:@c.Color"></span></span>
                     </button>
                 }
             </div>
+            <button type="button" class="link" @onclick='() => Nav.NavigateTo("/library")'>Open library <Icon Name="chevron-right" Size="13" /></button>
+        </section>
+    </div>
 
-            <button class="smap-open" @onclick='() => Nav.NavigateTo("/library")'>Open library <Icon Name="chevron-right" Size="13" /></button>
-        </div>
-
-        <div class="tile">
-            <div class="tile-eye"><Icon Name="pin" Size="13" /> pinned</div>
+    <aside class="side">
+        <section class="side-block">
+            <h2 class="eye"><Icon Name="pin" Size="12" /> Pinned</h2>
+            @if (Pins.Items.Count == 0)
+            {
+                <span class="muted">Nothing pinned yet.</span>
+            }
             @foreach (var p in Pins.Items)
             {
-                <div class="row">
-                    <span class="@(p.IsFolder ? "ic-folder" : "ic-pdf")"><Icon Name="@(p.IsFolder ? "folder" : (p.Format ?? DocumentFormat.Pdf).IconName())" Size="17" /></span>
-                    <div class="row-name">@p.Name</div>
-                    <span class="ic-pin"><Icon Name="pin" Size="12" /></span>
-                </div>
+                if (p.IsFolder)
+                {
+                    <div class="prow" title="@p.Path">
+                        <span class="p-ic folder"><Icon Name="folder" Size="17" /></span>
+                        <span class="p-name">@p.Name</span>
+                    </div>
+                }
+                else
+                {
+                    var fmt = p.Format ?? DocumentFormat.Pdf;
+                    <button type="button" class="prow" title="@p.Path" @onclick="() => OpenPinned(p)">
+                        <span class="p-ic fmt-@FmtClass(fmt)"><Icon Name="@fmt.IconName()" Size="17" /></span>
+                        <span class="p-name">@p.Name</span>
+                    </button>
+                }
             }
-        </div>
+        </section>
 
-        <div class="tile">
-            <div class="tile-eye"><Icon Name="clock" Size="13" /> recent</div>
-            @foreach (var r in Recents.Items.Take(4))
-            {
-                <button class="row" @onclick="() => Open(r)">
-                    <span class="ic-pdf"><Icon Name="@r.Format.IconName()" Size="16" /></span>
-                    <div class="row-name">@r.FileName</div>
-                    <span class="meta">
-                        @if (r.IsEncrypted)
+        <button type="button" class="shelf" @onclick='() => Nav.NavigateTo("/library")'>
+            <span class="eye shelf-head">
+                <Icon Name="library" Size="12" /> Library
+                <span class="shelf-meta" title="@Lib.FolderPath">@ShortFolder(Lib.FolderPath) · @(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+            </span>
+            <span class="shelf-wrap" aria-hidden="true">
+                <span class="books">
+                    @if (Books.Count == 0)
+                    {
+                        @foreach (var w in EmptyBooks)
                         {
-                            <span class="enc"><Icon Name="lock" Size="10" /></span>
+                            <span class="book empty" style="width:@(w)px"></span>
                         }
-                        @Relative(r.LastOpened)
-                    </span>
-                </button>
-            }
-        </div>
+                    }
+                    else
+                    {
+                        @foreach (var b in Books)
+                        {
+                            <span class="book" style="width:@(b.W)px;height:@(b.H)px;background:@b.Color"></span>
+                        }
+                    }
+                </span>
+                <span class="plank"></span>
+            </span>
+            <span class="shelf-go">@(Books.Count == 0 ? "Your shelves are empty — open the Library" : "Open the shelves") <Icon Name="chevron-right" Size="13" /></span>
+        </button>
 
-    </div>
+        <section class="watch">
+            <h2 class="eye"><Icon Name="folder" Size="12" /> Watched folder</h2>
+            <span class="w-path" title="@Watched.FolderPath">@Watched.FolderPath</span>
+            <span class="w-sub">@Watched.DocumentCount documents found · scanned @HomeFormat.Relative(Watched.LastScanned)</span>
+            <span class="w-actions">
+                <button type="button" class="mini accent" @onclick="ChangeWatched">change</button>
+                <button type="button" class="mini" disabled title="Coming soon — one watched folder for now"><Icon Name="plus" Size="11" /> add folder</button>
+            </span>
+        </section>
+    </aside>
+
 </div>
 
 @code {
+    private const int RecentCount = 4;
+    private static readonly int[] EmptyBooks = { 16, 22, 14, 26, 18, 20, 15, 24, 17 };
+
+    private Timer? _clock;
+    private Task _restore = Task.CompletedTask;
+
     protected override void OnInitialized()
     {
         Recents.Changed += OnChanged;
         Pins.Changed += OnChanged;
         Watched.Changed += OnChanged;
         Lib.Changed += OnChanged;
+        Tabs.Changed += OnChanged;
+        Prefs.Changed += OnChanged;
+
+        // Keep the eyebrow clock current while Home is open.
+        _clock = new Timer(_ => OnChanged(), null, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -121,12 +222,147 @@
         }
 
         await Profile.HydrateAsync();
+        if (!Prefs.IsHydrated)
+        {
+            await Prefs.HydrateAsync();
+        }
+
         await Recents.HydrateAsync();
         await Pins.HydrateAsync();
         await Watched.HydrateAsync();
-        await Lib.HydrateAsync();
         await InvokeAsync(StateHasChanged);
+
+        // Rebuild last session's tabs (idempotent; only the active tab's file opens) so the
+        // resume cards can show where you stopped. The library scan runs alongside.
+        _restore = Tabs.RestoreAsync();
+        await Lib.HydrateAsync();
     }
+
+    // ── Greeting ─────────────────────────────────────────────────────────
+
+    private static string DayLine => DateTime.Now.ToString("dddd d MMM yyyy · HH:mm");
+
+    private string Greeting
+    {
+        get
+        {
+            var h = DateTime.Now.Hour;
+            var part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+            return string.IsNullOrWhiteSpace(Profile.Name) ? $"Good {part}." : $"Good {part}, {Profile.Name}.";
+        }
+    }
+
+    private string LibCountText
+    {
+        get
+        {
+            var n = Lib.Entries.Count;
+            return n == 1 ? "1 document" : $"{n} documents";
+        }
+    }
+
+    private bool IsFirstRun => Recents.Items.Count == 0 && Tabs.Tabs.Count == 0;
+
+    // ── Resume cards ─────────────────────────────────────────────────────
+
+    /// <summary>Open tabs, the active one first, three at most.</summary>
+    private IReadOnlyList<ReaderTab> ResumeTabs
+    {
+        get
+        {
+            var list = new List<ReaderTab>(3);
+            if (Tabs.Active is { } a)
+            {
+                list.Add(a);
+            }
+
+            foreach (var t in Tabs.Tabs)
+            {
+                if (list.Count == 3)
+                {
+                    break;
+                }
+
+                if (!ReferenceEquals(t, Tabs.Active))
+                {
+                    list.Add(t);
+                }
+            }
+
+            return list;
+        }
+    }
+
+    private static string WhereStopped(ReaderTab t)
+    {
+        if (t.Error is not null)
+        {
+            return "Couldn't open — check the file";
+        }
+
+        if (t.Format != DocumentFormat.Pdf)
+        {
+            return $"{t.Format.Label()} · read-only";
+        }
+
+        return t.Session is { } s ? $"Page {t.CurrentPage} of {s.Document.PageCount}" : $"Page {t.CurrentPage}";
+    }
+
+    /// <summary>The tab's last mode as a verb (Reading, Marking, Arranging, Protecting).</summary>
+    private string ModeWord(ReaderTab t) => ShellService.Gerund(Shell.ModeFor(t.Id));
+
+    private string WhenFor(string path)
+    {
+        var r = Recents.Items.FirstOrDefault(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase));
+        return r is null ? "open" : HomeFormat.Relative(r.LastOpened);
+    }
+
+    private static string FmtClass(DocumentFormat f) => f switch
+    {
+        DocumentFormat.Docx => "docx",
+        DocumentFormat.Xlsx => "xlsx",
+        DocumentFormat.Pdf => "pdf",
+        _ => "text",
+    };
+
+    // ── Library shelf preview ────────────────────────────────────────────
+
+    private sealed record Book(int W, int H, string Color);
+
+    private IReadOnlyList<Book> Books
+    {
+        get
+        {
+            var order = Categories.Categories.Select((c, i) => (c.Name, i)).ToDictionary(x => x.Name, x => x.i, StringComparer.OrdinalIgnoreCase);
+            return Lib.Entries
+                .OrderBy(e => e.Category is not null && order.TryGetValue(e.Category, out var i) ? i : int.MaxValue)
+                .ThenByDescending(e => e.Modified)
+                .Take(14)
+                .Select(e =>
+                {
+                    var pages = e.Pages ?? 10;
+                    return new Book(
+                        (int)Math.Round(Math.Min(30, 12 + pages * 0.25)),
+                        (int)Math.Round(70 + Math.Min(24, pages * 0.3)),
+                        e.CategoryColor ?? "var(--chvd-ink-muted)");
+                })
+                .ToList();
+        }
+    }
+
+    private static string ShortFolder(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+            return "—";
+        }
+
+        var trimmed = System.IO.Path.TrimEndingDirectorySeparator(path);
+        var name = System.IO.Path.GetFileName(trimmed);
+        return string.IsNullOrEmpty(name) ? trimmed : name;
+    }
+
+    // ── Storage map ──────────────────────────────────────────────────────
 
     private (int Count, long Bytes, int Pct) StatFor(string category)
     {
@@ -160,31 +396,7 @@
     private void OpenCategory(string category)
         => Nav.NavigateTo($"/library?cat={Uri.EscapeDataString(category)}");
 
-    private static string Size(long bytes)
-    {
-        string[] units = { "B", "KB", "MB", "GB" };
-        double s = bytes;
-        var i = 0;
-        while (s >= 1024 && i < units.Length - 1)
-        {
-            s /= 1024;
-            i++;
-        }
-
-        return $"{s:0.#} {units[i]}";
-    }
-
-    private string Greeting
-    {
-        get
-        {
-            var h = DateTime.Now.Hour;
-            var part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
-            return $"good {part}";
-        }
-    }
-
-    private string NameSuffix => string.IsNullOrWhiteSpace(Profile.Name) ? "." : $", {Profile.Name!.ToLowerInvariant()}.";
+    // ── Actions ──────────────────────────────────────────────────────────
 
     private async Task OpenFile()
     {
@@ -194,46 +406,62 @@
             return;
         }
 
-        var name = System.IO.Path.GetFileName(path);
-        await Recents.TouchAsync(new RecentItem(name, path, DocumentFormatExtensions.FromPath(path), DateTimeOffset.Now, false));
-        OpenDoc.Request(path, name);
+        await OpenPathAsync(path, System.IO.Path.GetFileName(path), DocumentFormatExtensions.FromPath(path), encrypted: false);
+    }
+
+    private Task OpenRecent(RecentItem r) => OpenPathAsync(r.Path, r.FileName, r.Format, r.IsEncrypted);
+
+    private Task OpenTab(ReaderTab t) => OpenPathAsync(t.Path, t.FileName, t.Format, IsEncrypted(t.Path));
+
+    private Task OpenPinned(PinnedItem p)
+    {
+        var fmt = p.Format ?? DocumentFormatExtensions.FromPath(p.Path);
+        return OpenPathAsync(p.Path, p.Name, fmt, IsEncrypted(p.Path));
+    }
+
+    private bool IsEncrypted(string path)
+        => Recents.Items.FirstOrDefault(i => string.Equals(i.Path, path, StringComparison.OrdinalIgnoreCase))?.IsEncrypted ?? false;
+
+    /// <summary>Open (or focus) the file as a tab, remember it in Recent, then show the Reader.</summary>
+    private async Task OpenPathAsync(string path, string name, DocumentFormat format, bool encrypted)
+    {
+        // Let a session restore that is still running finish first, so the same file can't
+        // end up in two tabs.
+        try { await _restore; } catch { /* a failed restore must not block opening */ }
+
+        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, encrypted));
+        await Tabs.OpenAsync(path, name, format);
         Nav.NavigateTo("/reader");
     }
 
-    private void Open(RecentItem r)
+    private async Task ChangeWatched()
     {
-        OpenDoc.Request(r.Path, r.FileName);
-        Nav.NavigateTo("/reader");
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
+        {
+            await Watched.SetFolderAsync(folder);
+        }
     }
 
-    private static string Relative(DateTimeOffset? when)
+    private async Task ChooseLibraryFolder()
     {
-        if (when is null)
+        var folder = await Picker.PickFolderAsync();
+        if (folder is not null)
         {
-            return "never";
+            await SaveFolders.SetBaseFolderAsync(folder); // LibraryService rescans on this change
         }
-
-        var d = DateTimeOffset.Now - when.Value;
-        if (d.TotalMinutes < 60)
-        {
-            return $"{Math.Max(1, (int)d.TotalMinutes)}m";
-        }
-
-        if (d.TotalHours < 24)
-        {
-            return $"{(int)d.TotalHours}h";
-        }
-
-        return d.TotalDays < 2 ? "yesterday" : $"{(int)d.TotalDays}d";
     }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
+        _clock?.Dispose();
         Recents.Changed -= OnChanged;
         Pins.Changed -= OnChanged;
         Watched.Changed -= OnChanged;
         Lib.Changed -= OnChanged;
+        Tabs.Changed -= OnChanged;
+        Prefs.Changed -= OnChanged;
     }
 }

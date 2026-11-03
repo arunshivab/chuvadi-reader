@@ -1,0 +1,119 @@
+@namespace ChuvadiReader.Ui.Components.Cards
+@using System.Globalization
+@*
+    Measure readout. The host draws the ruler on the page, calls MeasureService.Measure
+    (or MeasurePolyline) with the two page-fraction points, and passes the result in.
+    The card only displays it: distance, scale (file viewport scale or 1:1) and angle.
+*@
+
+<section class="chvd-card" aria-label="Measure">
+    <header class="head">
+        <span class="title">Measure</span>
+        <span class="meta">@MetaText</span>
+        <button type="button" class="close" title="Close" aria-label="Close" @onclick="OnClose">
+            <Icon Name="close" Size="14" />
+        </button>
+    </header>
+
+    @if (Measurement is null && Polyline is null)
+    {
+        <div class="empty">
+            <Icon Name="measure-tool" Size="16" />
+            <span>Drag across the page to measure.</span>
+        </div>
+    }
+    else
+    {
+        <dl class="grid">
+            @if (Measurement is { } m)
+            {
+                <dt>distance</dt>
+                <dd>@Distance(m)</dd>
+                @if (m.ScaleSource == MeasureScaleSource.FromFile)
+                {
+                    <dt>on paper</dt>
+                    <dd>@Paper(m.PaperMm, m.PaperIn)</dd>
+                }
+                <dt>scale</dt>
+                <dd title="@ScaleTitle(m.ScaleSource)">@m.ScaleLabel</dd>
+                <dt>angle</dt>
+                <dd>@m.AngleLabel</dd>
+            }
+            @if (Polyline is { } p)
+            {
+                <dt>@(p.Closed ? "perimeter" : "length")</dt>
+                <dd>@(p.FileLengthFormatted ?? Paper(p.PaperLengthMm, p.PaperLengthIn))</dd>
+                @if (p.AreaLabel is not null)
+                {
+                    <dt>area</dt>
+                    <dd>@(p.FileAreaFormatted ?? Area(p))</dd>
+                }
+                @if (Measurement is null)
+                {
+                    <dt>scale</dt>
+                    <dd title="@ScaleTitle(p.ScaleSource)">@p.ScaleLabel</dd>
+                }
+            }
+        </dl>
+
+        <div class="actions">
+            <div class="units" role="group" aria-label="Units">
+                <button type="button" class="@(Inches ? null : "on")" aria-pressed="@(Inches ? "false" : "true")" @onclick="() => Inches = false">mm</button>
+                <button type="button" class="@(Inches ? "on" : null)" aria-pressed="@(Inches ? "true" : "false")" @onclick="() => Inches = true">in</button>
+            </div>
+            @if (OnClear.HasDelegate)
+            {
+                <button type="button" class="link" @onclick="OnClear">Clear</button>
+            }
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter] public string? Path { get; set; }
+
+    [Parameter] public IPdfSession? Session { get; set; }
+
+    [Parameter] public int CurrentPage { get; set; }
+
+    /// <summary>The latest straight-line measurement (null = nothing measured yet).</summary>
+    [Parameter] public MeasureResult? Measurement { get; set; }
+
+    /// <summary>Optional polyline/area measurement.</summary>
+    [Parameter] public PolylineMeasureResult? Polyline { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    [Parameter] public EventCallback<string> OnMessage { get; set; }
+
+    /// <summary>When set, a "Clear" link is shown.</summary>
+    [Parameter] public EventCallback OnClear { get; set; }
+
+    private bool Inches { get; set; }
+
+    private string MetaText =>
+        Measurement is { } m ? $"page {m.PageIndex + 1}"
+        : Polyline is { } p ? $"page {p.PageIndex + 1}"
+        : Session is null ? string.Empty : $"page {CurrentPage + 1}";
+
+    private string Distance(MeasureResult m)
+    {
+        if (m.ScaleSource == MeasureScaleSource.FromFile && m.FileFormatted is not null)
+        {
+            return m.FileFormatted;
+        }
+
+        return Inches ? Fmt(m.DistanceIn, "0.00") + " in" : Fmt(m.DistanceMm, "0.0") + " mm";
+    }
+
+    private string Paper(double mm, double inch) => Inches ? Fmt(inch, "0.00") + " in" : Fmt(mm, "0.0") + " mm";
+
+    private string Area(PolylineMeasureResult p) =>
+        Inches ? Fmt(p.PaperAreaIn2 ?? 0, "0.00") + " in²" : Fmt(p.PaperAreaMm2 ?? 0, "0.0") + " mm²";
+
+    private static string ScaleTitle(MeasureScaleSource s) => s == MeasureScaleSource.FromFile
+        ? "The drawing's own scale, read from the file"
+        : "The file sets no scale: 1 : 1 of the printed page";
+
+    private static string Fmt(double v, string f) => v.ToString(f, CultureInfo.InvariantCulture);
+}

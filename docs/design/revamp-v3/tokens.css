@@ -1,0 +1,182 @@
+/*
+ * Chuvadi Reader — Design tokens for the revamp (drop-in replacement for wwwroot/css/tokens.css)
+ *
+ * Keeps every existing --chvd-* name so current components keep working, and adds:
+ *   --chvd-on-accent   text/icon colour on binding-red buttons
+ *   --chvd-danger      destructive text (Delete, Remove)
+ *   --chvd-page        rendered PDF page background (always white — themes never tint the page)
+ *   --chvd-canvas      the surface pages sit on (= surface-lo)
+ *   --chvd-highlight-* annotation highlight colours (Mark)
+ * Five themes: light (Cream paper), dark (Night paper), palm, indigo, contrast.
+ */
+
+:root,
+[data-theme="light"] {               /* Cream paper — default */
+    --chvd-surface-hi:   #fbf7ec;    /* title bar, panels, cards, leaf bar */
+    --chvd-surface-mid:  #f2ead6;    /* app background, mode bar, page ribbon */
+    --chvd-surface-lo:   #e8dcc4;    /* canvas behind pages, segmented-control track */
+    --chvd-paper: var(--chvd-surface-hi); --chvd-paper-warm: var(--chvd-surface-mid); --chvd-paper-deep: var(--chvd-surface-lo);
+    --chvd-ink:          #1a1310;
+    --chvd-ink-soft:     #3a2f25;
+    --chvd-ink-muted:    #8a7c64;    /* meta text only (3.9:1) — never body copy */
+    --chvd-border:       #c4b497;
+    --chvd-border-soft:  #d9cdb4;
+    --chvd-binding:      #8a3a1c;    /* accent */
+    --chvd-binding-soft: rgba(138, 58, 28, 0.12);
+    --chvd-on-accent:    #fbf7ec;
+    --chvd-marigold:     #c47416;
+    --chvd-marigold-glow: rgba(196, 116, 22, 0.30);
+    --chvd-olive:        #6b7a3e;
+    --chvd-success:      #5d7a3a;
+    --chvd-warn:         #a6651d;
+    --chvd-error:        #a83a2a;
+    --chvd-danger:       #a83a2a;
+}
+
+[data-theme="dark"] {                /* Night paper */
+    --chvd-surface-hi:   #241b15;
+    --chvd-surface-mid:  #1b1410;
+    --chvd-surface-lo:   #100b08;
+    --chvd-ink:          #f2ead6;
+    --chvd-ink-soft:     #d9cdb4;
+    --chvd-ink-muted:    #a3957c;
+    --chvd-border:       #4a3c2f;
+    --chvd-border-soft:  #33281f;
+    --chvd-binding:      #e08a52;
+    --chvd-binding-soft: rgba(224, 138, 82, 0.18);
+    --chvd-on-accent:    #1b1410;
+    --chvd-marigold:     #e0a050;
+    --chvd-marigold-glow: rgba(224, 160, 80, 0.30);
+    --chvd-olive:        #a8bb6e;
+    --chvd-success:      #a8bb6e;
+    --chvd-warn:         #e0a050;
+    --chvd-error:        #f08a72;
+    --chvd-danger:       #f08a72;
+}
+
+[data-theme="palm"] {                /* Palm leaf */
+    --chvd-surface-hi:   #f6f2e1;
+    --chvd-surface-mid:  #ebe5c9;
+    --chvd-surface-lo:   #dcd3ae;
+    --chvd-ink:          #1d2112;
+    --chvd-ink-soft:     #3a4025;
+    --chvd-ink-muted:    #6f7050;
+    --chvd-border:       #b5ab80;
+    --chvd-border-soft:  #d0c79f;
+    --chvd-binding:      #4a6624;
+    --chvd-binding-soft: rgba(74, 102, 36, 0.13);
+    --chvd-on-accent:    #f6f2e1;
+    --chvd-marigold:     #b5821f;
+    --chvd-marigold-glow: rgba(181, 130, 31, 0.30);
+    --chvd-olive:        #7d5f1c;
+    --chvd-success:      #4a6624;
+    --chvd-warn:         #b5821f;
+    --chvd-error:        #a83a2a;
+    --chvd-danger:       #a83a2a;
+}
+
+[data-theme="indigo"] {              /* Indigo ink */
+    --chvd-surface-hi:   #f8f9fc;
+    --chvd-surface-mid:  #edf0f6;
+    --chvd-surface-lo:   #dfe4ee;
+    --chvd-ink:          #121829;
+    --chvd-ink-soft:     #2f3851;
+    --chvd-ink-muted:    #5f6886;
+    --chvd-border:       #b8c0d4;
+    --chvd-border-soft:  #d3d9e6;
+    --chvd-binding:      #2c3e8c;
+    --chvd-binding-soft: rgba(44, 62, 140, 0.11);
+    --chvd-on-accent:    #f8f9fc;
+    --chvd-marigold:     #b8691a;
+    --chvd-marigold-glow: rgba(184, 105, 26, 0.30);
+    --chvd-olive:        #3f7566;
+    --chvd-success:      #3f7566;
+    --chvd-warn:         #b8691a;
+    --chvd-error:        #a83a2a;
+    --chvd-danger:       #a83a2a;
+}
+
+[data-theme="contrast"] {            /* High contrast — kiosk & low vision */
+    --chvd-surface-hi:   #ffffff;
+    --chvd-surface-mid:  #f5f5f2;
+    --chvd-surface-lo:   #e3e3dd;
+    --chvd-ink:          #000000;
+    --chvd-ink-soft:     #111111;
+    --chvd-ink-muted:    #3d3d3d;
+    --chvd-border:       #1a1a1a;
+    --chvd-border-soft:  #6b6b6b;
+    --chvd-binding:      #7a240c;
+    --chvd-binding-soft: rgba(122, 36, 12, 0.16);
+    --chvd-on-accent:    #ffffff;
+    --chvd-marigold:     #8a4f00;
+    --chvd-marigold-glow: rgba(138, 79, 0, 0.30);
+    --chvd-olive:        #2f5212;
+    --chvd-success:      #2f5212;
+    --chvd-warn:         #8a4f00;
+    --chvd-error:        #9b1c0c;
+    --chvd-danger:       #9b1c0c;
+    --chvd-stroke:       1px;        /* hairlines become real lines */
+}
+
+:root {
+    /* Fixed across themes */
+    --chvd-page:   #ffffff;
+    --chvd-canvas: var(--chvd-surface-lo);
+    --chvd-highlight-yellow: rgba(232, 190, 60, 0.55);
+    --chvd-highlight-blue:   rgba(120, 170, 220, 0.45);
+    --chvd-highlight-green:  rgba(143, 192, 122, 0.45);
+    --chvd-highlight-pink:   rgba(229, 154, 154, 0.45);
+    --chvd-find-hit:         rgba(196, 116, 22, 0.32);
+    --chvd-redact-box:       #111111;
+    --chvd-scrim:            rgba(26, 19, 16, 0.32);
+    --chvd-selection-bar:    #1a1310;   /* dark floating action bars (Arrange selection, page hover strip) */
+
+    /* Type */
+    --chvd-serif-display: "Instrument Serif", Georgia, serif;   /* titles, the four verbs (italic), section heads */
+    --chvd-serif-body:    "Fraunces", Georgia, serif;           /* intro/blurb copy only */
+    --chvd-tamil:         "Tiro Tamil", "Noto Serif Tamil", serif;
+    --chvd-mono:          "IBM Plex Mono", ui-monospace, monospace; /* file names, numbers, eyebrows, kbd */
+    --chvd-sans-display:  "LiPi Sans", system-ui, sans-serif;   /* all UI text */
+
+    /* Type scale (px) */
+    --chvd-fs-eyebrow: 10.5px;  /* mono, uppercase, letter-spacing .14em */
+    --chvd-fs-meta:    11px;
+    --chvd-fs-small:   12.5px;
+    --chvd-fs-body:    13px;
+    --chvd-fs-ui:      13.5px;
+    --chvd-fs-title-s: 20px;    /* panel / card titles (serif) */
+    --chvd-fs-title:   22px;
+    --chvd-fs-verb:    21px;    /* mode switch, serif italic */
+    --chvd-fs-h1:      36px;
+
+    /* Geometry */
+    --chvd-radius-sm: 4px;
+    --chvd-radius:    6px;      /* buttons, inputs */
+    --chvd-radius-md: 8px;      /* tabs, cards */
+    --chvd-radius-lg: 10px;     /* panels, popovers */
+    --chvd-radius-xl: 12px;     /* dialogs, floating bars */
+    --chvd-stroke:    0.5px;
+
+    /* Layout */
+    --chvd-titlebar-h: 46px;
+    --chvd-modebar-h:  52px;
+    --chvd-statusbar-h: 30px;
+    --chvd-ribbon-w:   176px;   /* 214px in Arrange (shelf) */
+    --chvd-margin-w:   296px;   /* right "margin" panel */
+    --chvd-hit:        30px;    /* icon buttons; 44px when UI scale ≥125% or touch */
+
+    /* Elevation */
+    --chvd-shadow-page:    0 6px 22px rgba(0, 0, 0, 0.30);
+    --chvd-shadow-float:   0 10px 28px rgba(0, 0, 0, 0.18);
+    --chvd-shadow-popover: 0 18px 44px rgba(0, 0, 0, 0.24);
+    --chvd-shadow-dialog:  0 30px 70px rgba(0, 0, 0, 0.35);
+
+    /* Motion */
+    --chvd-ease: cubic-bezier(0.32, 0.72, 0, 1);
+    --chvd-quick: 120ms var(--chvd-ease);
+    --chvd-base:  180ms var(--chvd-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root { --chvd-quick: 0ms; --chvd-base: 0ms; }
+}

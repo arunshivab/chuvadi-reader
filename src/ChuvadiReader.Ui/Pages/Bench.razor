@@ -15,51 +15,23 @@
 
 <PageTitle>Chuvadi · Bench</PageTitle>
 
-<div class="bench">
+<div class="bench mview">
+    <div class="bench-col">
     @if (_busy)
     {
         <div class="bench-busy">
             <div class="bench-busy-card"><span class="bspin big"></span><span>@(_busyLabel ?? "Working…")</span></div>
         </div>
     }
-    <div class="bench-bar">
-        <a class="bench-back" href="/" title="Back to dashboard"><Icon Name="chevron-left" Size="15" /></a>
-        <span class="bench-name">Bench</span>
-        <div class="session-wrap">
-            <button class="bench-session" @onclick="ToggleSessionMenu" title="Save or open a bench session"><Icon Name="save" Size="13" /> Session <span class="caret">▾</span></button>
-            @if (_sessionMenu)
-            {
-                <div class="session-menu">
-                    <button @onclick="SaveSession" disabled="@(_busy || (BenchSvc.IsEmpty && !BenchSvc.HasSources))">Save session…</button>
-                    <button @onclick="OpenSession" disabled="@_busy">Open session…</button>
-                </div>
-            }
-        </div>
-        <span style="flex:1"></span>
-        <button class="bench-reset" @onclick="ConfirmReset" disabled="@(_busy || (!BenchSvc.HasSources && BenchSvc.IsEmpty))" title="Clear the bench"><Icon Name="rotate-ccw" Size="13" /> Reset</button>
-        <span class="bt-sep"></span>
-        <button class="bench-hist" @onclick="Undo" disabled="@(_busy || !BenchSvc.CanUndo)" title="Undo (Ctrl+Z)" aria-label="Undo"><Icon Name="rotate-ccw" Size="14" /></button>
-        <button class="bench-hist flip" @onclick="Redo" disabled="@(_busy || !BenchSvc.CanRedo)" title="Redo (Ctrl+Y)" aria-label="Redo"><Icon Name="rotate-ccw" Size="14" /></button>
-        <span class="bt-sep"></span>
-        <span class="bench-view">
-            <button class="bv @(_perRow == 1 ? "on" : null)" @onclick="() => SetPerRow(1)" title="One desk per row"><Icon Name="square" Size="15" /></button>
-            <button class="bv @(_perRow == 2 ? "on" : null)" @onclick="() => SetPerRow(2)" title="Two desks per row"><Icon Name="columns" Size="15" /></button>
-            <button class="bv @(_perRow == 3 ? "on" : null)" @onclick="() => SetPerRow(3)" title="Three desks per row"><Icon Name="grid-view" Size="15" /></button>
-        </span>
-        <span class="bt-sep"></span>
-        <button class="bt bt-fetch" @onclick="FetchFile" disabled="@(_busy || _fetching)"><Icon Name="folder" Size="15" /> Fetch File</button>
-        <button class="bt bt-bind" @onclick="BindAll" disabled="@(_busy || BenchSvc.IsEmpty)"><Icon Name="save" Size="15" /> Bind all</button>
-        <button class="bt" @onclick="CombineAll" disabled="@(_busy || BenchSvc.IsEmpty)" title="Combine every desk into one PDF"><Icon Name="merge" Size="15" /> Combine</button>
-        <button class="bt" @onclick="AddDesk" disabled="@(_busy || !BenchSvc.CanAddDesk)" title="@(BenchSvc.CanAddDesk ? "Add a desk" : "30-desk limit reached")"><Icon Name="plus" Size="15" /> Add desk</button>
-        @if (BenchSvc.SelectedCount > 0)
+        @if (_sessionMenu)
         {
-            <button class="bt" @onclick="ExtractSelected" disabled="@(_busy || !BenchSvc.CanAddDesk)" title="@(BenchSvc.CanAddDesk ? "Move the selected pages into a new desk" : "30-desk limit reached")"><Icon Name="upload" Size="15" /> Extract (@BenchSvc.SelectedCount)</button>
+            <div class="pop-scrim" @onclick="() => _sessionMenu = false"></div>
+            <div class="pop bench-sessionpop">
+                <div class="pop-h">Bench session</div>
+                <button class="pop-item" @onclick="SaveSession" disabled="@(_busy || (BenchSvc.IsEmpty && !BenchSvc.HasSources))"><Icon Name="save" Size="14" /><span class="pop-l">Save session…</span></button>
+                <button class="pop-item" @onclick="OpenSession" disabled="@_busy"><Icon Name="folder" Size="14" /><span class="pop-l">Open session…</span></button>
+            </div>
         }
-        @if (BenchSvc.SelectedCount == 2)
-        {
-            <button class="bt" @onclick="OpenCompare" disabled="@_busy" title="Compare the two selected pages side by side"><Icon Name="columns" Size="15" /> Compare</button>
-        }
-    </div>
 
     @if (_status is not null)
     {
@@ -74,7 +46,7 @@
     }
 
     <div class="bench-main" @ref="_grid">
-        <aside class="bench-shelf" style="--shelf-thumb:@(ShelfThumbPx)px">
+        <aside class="bench-shelf @(_shelfHidden ? "hidden" : null)" style="--shelf-thumb:@(ShelfThumbPx)px">
             <div class="shelf-head">Shelf</div>
             @if (_fetching)
             {
@@ -1105,6 +1077,45 @@
             </div>
         </div>
     }
+    </div>
+
+    <div class="mview-rails">
+        <SideRail Kind="tools" Heading="ARRANGE">
+            <RailButton Icon="shelf" Label="Shelf" Active="!_shelfHidden" OnClick="() => _shelfHidden = !_shelfHidden" />
+            <RailButton Icon="folder" Label="Fetch file" Disabled="@(_busy || _fetching)" OnClick="FetchFile" />
+            <RailButton Icon="plus" Label="Add desk" Disabled="@(_busy || !BenchSvc.CanAddDesk)" DisabledReason="@(BenchSvc.CanAddDesk ? null : "30-desk limit reached")" OnClick="AddDesk" />
+            <RailButton Icon="page-add" Label="Blank page" Disabled="@(_busy || FocusDeskId is null)" OnClick="AddBlankToFocused" />
+            <RailSep />
+            <RailButton Icon="undo" Label="Undo" Keys="Ctrl Z" Disabled="@(_busy || !BenchSvc.CanUndo)" OnClick="Undo" />
+            <RailButton Icon="redo" Label="Redo" Keys="Ctrl Y" Disabled="@(_busy || !BenchSvc.CanRedo)" OnClick="Redo" />
+            <RailButton Icon="save" Label="Session…" Active="_sessionMenu" OnClick="ToggleSessionMenu" />
+            <RailButton Icon="close" Label="Reset bench" Disabled="@(_busy || (!BenchSvc.HasSources && BenchSvc.IsEmpty))" OnClick="ConfirmReset" />
+            @if (BenchSvc.SelectedCount > 0)
+            {
+                <RailSep />
+                <RailButton Icon="page-extract" Label="@($"To new desk ({BenchSvc.SelectedCount})")" Disabled="@(_busy || !BenchSvc.CanAddDesk)" OnClick="ExtractSelected" />
+            }
+            @if (BenchSvc.SelectedCount == 2)
+            {
+                <RailButton Icon="compare" Label="Compare the two" Disabled="_busy" OnClick="OpenCompare" />
+            }
+            <RailButton Icon="sliders" Label="Desks per row" Class="rb-viewfold" OnClick="CyclePerRow" />
+            <RailSpacer />
+            <RailButton Icon="doc-merge" Label="Combine into one" Disabled="@(_busy || BenchSvc.IsEmpty)" OnClick="CombineAll" />
+            <RailButton Icon="doc-merge" Label="Bind all" Primary="true" Disabled="@(_busy || BenchSvc.IsEmpty)" OnClick="BindAll" />
+        </SideRail>
+        <SideRail Kind="view" Heading="VIEW">
+            <RailText Title="Desks per row">/ row</RailText>
+            <RailButton Icon="page-single" Label="1 desk per row" Size="18" Active="_perRow == 1" OnClick="() => SetPerRow(1)" />
+            <RailButton Icon="page-facing" Label="2 desks per row" Size="18" Active="_perRow == 2" OnClick="() => SetPerRow(2)" />
+            <RailButton Icon="grid-view" Label="3 desks per row" Size="18" Active="_perRow == 3" OnClick="() => SetPerRow(3)" />
+            <RailSep />
+            <RailButton Icon="zoom-in" Label="Larger shelf pages" Size="18" Disabled="@(_shelfThumbStep >= 3)" OnClick='() => SetShelfThumb((_shelfThumbStep + 1).ToString())' />
+            <RailButton Icon="zoom-out" Label="Smaller shelf pages" Size="18" Disabled="@(_shelfThumbStep <= 0)" OnClick='() => SetShelfThumb((_shelfThumbStep - 1).ToString())' />
+            <RailSep />
+            <RailButton Icon="list-view" Label="@(BenchSvc.AllCollapsed ? "Expand shelf files" : "Collapse shelf files")" Size="18" Active="BenchSvc.AllCollapsed" Disabled="@(!BenchSvc.HasSources)" OnClick="ToggleCollapseAll" />
+        </SideRail>
+    </div>
 </div>
 
 @code {
@@ -1167,6 +1178,7 @@
     {
         BenchSvc.EnsureDesk();
         BenchSvc.Changed += OnBenchChanged;
+        ShellPublish();
         BenchDrop.SetBenchActive(true);
         BenchDrop.FilesDropped += OnFilesDropped;
         try
@@ -1182,6 +1194,7 @@
 
     private void OnBenchChanged()
     {
+        _ = InvokeAsync(ShellPublish);
         _dirty = true;
         InvokeAsync(StateHasChanged);
     }
@@ -2818,6 +2831,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        ShellRelease();
         BenchSvc.Changed -= OnBenchChanged;
         BenchDrop.FilesDropped -= OnFilesDropped;
         BenchDrop.SetBenchActive(false);

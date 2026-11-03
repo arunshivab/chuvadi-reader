@@ -23,275 +23,107 @@
 
 <PageTitle>Chuvadi · Reader</PageTitle>
 
-<div class="reader @(_reading ? "reading" : null) @(_drawerPinned && _drawerOpen ? "pinned" : null)" style="--reader-page-bg:@_pageBg">
+<div class="reader mview @(_reading ? "reading" : null) @(HasAnyCard ? "has-card" : null)" style="--reader-page-bg:@_pageBg">
     @{
         var tab = Tab;
         var doc = tab?.Session?.Document;
+        var viewOnly = tab is not null && tab.Format.IsViewOnly();
     }
-    <header class="rtop">
-        <div class="rtools">
-            @if (doc is not null)
+
+    @if (_pagesDrawer && (doc is not null || (viewOnly && _viewerOutline.Count > 0)))
+    {
+        <aside class="mdrawer" aria-label="Pages and outline">
+            <div class="mdrawer-tabs">
+                @if (!viewOnly)
+                {
+                    <button class="mdrawer-tab @(_drawerTab == "pages" ? "on" : null)" @onclick='() => SetDrawerTab("pages")'>Pages</button>
+                }
+                <button class="mdrawer-tab @(_drawerTab == "outline" || viewOnly ? "on" : null)" @onclick='() => SetDrawerTab("outline")'>Outline</button>
+                @if (!viewOnly)
+                {
+                    <button class="mdrawer-tab" disabled title="Attachments — coming soon">Attachments</button>
+                }
+                <button class="mdrawer-x" @onclick="() => _pagesDrawer = false" aria-label="Close"><Icon Name="x" Size="13" /></button>
+            </div>
+            @if (viewOnly)
             {
-                <button class="ricon" @onclick="() => GoTo(CurPage - PageStep)" disabled="@(CurPage <= 1)" aria-label="Previous page"><Icon Name="chevron-left" Size="16" /></button>
-                <span class="rpagenav">
-                    <input class="rpagebox" value="@_pageInput" @onchange="OnJumpChange" inputmode="numeric" aria-label="Page number" />
-                    <span class="rpagetotal">/ @doc.PageCount</span>
-                </span>
-                <button class="ricon" @onclick="() => GoTo(CurPage + PageStep)" disabled="@(CurPage >= doc.PageCount)" aria-label="Next page"><Icon Name="chevron-right" Size="16" /></button>
-
-                <span class="rsep"></span>
-                <button class="ricon" @onclick="ZoomOut" disabled="@(CurScale <= 0.1)" aria-label="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
-                <span class="rzoom">@ZoomPct%</span>
-                <button class="ricon" @onclick="ZoomIn" disabled="@(CurScale >= 8.0)" aria-label="Zoom in"><Icon Name="zoom-in" Size="15" /></button>
-
-                <span class="rsep"></span>
-                <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth" title="Fit width"><Icon Name="fit-width" Size="18" /></button>
-                <button class="vbtn @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage" title="Fit page"><Icon Name="fit-page" Size="18" /></button>
-                <button class="vbtn" @onclick="ActualSize" title="Actual size (100%)"><Icon Name="actual-size" Size="18" /></button>
-
-                <span class="rsep"></span>
-                <button class="vbtn @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)" title="Single page"><Icon Name="page-single" Size="18" /></button>
-                <button class="vbtn @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)" title="Two-page"><Icon Name="page-facing" Size="18" /></button>
-
-                <span class="rsep"></span>
-                <button class="vbtn" @onclick="() => RotateScopeBy(-90)" title="Rotate left (scope in View ▸ Rotate)"><Icon Name="rotate-ccw" Size="18" /></button>
-                <button class="vbtn" @onclick="() => RotateScopeBy(90)" title="Rotate right (scope in View ▸ Rotate)"><Icon Name="rotate-cw" Size="18" /></button>
-                <button class="vbtn @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)" title="Hand (pan)"><Icon Name="hand" Size="18" /></button>
-                <button class="vbtn @(_bm ? "on" : null)" @onclick="ToggleBookmarks" title="Bookmarks"><Icon Name="library" Size="18" /></button>
-                <button class="vbtn @(_tool == ReaderTool.Marquee ? "on" : null)" @onclick="() => SetTool(ReaderTool.Marquee)" title="Marquee zoom"><Icon Name="zoom-area" Size="18" /></button>
-                <button class="vbtn @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)" title="Loupe"><Icon Name="loupe" Size="18" /></button>
-                <button class="vbtn @(_tool == ReaderTool.Snapshot ? "on" : null)" @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region"><Icon Name="crop" Size="18" /></button>
-                <button class="vbtn @(Tab?.ScrollLocked == true ? "on" : null)" @onclick="ToggleScrollLock" title="Lock scrolling"><Icon Name="lock" Size="16" /></button>
-                <span class="rsep"></span>
-                <button class="vbtn @(_drawerOpen ? "on" : null)" @onclick="ToggleDrawer" title="View options"><Icon Name="eye" Size="16" /></button>
-                <span class="rpc-wrap">
-                    <button class="vbtn @(_pageColorOpen ? "on" : null)" @onclick="TogglePageColor" title="Page colour (view only)"><Icon Name="contrast" Size="16" /></button>
-                    @if (_pageColorOpen)
+                <div class="mdrawer-body">
+                    @foreach (var o in _viewerOutline)
                     {
-                        <div class="rpc-pop" @onclick:stopPropagation="true">
-                            <div class="rpc-h">Page colour <span class="rpc-sub">view only — not saved to file</span></div>
-                            <div class="rpc-swatches">
-                                @foreach (var (name, hex) in _pageBgPresets)
+                        var oo = o;
+                        <button class="ol-row" style="padding-left:@(12 + (oo.Level - 1) * 12)px" @onclick="() => ViewerGoAnchor(oo.Anchor)">@oo.Title</button>
+                    }
+                </div>
+            }
+            else if (_drawerTab == "pages" && doc is not null && tab?.Session is { } thumbSession)
+            {
+                <div class="mdrawer-body">
+                    @for (var i = 0; i < doc.PageCount; i++)
+                    {
+                        var pi = i;
+                        @foreach (var ch in ChaptersAt(pi))
+                        {
+                            var chh = ch;
+                            <button class="chap" @onclick="() => GoTo(chh.PageIndex + 1)">§ @(string.IsNullOrWhiteSpace(chh.Title) ? "(untitled)" : chh.Title)</button>
+                        }
+                        <button class="thumb @(pi + 1 == CurPage ? "on" : null)" @onclick="() => GoTo(pi + 1)" title="Page @(pi + 1)">
+                            <span class="thumb-pg" style="aspect-ratio:@ThumbAspect">
+                                @if (thumbSession.TryGetRenderedSvg(pi, out var tsvg))
                                 {
-                                    <button class="rpc-sw @(SameColor(_pageBg, hex) ? "on" : null)" style="background:@hex"
-                                            title="@name" @onclick="() => SetPageBg(hex)"></button>
+                                    <PageSvg Svg="@tsvg" Rotation="@RotationFor(pi)" />
                                 }
-                            </div>
-                            <div class="rpc-custom">
-                                <label>Custom</label>
-                                <input type="color" value="@_pageBg" @oninput="OnCustomPageBg" />
-                                <button class="rpc-reset" @onclick='() => SetPageBg("#ffffff")'>Reset</button>
-                            </div>
-                        </div>
+                                else
+                                {
+                                    <span class="thumb-ph">@(pi + 1)</span>
+                                }
+                            </span>
+                            <span class="thumb-n">@(pi + 1)</span>
+                        </button>
                     }
-                </span>
-                <span class="rsep"></span>
-                <button class="vbtn @(_markup ? "on" : null)" @onclick="ToggleMarkup" title="Edit"><Icon Name="edit" Size="16" /></button>
-                <button class="vbtn @(Tab?.StampOpen == true ? "on" : null)" @onclick="ToggleStamp" title="Watermark &amp; header/footer"><Icon Name="stamp" Size="16" /></button>
-                <button class="vbtn" @onclick="OpenInBench" title="Open in Bench"><Icon Name="grid-view" Size="16" /></button>
-                @if (Entitlements.CanRedact)
-                {
-                    <button class="vbtn" @onclick="SendToRedact" title="Send to Redact"><Icon Name="redact" Size="16" /></button>
-                }
-            }
-        </div>
-    </header>
-
-    @if (doc is not null)
-    {
-        <nav class="rmodebar">
-            <div class="rmode-doc">
-                <button class="rdoctitle" @onclick="ToggleDocMenu" title="Document actions">
-                    <span class="rdoctitle-name">@(tab?.FileName ?? "Document")</span>
-                    <Icon Name="chevron-down" Size="13" />
-                </button>
-                @if (_docMenuOpen)
-                {
-                    <div class="rdocmenu-scrim" @onclick="CloseDocMenu"></div>
-                    <div class="rdocmenu" @onclick:stopPropagation="true">
-                        <button class="rdm-item" @onclick="DocProperties"><Icon Name="info" Size="15" /><span>Properties</span></button>
-                        <button class="rdm-item" @onclick="DocExport"><Icon Name="download" Size="15" /><span>Export pages as images</span></button>
-                        <button class="rdm-item" @onclick="DocPress"><Icon Name="compress" Size="15" /><span>Reduce file size (Press)</span></button>
-                        <div class="rdm-sep"></div>
-                        <button class="rdm-item" @onclick="DocFlatten" disabled="@_flattening"><Icon Name="flatten" Size="15" /><span>Flatten forms &amp; marks</span></button>
-                        <div class="rdm-sep"></div>
-                        <button class="rdm-item" @onclick='() => DocNav("/merge")'><Icon Name="merge" Size="15" /><span>Merge files…</span></button>
-                        <button class="rdm-item" @onclick='() => DocNav("/split")'><Icon Name="split" Size="15" /><span>Split pages…</span></button>
-                    </div>
-                }
-            </div>
-            <div class="rmode-switch">
-                <button class="rmode-seg @(!_markup ? "on" : null)" @onclick="SetRead" title="Read (1)"><span class="rmode-verb">Read</span><span class="rmode-key">1</span></button>
-                <button class="rmode-seg @(_markup ? "on" : null)" @onclick="SetMark" title="Mark (2)"><span class="rmode-verb">Mark</span><span class="rmode-key">2</span></button>
-                <button class="rmode-seg" @onclick="OpenInBench" title="Arrange (3)"><span class="rmode-verb">Arrange</span><span class="rmode-key">3</span></button>
-                @if (Entitlements.CanRedact)
-                {
-                    <button class="rmode-seg" @onclick="SendToRedact" title="Protect (4)"><span class="rmode-verb">Protect</span><span class="rmode-key">4</span></button>
-                }
-            </div>
-            <div class="rmode-end"></div>
-        </nav>
-    }
-
-    @if (_bm && doc is not null)
-    {
-        <div class="bm-panel">
-            <div class="bm-head">
-                <span>Bookmarks</span>
-                <button @onclick="ToggleBookmarks" aria-label="Close"><Icon Name="x" Size="15" /></button>
-            </div>
-            <div class="bm-acts">
-                <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page"><Icon Name="plus" Size="13" /> Add</button>
-                <button class="bm-act" @onclick="() => BmMove(-1)" disabled="@(_bmSel is null)" title="Move up"><Icon Name="chevron-up" Size="13" /></button>
-                <button class="bm-act" @onclick="() => BmMove(1)" disabled="@(_bmSel is null)" title="Move down"><Icon Name="chevron-down" Size="13" /></button>
-                <button class="bm-act" @onclick="BmIndent" disabled="@(_bmSel is null)" title="Indent (nest under the entry above)"><Icon Name="chevron-right" Size="13" /></button>
-                <button class="bm-act" @onclick="BmOutdent" disabled="@(_bmSel is null)" title="Outdent"><Icon Name="chevron-left" Size="13" /></button>
-                <button class="bm-act del" @onclick="BmDelete" disabled="@(_bmSel is null)" title="Delete"><Icon Name="trash" Size="13" /></button>
-            </div>
-            <div class="bm-tree">
-                @if (_bmTree is null || _bmTree.Count == 0)
-                {
-                    <div class="bm-empty">No bookmarks in this document. Use <strong>Add</strong> to create one at the current page, then Save.</div>
-                }
-                else
-                {
-                    @foreach (var (node, depth) in BmFlat())
-                    {
-                        <div class="bm-row @(ReferenceEquals(node, _bmSel) ? "sel" : null)" style="padding-left:@(8 + depth * 16)px" @onclick="() => BmSelect(node)">
-                            @if (ReferenceEquals(node, _bmRenaming))
-                            {
-                                <input class="bm-rename" value="@node.Title" @oninput="e => node.Title = e.Value?.ToString() ?? string.Empty" @onblur="BmEndRename" @onkeydown="BmRenameKey" @onclick:stopPropagation="true" />
-                            }
-                            else
-                            {
-                                <span class="bm-title" @ondblclick="() => BmBeginRename(node)" title="Double-click to rename">@(string.IsNullOrWhiteSpace(node.Title) ? "(untitled)" : node.Title)</span>
-                            }
-                            <button class="bm-go" @onclick:stopPropagation="true" @onclick="() => BmGo(node)" title="Go to page @(node.PageIndex + 1)">p@(node.PageIndex + 1)</button>
-                        </div>
-                    }
-                }
-            </div>
-            <div class="bm-foot">
-                <span class="bm-status">@_bmStatus</span>
-                <button class="bm-save" @onclick="BmSave" disabled="@_bmBusy">@(_bmBusy ? "saving…" : "Save bookmarks")</button>
-            </div>
-        </div>
-    }
-
-    @if (_markup && doc is not null)
-    {
-        <div class="mk-rail">
-            <div class="mk-tools">
-                <button class="mk-tool @(_mkTool == "text" ? "on" : null)" @onclick='() => SetMkTool("text")' title="Add text"><Icon Name="text-box" Size="15" /> Text</button>
-                <button class="mk-tool @(_mkTool == "image" ? "on" : null)" @onclick="AddImageViaPicker" title="Add image"><Icon Name="file-image" Size="15" /> Image</button>
-                <button class="mk-tool @(_mkTool == "rect" ? "on" : null)" @onclick='() => SetMkTool("rect")' title="Rectangle"><Icon Name="shape-rect" Size="15" /> Rect</button>
-                <button class="mk-tool @(_mkTool == "line" ? "on" : null)" @onclick='() => SetMkTool("line")' title="Line"><Icon Name="minus" Size="15" /> Line</button>
-                <button class="mk-tool @(_mkTool == "ellipse" ? "on" : null)" @onclick='() => SetMkTool("ellipse")' title="Ellipse"><Icon Name="shape-ellipse" Size="15" /> Ellipse</button>
-                <button class="mk-tool @(_mkTool == "arrow" ? "on" : null)" @onclick='() => SetMkTool("arrow")' title="Arrow"><Icon Name="shape-arrow" Size="15" /> Arrow</button>
-                <button class="mk-tool @(_mkTool == "freehand" ? "on" : null)" @onclick='() => SetMkTool("freehand")' title="Freehand draw"><Icon Name="shape-draw" Size="15" /> Draw</button>
-                <button class="mk-tool @(_sigOpen ? "on" : null)" @onclick="OpenSignature" title="Add signature"><Icon Name="sign" Size="15" /> Sign</button>
-            </div>
-
-            @* Redaction relocated to the Redact destination (/redact). Markup is overlay-only. *@
-            @if (_selText is { } sel)
-            {
-                <span class="mk-style">
-                    <select class="mk-sel" value="@sel.FontFamily" @onchange="e => SetFont(sel, e)">
-                        <option value="Helvetica">Helvetica</option>
-                        <option value="Times">Times</option>
-                        <option value="Courier">Courier</option>
-                    </select>
-                    <button class="mk-tg @(sel.Bold ? "on" : null)" @onclick="() => { sel.Bold = !sel.Bold; }" title="Bold"><b>B</b></button>
-                    <button class="mk-tg @(sel.Italic ? "on" : null)" @onclick="() => { sel.Italic = !sel.Italic; }" title="Italic"><i>I</i></button>
-                    <input class="mk-num" type="number" min="6" max="200" step="1" value="@sel.FontSizePt" @onchange="e => SetSize(sel, e)" title="Size (pt)" />
-                    <span class="mk-aligns">
-                        <button class="mk-tg @(sel.Align == "left" ? "on" : null)" @onclick='() => sel.Align = "left"' title="Left">⯇</button>
-                        <button class="mk-tg @(sel.Align == "center" ? "on" : null)" @onclick='() => sel.Align = "center"' title="Center">≡</button>
-                        <button class="mk-tg @(sel.Align == "right" ? "on" : null)" @onclick='() => sel.Align = "right"' title="Right">⯈</button>
-                        <button class="mk-tg @(sel.Align == "justify" ? "on" : null)" @onclick='() => sel.Align = "justify"' title="Justify">☰</button>
-                    </span>
-                    <label class="mk-swatch custom on" title="Text colour" style="background:@sel.ColorHex">
-                        <input type="color" value="@sel.ColorHex" @onchange="e => SetTextColor(sel, e)" />
-                    </label>
-                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@sel.Rotation" @onchange="e => SetRotation(sel, e)" title="Rotation (°)" />°</span>
-                    <button class="mk-tg del" @onclick="() => RemoveSelectedText()" title="Delete text">&times;</button>
-                </span>
-            }
-            else if (_selShape is { } ssel)
-            {
-                <span class="mk-style">
-                    <span class="mk-style-lbl">@ShapeKindLabel(ssel.Kind)</span>
-                    <span class="mk-stroke-lbl">Stroke</span>
-                    <label class="mk-swatch custom on" title="Stroke colour" style="background:@ssel.StrokeHex">
-                        <input type="color" value="@ssel.StrokeHex" @onchange="e => SetShapeStroke(ssel, e)" />
-                    </label>
-                    <input class="mk-num" type="number" min="0.25" max="60" step="0.25" value="@ssel.StrokeWidthPt" @onchange="e => SetShapeWidth(ssel, e)" title="Stroke width (pt)" />
-                    @if (ssel.Kind == ShapeKind.Rectangle || ssel.Kind == ShapeKind.Ellipse)
-                    {
-                        <span class="mk-fill-grp">
-                            <button class="mk-tg @(string.IsNullOrEmpty(ssel.FillHex) ? null : "on")" @onclick="() => ToggleShapeFill(ssel)" title="Toggle fill">Fill</button>
-                            @if (!string.IsNullOrEmpty(ssel.FillHex))
-                            {
-                                <label class="mk-swatch custom on" title="Fill colour" style="background:@ssel.FillHex">
-                                    <input type="color" value="@ssel.FillHex" @onchange="e => SetShapeFill(ssel, e)" />
-                                </label>
-                            }
-                        </span>
-                    }
-                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@ssel.Rotation" @onchange="e => SetShapeRotation(ssel, e)" title="Rotation (°)" />°</span>
-                    <button class="mk-tg @(ssel.BehindContent ? "on" : null)" @onclick="() => { ssel.BehindContent = !ssel.BehindContent; }" title="Place behind page content">Behind</button>
-                    <button class="mk-tg del" @onclick="() => RemoveSelectedShape()" title="Delete shape">&times;</button>
-                </span>
-            }
-            else if (_selImage is { } isel)
-            {
-                <span class="mk-style">
-                    <span class="mk-style-lbl">Image</span>
-                    <button class="mk-tg @(isel.Lock ? "on" : null)" @onclick="() => ToggleImageLock(isel)" title="@(isel.Lock ? "Aspect locked" : "Aspect unlocked")"><Icon Name="lock" Size="13" /></button>
-                    <button class="mk-tg" @onclick="AddImageViaPicker" title="Replace / add another image"><Icon Name="file-image" Size="13" /></button>
-                    <span class="mk-opacity" title="Opacity">
-                        <input class="mk-range" type="range" min="0.1" max="1" step="0.05" value="@isel.Opacity" @oninput="e => SetImageOpacity(isel, e)" />
-                        <span class="mk-opacity-val">@(((int)Math.Round(isel.Opacity * 100)))%</span>
-                    </span>
-                    <span class="mk-rot"><Icon Name="rotate-cw" Size="13" /><input class="mk-num" type="number" min="-180" max="180" step="1" value="@isel.Rotation" @onchange="e => SetImageRotation(isel, e)" title="Rotation (°)" />°</span>
-                    <button class="mk-tg @(isel.BehindContent ? "on" : null)" @onclick="() => { isel.BehindContent = !isel.BehindContent; }" title="Place behind page content">Behind</button>
-                    <button class="mk-tg del" @onclick="() => RemoveSelectedImage()" title="Delete image">&times;</button>
-                </span>
+                </div>
             }
             else
             {
-                <span class="mk-hint">
-                    @(_mkTool switch
+                <div class="bm-acts">
+                    <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page (Ctrl B)"><Icon Name="plus" Size="13" /> Add</button>
+                    <button class="bm-act" @onclick="() => BmMove(-1)" disabled="@(_bmSel is null)" title="Move up"><Icon Name="chevron-up" Size="13" /></button>
+                    <button class="bm-act" @onclick="() => BmMove(1)" disabled="@(_bmSel is null)" title="Move down"><Icon Name="chevron-down" Size="13" /></button>
+                    <button class="bm-act" @onclick="BmIndent" disabled="@(_bmSel is null)" title="Indent (nest under the entry above)"><Icon Name="chevron-right" Size="13" /></button>
+                    <button class="bm-act" @onclick="BmOutdent" disabled="@(_bmSel is null)" title="Outdent"><Icon Name="chevron-left" Size="13" /></button>
+                    <button class="bm-act del" @onclick="BmDelete" disabled="@(_bmSel is null)" title="Delete"><Icon Name="trash" Size="13" /></button>
+                </div>
+                <div class="bm-tree">
+                    @if (_bmTree is null || _bmTree.Count == 0)
                     {
-                        "text" => "Click to place a text box, or drag to size one.",
-                        "rect" => "Drag to draw a rectangle.",
-                        "line" => "Drag to draw a line.",
-                        "image" => "Pick an image, or paste / drop one onto the page.",
-                        _ => "Click to place a text box, or drag to size one.",
-                    })
-                </span>
+                        <div class="bm-empty">No bookmarks in this document. Use <strong>Add</strong> to create one at the current page, then Save.</div>
+                    }
+                    else
+                    {
+                        @foreach (var (node, depth) in BmFlat())
+                        {
+                            <div class="bm-row @(ReferenceEquals(node, _bmSel) ? "sel" : null)" style="padding-left:@(8 + depth * 16)px" @onclick="() => BmGo(node)" title="Go to page @(node.PageIndex + 1) · double-click to rename">
+                                @if (ReferenceEquals(node, _bmRenaming))
+                                {
+                                    <input class="bm-rename" value="@node.Title" @oninput="e => node.Title = e.Value?.ToString() ?? string.Empty" @onblur="BmEndRename" @onkeydown="BmRenameKey" @onclick:stopPropagation="true" />
+                                }
+                                else
+                                {
+                                    <span class="bm-title" @ondblclick="() => BmBeginRename(node)" title="Double-click to rename">@(string.IsNullOrWhiteSpace(node.Title) ? "(untitled)" : node.Title)</span>
+                                }
+                                <button class="bm-go" @onclick:stopPropagation="true" @onclick="() => BmGo(node)" title="Go to page @(node.PageIndex + 1)">p@(node.PageIndex + 1)</button>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="bm-foot">
+                    <span class="bm-status">@_bmStatus</span>
+                    <button class="bm-save" @onclick="BmSave" disabled="@_bmBusy">@(_bmBusy ? "saving…" : "Save bookmarks")</button>
+                </div>
             }
-
-            <span class="mk-spacer"></span>
-            @if (_mkStatus is not null)
-            {
-                <span class="mk-status @(_mkError ? "err" : null)">@_mkStatus</span>
-                @if (_mkSavedPath is not null)
-                {
-                    <button class="mk-open" @onclick="OpenRedacted">Open it</button>
-                }
-            }
-            <span class="mk-count">@TextCount text · @ShapeCount shape@(ShapeCount == 1 ? "" : "s") · @ImageCount image@(ImageCount == 1 ? "" : "s")</span>
-            <button class="mk-btn" @onclick="ClearMarkup" disabled="@(OverlayCount == 0 || _mkSaving)">Clear</button>
-            @if (OverlayCount > 0)
-            {
-                <button class="mk-btn" @onclick="SaveInPlace" disabled="@_mkSaving" title="Overwrite the open file">@(_mkSaving ? "Saving…" : "Save")</button>
-            }
-            <button class="mk-btn primary" @onclick="SaveMarkup" disabled="@(OverlayCount == 0 || _mkSaving)" title="Save to a new file">@(_mkSaving ? "Saving…" : "Save as new PDF")</button>
-            <button class="mk-btn" @onclick="ToggleMarkup">Done</button>
-        </div>
+        </aside>
     }
 
+    <div class="mview-canvas">
     @if (_showProps)
     {
         <div @onclick="CloseProperties" style="position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:60;display:flex;align-items:center;justify-content:center">
@@ -464,6 +296,39 @@
             <button class="rempty-btn" @onclick="OpenViaPicker">Fetch…</button>
         </div>
     }
+    else if (viewOnly)
+    {
+        <div class="rviewer">
+            @switch (tab.Format)
+            {
+                case DocumentFormat.Docx:
+                    <DocxView @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" />
+                    break;
+                case DocumentFormat.Xlsx:
+                    <XlsxView @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" />
+                    break;
+                case DocumentFormat.Markdown:
+                    <MarkdownView @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" />
+                    break;
+                case DocumentFormat.Html:
+                    <HtmlView @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" />
+                    break;
+                default:
+                    <TextView @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" />
+                    break;
+            }
+        </div>
+        @if (_viewerFindOpen)
+        {
+            <div class="rfind">
+                <input class="rfind-box" placeholder="Find in @tab.Format.Label()…" value="@_viewerFindInput"
+                       @oninput="e => _viewerFindInput = e.Value?.ToString() ?? string.Empty"
+                       @onkeydown="OnViewerFindKey" />
+                <span class="rfind-count">@(_viewerFind is null ? "" : $"{_viewerFindCount} found")</span>
+                <button class="rfind-x" @onclick="CloseViewerFind" title="Close (Esc)"><Icon Name="x" Size="14" /></button>
+            </div>
+        }
+    }
     else if (tab.Session is { Document.IsXfaForm: true })
     {
         <div class="rempty">
@@ -635,6 +500,29 @@
                                 }
                             </div>
                         }
+                        @if (_measureOn && !_markup)
+                        {
+                            <div class="mk-layer drawmode ms-layer" data-page="@n" @onpointerdown="e => MsDown(e, n)">
+                                @if (_msPage == n && _msA is { } ma)
+                                {
+                                    <svg class="mk-shape-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                        @if (_msB is { } mb)
+                                        {
+                                            <line x1="@F(ma.X * 100)" y1="@F(ma.Y * 100)" x2="@F(mb.X * 100)" y2="@F(mb.Y * 100)" stroke="#2c3e8c" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                                        }
+                                    </svg>
+                                    <span class="ms-dot" style="left:@Pct(ma.X);top:@Pct(ma.Y)"></span>
+                                    @if (_msB is { } mb2)
+                                    {
+                                        <span class="ms-dot" style="left:@Pct(mb2.X);top:@Pct(mb2.Y)"></span>
+                                        @if (_measure is { } mr)
+                                        {
+                                            <span class="ms-label" style="left:@Pct((ma.X + mb2.X) / 2);top:@Pct((ma.Y + mb2.Y) / 2)">@mr.DistanceLabel</span>
+                                        }
+                                    }
+                                }
+                            </div>
+                        }
                         @if (_findOpen && _findByPage.TryGetValue(n, out var pageHits))
                         {
                             @foreach (var fm in pageHits)
@@ -686,158 +574,383 @@
         </div>
     }
 
-    @if (_markup && doc is not null && _sigOpen)
+    @if (doc is not null && _sigReport is { HasSignatures: true } sr && _showSigBanner && !_markup)
     {
-        <div class="rdrawer sigdrawer">
-            <div class="rdrawer-h">
-                <span>Add signature</span>
-                <span class="rd-h-btns">
-                    <button @onclick="CloseSignature" aria-label="Close"><Icon Name="x" Size="15" /></button>
-                </span>
-            </div>
+        <div class="rsigbanner">
+            <SignatureBanner Signature="@sr.Signatures[0]" OnDetails='() => OpenCard("signatures")' />
+            <button class="rsigbanner-x" @onclick="() => _showSigBanner = false" aria-label="Hide"><Icon Name="x" Size="12" /></button>
+        </div>
+    }
 
-            <div class="sig-modes">
-                <button class="sig-mode @(_sigMode == "type" ? "on" : null)" @onclick='() => _sigMode = "type"'>Type</button>
-                <button class="sig-mode @(_sigMode == "upload" ? "on" : null)" @onclick='() => _sigMode = "upload"'>Upload</button>
-            </div>
-
-            @if (_sigMode == "type")
+    <div class="fcards">
+        @if (_markup && doc is not null)
+        {
+            @if (_sigOpen)
             {
-                <input class="stamp-in" placeholder="Type your name" maxlength="60" @bind="_sigText" @bind:event="oninput" />
-                <div class="stamp-row">
-                    <select class="stamp-sel" @bind="_sigFontName">
-                        @foreach (var f in _sigFonts)
+                <FloatCard Title="Signature" Meta="drawn as an overlay" OnClose="CloseSignature">
+                    <div class="fc-seg">
+                        <button class="@(_sigMode == "type" ? "on" : null)" @onclick='() => _sigMode = "type"'>Type</button>
+                        <button class="@(_sigMode == "upload" ? "on" : null)" @onclick='() => _sigMode = "upload"'>Upload</button>
+                    </div>
+                    @if (_sigMode == "type")
+                    {
+                        <input class="fc-in" placeholder="Type your name" maxlength="60" @bind="_sigText" @bind:event="oninput" />
+                        <div class="fc-row">
+                            <select class="fc-sel fc-grow" @bind="_sigFontName">
+                                @foreach (var f in _sigFonts)
+                                {
+                                    <option value="@f.Name">@f.Name</option>
+                                }
+                            </select>
+                            <label class="fc-sw on" title="Ink colour" style="background:@_sigColor"><input type="color" @bind="_sigColor" @bind:event="oninput" /></label>
+                        </div>
+                        <div class="sig-preview" style="@SigPreviewStyle">@(string.IsNullOrWhiteSpace(_sigText) ? "Your signature" : _sigText)</div>
+                        <button class="fc-btn primary" disabled="@(string.IsNullOrWhiteSpace(_sigText))" @onclick="PlaceTypedSignature">Place signature</button>
+                    }
+                    else
+                    {
+                        <p class="fc-note">Pick a PNG or JPG of your signature — a transparent PNG sits best on the page.</p>
+                        <button class="fc-btn primary" @onclick="UploadSignature">Choose image…</button>
+                    }
+                    @if (_sigError is { } se)
+                    {
+                        <div class="fc-status err">@se</div>
+                    }
+                    else
+                    {
+                        <p class="fc-note">Placed signatures are normal overlays — drag, resize, or delete them, then Save. For a certificate signature use Protect › Sign with certificate.</p>
+                    }
+                </FloatCard>
+            }
+            else if (_selText is { } sel)
+            {
+                <FloatCard Title="Text box" Meta="@SelMeta(_selTextPage, _texts, sel)">
+                    <div class="fc-seg">
+                        @foreach (var fam in new[] { "Helvetica", "Times", "Courier" })
                         {
-                            <option value="@f.Name">@f.Name</option>
+                            var ff = fam;
+                            <button class="@(sel.FontFamily == ff ? "on" : null)" @onclick="() => { MkSnap(); sel.FontFamily = ff; }">@ff</button>
                         }
-                    </select>
-                    <input type="color" @bind="_sigColor" @bind:event="oninput" title="Ink colour" />
-                </div>
-                <div class="sig-preview" style="@SigPreviewStyle">@(string.IsNullOrWhiteSpace(_sigText) ? "Your signature" : _sigText)</div>
-                <button class="sig-place" disabled="@(string.IsNullOrWhiteSpace(_sigText))" @onclick="PlaceTypedSignature">Place signature</button>
+                    </div>
+                    <div class="fc-row">
+                        <button class="fc-btn fc-sq @(sel.Bold ? "on" : null)" @onclick="() => { MkSnap(); sel.Bold = !sel.Bold; }" title="Bold"><b>B</b></button>
+                        <button class="fc-btn fc-sq @(sel.Italic ? "on" : null)" @onclick="() => { MkSnap(); sel.Italic = !sel.Italic; }" title="Italic"><i>I</i></button>
+                        <button class="fc-btn fc-sq" @onclick="() => { MkSnap(); sel.FontSizePt = Math.Max(6, sel.FontSizePt - 1); }" title="Smaller">−</button>
+                        <input class="fc-num fc-grow" type="number" min="6" max="200" step="1" value="@sel.FontSizePt" @onchange="e => { MkSnap(); SetSize(sel, e); }" title="Size (pt)" />
+                        <button class="fc-btn fc-sq" @onclick="() => { MkSnap(); sel.FontSizePt = Math.Min(200, sel.FontSizePt + 1); }" title="Larger">+</button>
+                    </div>
+                    <div class="fc-seg">
+                        @foreach (var (al, lbl) in new[] { ("left", "Left"), ("center", "Centre"), ("right", "Right"), ("justify", "Justify") })
+                        {
+                            var a = al;
+                            <button class="@(sel.Align == a ? "on" : null)" @onclick="() => { MkSnap(); sel.Align = a; }">@lbl</button>
+                        }
+                    </div>
+                    <div class="fc-row">
+                        <span class="fc-lbl">Colour</span>
+                        <span class="fc-swatches">
+                            @foreach (var (_, hex) in _mkColorPresets)
+                            {
+                                var h = hex;
+                                <button class="fc-sw @(string.Equals(sel.ColorHex, h, StringComparison.OrdinalIgnoreCase) ? "on" : null)" style="background:@h" @onclick="() => { MkSnap(); sel.ColorHex = h; }" title="@h"></button>
+                            }
+                            <label class="fc-sw" title="Custom colour" style="background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)"><input type="color" value="@sel.ColorHex" @onchange="e => { MkSnap(); SetTextColor(sel, e); }" /></label>
+                        </span>
+                    </div>
+                    <div class="fc-row">
+                        <span class="fc-lbl">Rotation</span>
+                        <input class="fc-num" type="number" min="-180" max="180" step="1" value="@sel.Rotation" @onchange="e => { MkSnap(); SetRotation(sel, e); }" title="Rotation (°)" /> °
+                    </div>
+                    <div class="fc-foot">
+                        <button class="fc-btn fc-grow" @onclick="DuplicateSelected"><Icon Name="copy" Size="13" /> Duplicate</button>
+                        <button class="fc-btn fc-grow danger" @onclick="() => { MkSnap(); RemoveSelectedText(); }"><Icon Name="trash" Size="13" /> Delete</button>
+                    </div>
+                </FloatCard>
             }
-            else
+            else if (_selShape is { } ssel)
             {
-                <p class="sig-hint">Pick a PNG or JPG of your signature — a transparent PNG sits best on the page.</p>
-                <button class="sig-place" @onclick="UploadSignature">Choose image…</button>
+                <FloatCard Title="@ShapeKindLabel(ssel.Kind)" Meta="@SelMeta(_selShapePage, _shapes, ssel)">
+                    <div class="fc-row">
+                        <span class="fc-lbl">Stroke</span>
+                        <label class="fc-sw on" title="Stroke colour" style="background:@ssel.StrokeHex"><input type="color" value="@ssel.StrokeHex" @onchange="e => { MkSnap(); SetShapeStroke(ssel, e); }" /></label>
+                        <input class="fc-num" type="number" min="0.25" max="60" step="0.25" value="@ssel.StrokeWidthPt" @onchange="e => { MkSnap(); SetShapeWidth(ssel, e); }" title="Stroke width (pt)" /> pt
+                    </div>
+                    @if (ssel.Kind == ShapeKind.Rectangle || ssel.Kind == ShapeKind.Ellipse)
+                    {
+                        <div class="fc-row">
+                            <span class="fc-lbl">Fill</span>
+                            <button class="fc-btn @(string.IsNullOrEmpty(ssel.FillHex) ? null : "on")" @onclick="() => { MkSnap(); ToggleShapeFill(ssel); }">@(string.IsNullOrEmpty(ssel.FillHex) ? "None" : "On")</button>
+                            @if (!string.IsNullOrEmpty(ssel.FillHex))
+                            {
+                                <label class="fc-sw on" title="Fill colour" style="background:@ssel.FillHex"><input type="color" value="@ssel.FillHex" @onchange="e => { MkSnap(); SetShapeFill(ssel, e); }" /></label>
+                            }
+                        </div>
+                    }
+                    <div class="fc-row">
+                        <span class="fc-lbl">Rotation</span>
+                        <input class="fc-num" type="number" min="-180" max="180" step="1" value="@ssel.Rotation" @onchange="e => { MkSnap(); SetShapeRotation(ssel, e); }" title="Rotation (°)" /> °
+                    </div>
+                    <label class="fc-toggle">Place behind page content <input type="checkbox" checked="@ssel.BehindContent" @onchange="() => { MkSnap(); ssel.BehindContent = !ssel.BehindContent; }" /></label>
+                    <div class="fc-foot">
+                        <button class="fc-btn fc-grow" @onclick="DuplicateSelected"><Icon Name="copy" Size="13" /> Duplicate</button>
+                        <button class="fc-btn fc-grow danger" @onclick="() => { MkSnap(); RemoveSelectedShape(); }"><Icon Name="trash" Size="13" /> Delete</button>
+                    </div>
+                </FloatCard>
             }
-
-            @if (_sigError is { } se)
+            else if (_selImage is { } isel)
             {
-                <div class="sig-err">@se</div>
+                <FloatCard Title="Image" Meta="@SelMeta(_selImagePage, _images, isel)">
+                    <div class="fc-row">
+                        <span class="fc-lbl">Opacity</span>
+                        <input class="fc-grow" type="range" min="0.1" max="1" step="0.05" value="@isel.Opacity" @oninput="e => SetImageOpacity(isel, e)" @onchange="_ => MkSnap()" />
+                        <span class="fc-meta">@(((int)Math.Round(isel.Opacity * 100)))%</span>
+                    </div>
+                    <div class="fc-row">
+                        <span class="fc-lbl">Rotation</span>
+                        <input class="fc-num" type="number" min="-180" max="180" step="1" value="@isel.Rotation" @onchange="e => { MkSnap(); SetImageRotation(isel, e); }" title="Rotation (°)" /> °
+                    </div>
+                    <div class="fc-row">
+                        <button class="fc-btn @(isel.Lock ? "on" : null)" @onclick="() => ToggleImageLock(isel)" title="Keep the aspect ratio while resizing"><Icon Name="lock" Size="13" /> @(isel.Lock ? "Aspect locked" : "Aspect free")</button>
+                        <button class="fc-btn" @onclick="AddImageViaPicker" title="Add another image"><Icon Name="file-image" Size="13" /> Add image</button>
+                    </div>
+                    <label class="fc-toggle">Place behind page content <input type="checkbox" checked="@isel.BehindContent" @onchange="() => { MkSnap(); isel.BehindContent = !isel.BehindContent; }" /></label>
+                    <div class="fc-foot">
+                        <button class="fc-btn fc-grow" @onclick="DuplicateSelected"><Icon Name="copy" Size="13" /> Duplicate</button>
+                        <button class="fc-btn fc-grow danger" @onclick="() => { MkSnap(); RemoveSelectedImage(); }"><Icon Name="trash" Size="13" /> Delete</button>
+                    </div>
+                </FloatCard>
             }
-            else
+            else if (_mkStatus is not null)
             {
-                <p class="sig-note">Placed signatures are normal overlays — drag, resize, or delete them, then Save As.</p>
+                <FloatCard Title="Marks" Meta="@MarkCountLabel" OnClose="() => { _mkStatus = null; _mkSavedPath = null; }">
+                    <div class="fc-status @(_mkError ? "err" : null)">@_mkStatus</div>
+                    @if (_mkSavedPath is not null)
+                    {
+                        <button class="fc-btn" @onclick="OpenRedacted">Open it</button>
+                    }
+                </FloatCard>
             }
-        </div>
-    }
+        }
 
-    @if (doc is not null && Tab?.StampOpen == true)
-    {
-        var t = Tab!;
-        var wm = t.Watermark;
-        var hf = t.HeaderFooter;
-        <div class="rdrawer stampdrawer">
-            <div class="rdrawer-h">
-                <span>Watermark &amp; header/footer</span>
-                <span class="rd-h-btns">
-                    <button @onclick="ToggleStamp" aria-label="Close"><Icon Name="x" Size="15" /></button>
-                </span>
-            </div>
+        @if (doc is not null && tab is not null)
+        {
+            @switch (_card)
+            {
+                case "layers":
+                    <LayersCard Path="@tab.Path" Session="@tab.Session" CurrentPage="@CurPage" OnClose="CloseCard" OnMessage="OnCardMessage" OnLayersChanged="OnLayersChanged" />
+                    break;
+                case "measure":
+                    <MeasureCard Path="@tab.Path" Session="@tab.Session" CurrentPage="@CurPage" OnClose="CloseMeasure" OnMessage="OnCardMessage" Measurement="@_measure" OnClear="ClearMeasure" />
+                    break;
+                case "signatures":
+                    <SignaturesCard Path="@tab.Path" Session="@tab.Session" CurrentPage="@CurPage" OnClose="CloseCard" OnMessage="OnCardMessage" OnReport="OnSigReport" />
+                    break;
+                case "print":
+                    <PrintCard Path="@tab.Path" Session="@tab.Session" CurrentPage="@CurPage" OnClose="CloseCard" OnMessage="OnCardMessage" />
+                    break;
+                case "password":
+                    <PasswordCard Path="@tab.Path" Session="@tab.Session" CurrentPage="@CurPage" OnClose="CloseCard" OnMessage="OnCardMessage" OnSaved="OnProtectedSaved" />
+                    break;
+                case "cert":
+                    <FloatCard Title="Sign with certificate" Meta="always a new file" OnClose="CloseCard">
+                        <div class="fc-row">
+                            <button class="fc-btn fc-grow" @onclick="PickCert"><Icon Name="certification" Size="13" /> @(_certPath is null ? "Choose certificate (.pfx)…" : System.IO.Path.GetFileName(_certPath))</button>
+                        </div>
+                        <input class="fc-in" type="password" placeholder="Certificate password" @bind="_certPwd" @bind:event="oninput" />
+                        <input class="fc-in" placeholder="Reason (optional)" @bind="_certReason" @bind:event="oninput" />
+                        <input class="fc-in" placeholder="Location (optional)" @bind="_certLocation" @bind:event="oninput" />
+                        @if (_certSummary is not null)
+                        {
+                            <div class="fc-note">@_certSummary</div>
+                        }
+                        <p class="fc-note">An invisible digital signature is added; the signed copy is checked before it is saved. A visible signature box is waiting on the PDF library.</p>
+                        <div class="fc-foot">
+                            <button class="fc-btn primary fc-grow" disabled="@(_certPath is null || _certBusy)" @onclick="SignWithCertificate">@(_certBusy ? "Signing…" : "Save signed copy")</button>
+                        </div>
+                    </FloatCard>
+                    break;
+                case "stamp":
+                    var st = tab;
+                    var wm = st.Watermark;
+                    var hf = st.HeaderFooter;
+                    <FloatCard Title="@(_stampFocus == "watermark" ? "Watermark" : "Stamp")" Meta="preview on the page" Width="290" OnClose="CloseStamp">
+                        <div class="fc-card-scroll">
+                            <div class="fc-grp">Watermark</div>
+                            <input class="fc-in" placeholder="Watermark text (blank = off)" @bind="wm.Text" @bind:event="oninput" />
+                            <div class="fc-row">
+                                <select class="fc-sel fc-grow" @bind="wm.FontFamily">
+                                    <option value="Helvetica">Helvetica</option>
+                                    <option value="Times">Times</option>
+                                    <option value="Courier">Courier</option>
+                                </select>
+                                <button class="fc-btn fc-sq @(wm.Bold ? "on" : null)" @onclick="() => wm.Bold = !wm.Bold"><b>B</b></button>
+                                <button class="fc-btn fc-sq @(wm.Italic ? "on" : null)" @onclick="() => wm.Italic = !wm.Italic"><i>I</i></button>
+                                <label class="fc-sw on" title="Colour" style="background:@wm.ColorHex"><input type="color" @bind="wm.ColorHex" @bind:event="oninput" /></label>
+                            </div>
+                            <div class="fc-row"><span class="fc-lbl">Size</span><input class="fc-grow" type="range" min="8" max="144" step="1" @bind="wm.FontSize" @bind:event="oninput" /><span class="fc-meta">@(((int)wm.FontSize))</span></div>
+                            <div class="fc-row"><span class="fc-lbl">Opacity</span><input class="fc-grow" type="range" min="0.05" max="1" step="0.05" @bind="wm.Opacity" @bind:event="oninput" /><span class="fc-meta">@(((int)(wm.Opacity * 100)))%</span></div>
+                            <div class="fc-row">
+                                <span class="fc-lbl">Angle</span>
+                                <div class="fc-seg fc-grow">
+                                    @foreach (var a in new[] { 0, 45, 90, 315 })
+                                    {
+                                        var aa = a;
+                                        <button class="@((int)wm.RotationDegrees == aa ? "on" : null)" @onclick="() => wm.RotationDegrees = aa">@(aa)°</button>
+                                    }
+                                </div>
+                            </div>
+                            <label class="fc-toggle">All pages <input type="checkbox" @bind="wm.AllPages" /></label>
+                            @if (!wm.AllPages)
+                            {
+                                <div class="fc-row"><span class="fc-lbl">Pages</span><input type="number" min="1" class="fc-num" @bind="wm.FromPage" /> – <input type="number" min="0" class="fc-num" @bind="wm.ToPage" placeholder="end" /></div>
+                            }
 
-            <div class="rd-grp">WATERMARK</div>
-            <input class="stamp-in" placeholder="Watermark text (blank = off)" @bind="wm.Text" @bind:event="oninput" />
-            <div class="stamp-row">
-                <select class="stamp-sel" @bind="wm.FontFamily">
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times">Times</option>
-                    <option value="Courier">Courier</option>
-                </select>
-                <button class="stamp-chip @(wm.Bold ? "on" : null)" @onclick="() => wm.Bold = !wm.Bold"><b>B</b></button>
-                <button class="stamp-chip @(wm.Italic ? "on" : null)" @onclick="() => wm.Italic = !wm.Italic"><i>I</i></button>
-                <input type="color" @bind="wm.ColorHex" @bind:event="oninput" title="Colour" />
-            </div>
-            <div class="stamp-row">
-                <label>Size</label>
-                <input type="range" min="8" max="144" step="1" @bind="wm.FontSize" @bind:event="oninput" />
-                <span class="stamp-val">@(((int)wm.FontSize))</span>
-            </div>
-            <div class="stamp-row">
-                <label>Opacity</label>
-                <input type="range" min="0.05" max="1" step="0.05" @bind="wm.Opacity" @bind:event="oninput" />
-                <span class="stamp-val">@(((int)(wm.Opacity * 100)))%</span>
-            </div>
-            <div class="stamp-row">
-                <label>Angle</label>
-                @foreach (var a in new[] { 0, 45, 90, 315 })
+                            <div class="fc-grp">Header / footer</div>
+                            <label class="fc-toggle">Header <input type="checkbox" @bind="hf.HeaderEnabled" /></label>
+                            @if (hf.HeaderEnabled)
+                            {
+                                <div class="stamp-slots">
+                                    <BandSlotEditor @bind-Value="hf.HeaderLeft" Placeholder="left" />
+                                    <BandSlotEditor @bind-Value="hf.HeaderCenter" Placeholder="center" />
+                                    <BandSlotEditor @bind-Value="hf.HeaderRight" Placeholder="right" />
+                                </div>
+                            }
+                            <label class="fc-toggle">Footer <input type="checkbox" @bind="hf.FooterEnabled" /></label>
+                            @if (hf.FooterEnabled)
+                            {
+                                <div class="stamp-slots">
+                                    <BandSlotEditor @bind-Value="hf.FooterLeft" Placeholder="left" />
+                                    <BandSlotEditor @bind-Value="hf.FooterCenter" Placeholder="center" />
+                                    <BandSlotEditor @bind-Value="hf.FooterRight" Placeholder="right" />
+                                </div>
+                            }
+                            <div class="fc-row"><span class="fc-lbl">Size</span><input class="fc-grow" type="range" min="6" max="24" step="1" @bind="hf.FontSize" @bind:event="oninput" /><span class="fc-meta">@(((int)hf.FontSize))</span><label class="fc-sw on" title="Text colour" style="background:@hf.ColorHex"><input type="color" @bind="hf.ColorHex" @bind:event="oninput" /></label></div>
+                            <div class="fc-row">
+                                <label class="fc-toggle fc-grow">Band fill <input type="checkbox" @bind="hf.BackgroundEnabled" /></label>
+                                @if (hf.BackgroundEnabled)
+                                {
+                                    <label class="fc-sw on" style="background:@hf.BackgroundHex"><input type="color" @bind="hf.BackgroundHex" @bind:event="oninput" /></label>
+                                }
+                            </div>
+                            <label class="fc-toggle">All pages <input type="checkbox" @bind="hf.AllPages" /></label>
+                            @if (!hf.AllPages)
+                            {
+                                <div class="fc-row"><span class="fc-lbl">Pages</span><input type="number" min="1" class="fc-num" @bind="hf.FromPage" /> – <input type="number" min="0" class="fc-num" @bind="hf.ToPage" placeholder="end" /></div>
+                            }
+                            <div class="fc-note">Fit: Overlay (Shrink fits await a library fix).</div>
+                        </div>
+                        <div class="fc-foot">
+                            <button class="fc-btn fc-grow" @onclick="StampSaveInPlace" disabled="@(!HasStamp || _stampSaving)" title="Overwrite the open file">@(_stampSaving ? "Saving…" : "Save")</button>
+                            <button class="fc-btn primary fc-grow" @onclick="StampSaveAs" disabled="@(!HasStamp || _stampSaving)" title="Save to a new file">@(_stampSaving ? "Saving…" : "Save as new PDF")</button>
+                        </div>
+                        @if (_stampStatus is { } stst)
+                        {
+                            <div class="fc-status @(_stampError ? "err" : null)">@stst</div>
+                        }
+                    </FloatCard>
+                    break;
+            }
+        }
+
+        @if (_card == "view" && tab is not null)
+        {
+            <FloatCard Title="View" Meta="@(viewOnly ? tab.Format.Label() : $"{ZoomPct}%")" OnClose="CloseCard">
+                <div class="fc-card-scroll">
+                @if (viewOnly)
                 {
-                    <button class="stamp-chip @((int)wm.RotationDegrees == a ? "on" : null)" @onclick="() => wm.RotationDegrees = a">@(a)°</button>
+                    <div class="fc-grp">Text size</div>
+                    <div class="fc-seg">
+                        @foreach (var sz in new[] { 85, 100, 115, 130, 150 })
+                        {
+                            var z = sz;
+                            <button class="@(_textSize == z ? "on" : null)" @onclick="() => _textSize = z">@z%</button>
+                        }
+                    </div>
+                    <div class="fc-grp">Reading width</div>
+                    <div class="fc-seg">
+                        @foreach (var w in new[] { "narrow", "normal", "wide" })
+                        {
+                            var ww = w;
+                            <button class="@(_readWidth == ww ? "on" : null)" @onclick="() => _readWidth = ww">@ww</button>
+                        }
+                    </div>
+                    @if (tab.Format == DocumentFormat.Text)
+                    {
+                        <label class="fc-toggle">Wrap lines <input type="checkbox" checked="@_wrap" @onchange="() => _wrap = !_wrap" /></label>
+                    }
                 }
-            </div>
-            <label class="stamp-toggle"><input type="checkbox" @bind="wm.AllPages" /> All pages</label>
-            @if (!wm.AllPages)
-            {
-                <div class="stamp-row">
-                    <label>Pages</label>
-                    <input type="number" min="1" class="stamp-num" @bind="wm.FromPage" /> –
-                    <input type="number" min="0" class="stamp-num" @bind="wm.ToPage" placeholder="end" />
-                </div>
-            }
-
-            <div class="rd-grp">HEADER / FOOTER</div>
-            <label class="stamp-toggle"><input type="checkbox" @bind="hf.HeaderEnabled" /> Header</label>
-            @if (hf.HeaderEnabled)
-            {
-                <div class="stamp-slots">
-                    <BandSlotEditor @bind-Value="hf.HeaderLeft" Placeholder="left" />
-                    <BandSlotEditor @bind-Value="hf.HeaderCenter" Placeholder="center" />
-                    <BandSlotEditor @bind-Value="hf.HeaderRight" Placeholder="right" />
-                </div>
-            }
-            <label class="stamp-toggle"><input type="checkbox" @bind="hf.FooterEnabled" /> Footer</label>
-            @if (hf.FooterEnabled)
-            {
-                <div class="stamp-slots">
-                    <BandSlotEditor @bind-Value="hf.FooterLeft" Placeholder="left" />
-                    <BandSlotEditor @bind-Value="hf.FooterCenter" Placeholder="center" />
-                    <BandSlotEditor @bind-Value="hf.FooterRight" Placeholder="right" />
-                </div>
-            }
-            <div class="stamp-row">
-                <label>Size</label>
-                <input type="range" min="6" max="24" step="1" @bind="hf.FontSize" @bind:event="oninput" />
-                <span class="stamp-val">@(((int)hf.FontSize))</span>
-                <input type="color" @bind="hf.ColorHex" @bind:event="oninput" title="Text colour" />
-            </div>
-            <div class="stamp-row">
-                <label class="stamp-toggle"><input type="checkbox" @bind="hf.BackgroundEnabled" /> Band fill</label>
-                @if (hf.BackgroundEnabled)
+                else
                 {
-                    <input type="color" @bind="hf.BackgroundHex" @bind:event="oninput" />
+                    <div class="fc-grp">Fit</div>
+                    <div class="fc-row">
+                        <button class="fc-btn fc-grow @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth">Width</button>
+                        <button class="fc-btn fc-grow @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage">Page</button>
+                        <button class="fc-btn fc-grow" @onclick="ActualSize" title="Actual size (100%)">100%</button>
+                    </div>
+                    <div class="fc-grp">Zoom</div>
+                    <div class="fc-chips">
+                        @foreach (var p in _zoomPresets)
+                        {
+                            <button class="fc-chip @(ZoomPct == p ? "on" : null)" @onclick="() => ZoomPreset(p)">@p%</button>
+                        }
+                    </div>
+                    <div class="fc-grp">Page layout</div>
+                    <div class="fc-seg">
+                        <button class="@(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)">Single</button>
+                        <button class="@(TwoPageOn && Tab?.CoverAlone != true ? "on" : null)" @onclick="() => SetColumns(true)">Two-page</button>
+                        <button class="@(TwoPageOn && Tab?.CoverAlone == true ? "on" : null)" @onclick="CoverLayout">Cover</button>
+                    </div>
+                    <label class="fc-toggle">Show cover alone <input type="checkbox" checked="@(Tab?.CoverAlone == true)" @onchange="ToggleCover" /></label>
+                    <label class="fc-toggle">Scroll (continuous) <input type="checkbox" checked="@ContinuousOn" @onchange="ToggleContinuous" /></label>
+                    <label class="fc-toggle">Lock scrolling <input type="checkbox" checked="@(Tab?.ScrollLocked == true)" @onchange="ToggleScrollLock" /></label>
+                    <div class="fc-grp">Rotate view</div>
+                    <div class="fc-seg">
+                        <button class="@(_rotScope == RotateScopeKind.Page ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Page">Page</button>
+                        <button class="@(_rotScope == RotateScopeKind.Onward ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Onward">Onward</button>
+                        <button class="@(_rotScope == RotateScopeKind.Document ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Document">All</button>
+                    </div>
+                    <div class="fc-row">
+                        <button class="fc-btn fc-grow" @onclick="() => RotateScopeBy(-90)"><Icon Name="rotate-ccw" Size="14" /> Left</button>
+                        <button class="fc-btn fc-grow" @onclick="() => RotateScopeBy(90)"><Icon Name="rotate-cw" Size="14" /> Right</button>
+                    </div>
+                    <div class="fc-grp">Tools</div>
+                    <div class="fc-row">
+                        <button class="fc-btn fc-grow @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)">Hand</button>
+                        <button class="fc-btn fc-grow @(_tool == ReaderTool.Marquee ? "on" : null)" @onclick="() => SetTool(ReaderTool.Marquee)" title="Drag a box to zoom into it">Marquee</button>
+                        <button class="fc-btn fc-grow @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)">Loupe</button>
+                    </div>
+                    <div class="fc-row"><span class="fc-lbl">Lens</span>
+                        <div class="fc-seg fc-grow">
+                            <button class="@(_loupeRadius == 60 ? "on" : null)" @onclick="() => SetLoupe(60, _loupeMag)">S</button>
+                            <button class="@(_loupeRadius == 84 ? "on" : null)" @onclick="() => SetLoupe(84, _loupeMag)">M</button>
+                            <button class="@(_loupeRadius == 112 ? "on" : null)" @onclick="() => SetLoupe(112, _loupeMag)">L</button>
+                        </div>
+                    </div>
+                    <div class="fc-row"><span class="fc-lbl">Magnify</span>
+                        <div class="fc-seg fc-grow">
+                            <button class="@(_loupeMag == 1.5 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 1.5)">1.5×</button>
+                            <button class="@(_loupeMag == 2.2 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 2.2)">2×</button>
+                            <button class="@(_loupeMag == 3.0 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 3.0)">3×</button>
+                        </div>
+                    </div>
+                    <div class="fc-grp">Page colour <span style="text-transform:none;letter-spacing:0">· view only</span></div>
+                    <div class="fc-swatches">
+                        @foreach (var (name, hex) in _pageBgPresets)
+                        {
+                            <button class="fc-sw @(SameColor(_pageBg, hex) ? "on" : null)" style="background:@hex" title="@name" @onclick="() => SetPageBg(hex)"></button>
+                        }
+                        <label class="fc-sw" title="Custom" style="background:@_pageBg"><input type="color" value="@_pageBg" @oninput="OnCustomPageBg" /></label>
+                        <button class="fc-chip" @onclick='() => SetPageBg("#ffffff")'>Reset</button>
+                    </div>
+                    <div class="fc-grp">Display</div>
+                    <label class="fc-toggle">Strip under the page on hover <input type="checkbox" checked="@_hoverEnabled" @onchange="() => _hoverEnabled = !_hoverEnabled" /></label>
+                    <label class="fc-toggle">Page-curl corner <input type="checkbox" checked="@_curl" @onchange="() => _curl = !_curl" /></label>
+                    <button class="fc-btn" @onclick="ToggleReading"><Icon Name="expand" Size="14" /> @(_reading ? "Exit full screen" : "Full screen / reading")</button>
                 }
-            </div>
-            <label class="stamp-toggle"><input type="checkbox" @bind="hf.AllPages" /> All pages</label>
-            @if (!hf.AllPages)
-            {
-                <div class="stamp-row">
-                    <label>Pages</label>
-                    <input type="number" min="1" class="stamp-num" @bind="hf.FromPage" /> –
-                    <input type="number" min="0" class="stamp-num" @bind="hf.ToPage" placeholder="end" />
                 </div>
-            }
-            <div class="stamp-note">Fit: Overlay (Shrink fits await a library fix).</div>
-
-            <div class="stamp-actions">
-                <button class="mk-btn" @onclick="StampSaveInPlace" disabled="@(!HasStamp || _stampSaving)" title="Overwrite the open file">@(_stampSaving ? "Saving…" : "Save")</button>
-                <button class="mk-btn primary" @onclick="StampSaveAs" disabled="@(!HasStamp || _stampSaving)" title="Save to a new file">@(_stampSaving ? "Saving…" : "Save as new PDF")</button>
-            </div>
-            @if (_stampStatus is { } st)
-            {
-                <div class="rd-status @(_stampError ? "err" : null)">@st</div>
-            }
-        </div>
-    }
+            </FloatCard>
+        }
+    </div>
 
     @if (_snapMenuOpen && _snapBase64 is not null)
     {
@@ -887,76 +1000,9 @@
         </div>
     }
 
-    @if (doc is not null && _drawerOpen)
+    @if (doc is not null && _reading)
     {
-        <div class="rdrawer">
-            <div class="rdrawer-h">
-                <span>View</span>
-                <span class="rd-h-btns">
-                    <button class="@(_drawerPinned ? "on" : null)" @onclick="TogglePin" title="@(_drawerPinned ? "Unpin" : "Pin to right")"><Icon Name="pin" Size="14" /></button>
-                    <button @onclick="ToggleDrawer" aria-label="Close"><Icon Name="x" Size="15" /></button>
-                </span>
-            </div>
-
-            <div class="rd-grp">FIT</div>
-            <button class="rd-item @(Tab?.FitMode == ReaderFitMode.Width ? "on" : null)" @onclick="FitWidth"><Icon Name="fit-width" Size="17" /> <span>Fit width</span></button>
-            <button class="rd-item @(Tab?.FitMode == ReaderFitMode.Page ? "on" : null)" @onclick="FitPage"><Icon Name="fit-page" Size="17" /> <span>Fit page</span></button>
-            <button class="rd-item" @onclick="ActualSize"><Icon Name="actual-size" Size="17" /> <span>Actual size (100%)</span></button>
-
-            <div class="rd-grp">ZOOM</div>
-            <div class="rd-presets">
-                @foreach (var p in _zoomPresets)
-                {
-                    <button class="rd-chip @(ZoomPct == p ? "on" : null)" @onclick="() => ZoomPreset(p)">@p%</button>
-                }
-            </div>
-
-            <div class="rd-grp">PAGE LAYOUT</div>
-            <button class="rd-item @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)"><Icon Name="page-single" Size="17" /> <span>Single page</span></button>
-            <button class="rd-item @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)"><Icon Name="page-facing" Size="17" /> <span>Two-page</span></button>
-            <label class="rd-toggle"><input type="checkbox" checked="@(Tab?.CoverAlone == true)" @onchange="ToggleCover" /> Show cover alone</label>
-            <label class="rd-toggle"><input type="checkbox" checked="@ContinuousOn" @onchange="ToggleContinuous" /> Scroll (continuous)</label>
-
-            <div class="rd-grp">ROTATE VIEW</div>
-            <div class="rd-scope">
-                <button class="rd-seg @(_rotScope == RotateScopeKind.Page ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Page">This page</button>
-                <button class="rd-seg @(_rotScope == RotateScopeKind.Onward ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Onward">This page onwards</button>
-                <button class="rd-seg @(_rotScope == RotateScopeKind.Document ? "on" : null)" @onclick="() => _rotScope = RotateScopeKind.Document">Whole document</button>
-            </div>
-            <div class="rd-rotrow">
-                <button class="rd-item rd-rot" @onclick="() => RotateScopeBy(-90)"><Icon Name="rotate-ccw" Size="17" /> <span>Left</span></button>
-                <button class="rd-item rd-rot" @onclick="() => RotateScopeBy(90)"><Icon Name="rotate-cw" Size="17" /> <span>Right</span></button>
-            </div>
-
-            <div class="rd-grp">TOOLS</div>
-            <button class="rd-item @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)"><Icon Name="hand" Size="17" /> <span>Hand / pan</span></button>
-            <button class="rd-item @(_tool == ReaderTool.Marquee ? "on" : null)" @onclick="() => SetTool(ReaderTool.Marquee)"><Icon Name="zoom-area" Size="17" /> <span>Marquee zoom</span></button>
-            <button class="rd-item @(_tool == ReaderTool.Loupe ? "on" : null)" @onclick="() => SetTool(ReaderTool.Loupe)"><Icon Name="loupe" Size="17" /> <span>Loupe</span></button>
-            <div class="rd-sub">
-                <div class="rd-sublabel">Lens size</div>
-                <div class="rd-presets">
-                    <button class="rd-chip @(_loupeRadius == 60 ? "on" : null)" @onclick="() => SetLoupe(60, _loupeMag)">S</button>
-                    <button class="rd-chip @(_loupeRadius == 84 ? "on" : null)" @onclick="() => SetLoupe(84, _loupeMag)">M</button>
-                    <button class="rd-chip @(_loupeRadius == 112 ? "on" : null)" @onclick="() => SetLoupe(112, _loupeMag)">L</button>
-                </div>
-                <div class="rd-sublabel">Magnification</div>
-                <div class="rd-presets">
-                    <button class="rd-chip @(_loupeMag == 1.5 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 1.5)">1.5×</button>
-                    <button class="rd-chip @(_loupeMag == 2.2 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 2.2)">2×</button>
-                    <button class="rd-chip @(_loupeMag == 3.0 ? "on" : null)" @onclick="() => SetLoupe(_loupeRadius, 3.0)">3×</button>
-                </div>
-            </div>
-
-            <div class="rd-grp">DISPLAY</div>
-            <label class="rd-toggle"><input type="checkbox" checked="@(Tab?.ScrollLocked == true)" @onchange="ToggleScrollLock" /> Lock scrolling</label>
-            <label class="rd-toggle"><input type="checkbox" checked="@_hoverEnabled" @onchange="() => _hoverEnabled = !_hoverEnabled" /> Hover controls (bottom edge)</label>
-            <label class="rd-toggle"><input type="checkbox" checked="@_curl" @onchange="() => _curl = !_curl" /> Page-curl corner</label>
-            <button class="rd-item" @onclick="ToggleReading"><Icon Name="expand" Size="17" /> <span>@(_reading ? "Exit full screen" : "Full screen / reading")</span></button>
-        </div>
-    }
-
-    @if (doc is not null && _hoverEnabled && !_drawerOpen)
-    {
+        @* Immersive: the rails are hidden, so the old bottom-edge bar comes back for view controls. *@
         <div class="rhoverzone"></div>
         <div class="rfloat">
             <button class="vbtn" @onclick="ZoomOut" title="Zoom out"><Icon Name="zoom-out" Size="15" /></button>
@@ -969,10 +1015,22 @@
             <button class="vbtn @(!TwoPageOn ? "on" : null)" @onclick="() => SetColumns(false)" title="Single page"><Icon Name="page-single" Size="17" /></button>
             <button class="vbtn @(TwoPageOn ? "on" : null)" @onclick="() => SetColumns(true)" title="Two-page"><Icon Name="page-facing" Size="17" /></button>
             <span class="rsep"></span>
-            <button class="vbtn" @onclick="() => RotateScopeBy(-90)" title="Rotate left (scope in View ▸ Rotate)"><Icon Name="rotate-ccw" Size="17" /></button>
-            <button class="vbtn" @onclick="() => RotateScopeBy(90)" title="Rotate right (scope in View ▸ Rotate)"><Icon Name="rotate-cw" Size="17" /></button>
+            <button class="vbtn" @onclick="() => RotateScopeBy(-90)" title="Rotate left"><Icon Name="rotate-ccw" Size="17" /></button>
+            <button class="vbtn" @onclick="() => RotateScopeBy(90)" title="Rotate right"><Icon Name="rotate-cw" Size="17" /></button>
             <button class="vbtn @(_tool == ReaderTool.Hand ? "on" : null)" @onclick="() => SetTool(ReaderTool.Hand)" title="Hand (pan)"><Icon Name="hand" Size="17" /></button>
-            <button class="vbtn" @onclick="ToggleReading" title="Full screen"><Icon Name="expand" Size="15" /></button>
+            <button class="vbtn" @onclick="ToggleReading" title="Exit full screen"><Icon Name="expand" Size="15" /></button>
+        </div>
+    }
+
+    @if (doc is not null && _hoverEnabled && !_reading)
+    {
+        <div class="pstrip" role="toolbar" aria-label="This page">
+            <span class="pstrip-pg">p @CurPage</span>
+            <button @onclick="() => RotateCurrent(90)" title="Rotate this page (view only)"><Icon Name="rotate-cw" Size="14" /> Rotate page</button>
+            <button @onclick="() => ToggleSendMenu(CurPage - 1)" title="Send this page to a desk in Arrange"><Icon Name="grid-view" Size="14" /> To desk</button>
+            <button @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region (S)"><Icon Name="snapshot" Size="14" /> Snapshot</button>
+            <button @onclick="AddBookmarkHere" title="Bookmark this page (Ctrl B)"><Icon Name="bookmark" Size="14" /> Bookmark</button>
+            <button disabled title="Peek — coming soon"><Icon Name="eye" Size="14" /> Peek</button>
         </div>
     }
 
@@ -988,6 +1046,120 @@
     @if (_toast is { } toast)
     {
         <div class="rpage-toast">@toast</div>
+    }
+    </div>
+
+    @if (tab is not null && (doc is not null || viewOnly))
+    {
+        <div class="mview-rails">
+            @if (viewOnly)
+            {
+                <SideRail Kind="tools" Heading="TOOLS">
+                    <RailButton Icon="outline" Label="Outline" Active="_pagesDrawer" OnClick="TogglePagesDrawer" Disabled="@(_viewerOutline.Count == 0)" />
+                    <RailButton Icon="find-in-page" Label="Find" Keys="Ctrl F" Active="_viewerFindOpen" OnClick="OpenViewerFind" />
+                    <RailButton Icon="copy" Label="Copy all" OnClick="CopyAllViewerText" />
+                    <RailButton Icon="print" Label="Print" DisabledReason="Convert to PDF first" />
+                    @if (tab.Format is DocumentFormat.Markdown or DocumentFormat.Html)
+                    {
+                        <RailButton Icon="@(_showSource ? "eye" : "data-table")" Label="@(_showSource ? "Show rendered" : "Show source")" Active="_showSource" OnClick="() => _showSource = !_showSource" />
+                    }
+                    <RailButton Icon="sliders" Label="View" Class="rb-viewfold" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
+                    <RailSpacer />
+                    <RailButton Icon="file-pdf" Label="Convert to PDF" Primary="true" DisabledReason="Coming with the Layout library" />
+                </SideRail>
+                <SideRail Kind="view" Heading="VIEW">
+                    <RailButton Icon="zoom-in" Label="Larger text" Size="18" OnClick="() => _textSize = Math.Min(200, _textSize + 10)" />
+                    <RailText Title="Text size">@_textSize%</RailText>
+                    <RailButton Icon="zoom-out" Label="Smaller text" Size="18" OnClick="() => _textSize = Math.Max(60, _textSize - 10)" />
+                    <RailSep />
+                    <RailButton Icon="page-single" Label="Narrow column" Size="18" Active='_readWidth == "narrow"' OnClick='() => _readWidth = "narrow"' />
+                    <RailButton Icon="columns" Label="Normal width" Size="18" Active='_readWidth == "normal"' OnClick='() => _readWidth = "normal"' />
+                    <RailButton Icon="fit-width" Label="Wide" Size="18" Active='_readWidth == "wide"' OnClick='() => _readWidth = "wide"' />
+                    @if (tab.Format == DocumentFormat.Text)
+                    {
+                        <RailSep />
+                        <RailButton Icon="list-view" Label="Wrap lines" Size="18" Active="_wrap" OnClick="() => _wrap = !_wrap" />
+                    }
+                </SideRail>
+            }
+            else if (_markup)
+            {
+                <SideRail Kind="tools" Heading="MARK">
+                    <RailButton Icon="text-box" Label="Text" Keys="T" Active='_mkTool == "text" && !_sigOpen' OnClick='() => PickMkTool("text")' />
+                    <RailButton Icon="file-image" Label="Image" Keys="I" Active='_mkTool == "image" && !_sigOpen' OnClick="PickImageTool" />
+                    <RailButton Icon="shape-rect" Label="Rectangle" Keys="B" Active='_mkTool == "rect" && !_sigOpen' OnClick='() => PickMkTool("rect")' />
+                    <RailButton Icon="shape-ellipse" Label="Ellipse" Keys="E" Active='_mkTool == "ellipse" && !_sigOpen' OnClick='() => PickMkTool("ellipse")' />
+                    <RailButton Icon="minus" Label="Line" Keys="L" Active='_mkTool == "line" && !_sigOpen' OnClick='() => PickMkTool("line")' />
+                    <RailButton Icon="arrow-anno" Label="Arrow" Keys="A" Active='_mkTool == "arrow" && !_sigOpen' OnClick='() => PickMkTool("arrow")' />
+                    <RailButton Icon="freehand" Label="Draw" Keys="D" Active='_mkTool == "freehand" && !_sigOpen' OnClick='() => PickMkTool("freehand")' />
+                    <RailButton Icon="signature" Label="Signature" Keys="G" Active="_sigOpen" OnClick="OpenSignature" />
+                    <RailButton Icon="highlight" Label="Highlight" Keys="H" DisabledReason="Coming soon" />
+                    <RailButton Icon="sticky-note" Label="Note" Keys="N" DisabledReason="Coming soon" />
+                    <RailButton Icon="form-field" Label="Fill form" DisabledReason="Coming soon" />
+                    <RailSep />
+                    <RailButton Icon="undo" Label="Undo" Keys="Ctrl Z" Disabled="@(_mkUndo.Count == 0)" OnClick="MkUndo" />
+                    <RailButton Icon="redo" Label="Redo" Keys="Ctrl Y" Disabled="@(_mkRedo.Count == 0)" OnClick="MkRedo" />
+                    <RailButton Icon="trash" Label="Clear all marks" Disabled="@(OverlayCount == 0 || _mkSaving)" OnClick="() => { MkSnap(); ClearMarkup(); }" />
+                    <RailButton Icon="sliders" Label="View" Class="rb-viewfold" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
+                    <RailSpacer />
+                    <RailButton Icon="save" Label="Save" Keys="Ctrl S" Disabled="@(OverlayCount == 0 || _mkSaving)" OnClick="SaveInPlace" />
+                    <RailButton Icon="download" Label="Save as new PDF" Keys="Ctrl Shift S" Primary="true" Disabled="@(OverlayCount == 0 || _mkSaving)" OnClick="SaveMarkup" />
+                </SideRail>
+            }
+            else if (_protect)
+            {
+                <SideRail Kind="tools" Heading="PROTECT">
+                    <RailButton Icon="redact" Label="Redact box" Keys="R" OnClick="() => GoRedact(false)" />
+                    <RailButton Icon="find-in-page" Label="Find & redact" OnClick="() => GoRedact(true)" />
+                    <RailButton Icon="stamp" Label="Stamp" Active='_card == "stamp" && _stampFocus != "watermark"' OnClick='() => OpenStamp("stamp")' />
+                    <RailButton Icon="watermark" Label="Watermark" Active='_card == "stamp" && _stampFocus == "watermark"' OnClick='() => OpenStamp("watermark")' />
+                    <RailButton Icon="compress" Label="Flatten" Disabled="_flattening" OnClick="FlattenNow" />
+                    <RailButton Icon="doc-lock" Label="Password" Active='_card == "password"' OnClick='() => ToggleCard("password")' />
+                    <RailButton Icon="certification" Label="Sign with certificate" DisabledReason="@(ChuvadiReader.Core.Documents.CertificateSignService.IsAvailable ? null : ChuvadiReader.Core.Documents.CertificateSignService.WaitingReason)" Active='_card == "cert"' OnClick='() => ToggleCard("cert")' />
+                    <RailButton Icon="sliders" Label="View" Class="rb-viewfold" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
+                    <RailSpacer />
+                    <RailButton Icon="download" Label="Save redacted copy" Primary="true" OnClick="() => GoRedact(false)" />
+                </SideRail>
+            }
+            else
+            {
+                <SideRail Kind="tools" Heading="READ">
+                    <RailButton Icon="page-single" Label="Pages & outline" Active="_pagesDrawer" OnClick="TogglePagesDrawer" />
+                    <RailButton Icon="bookmark" Label="Add bookmark" Keys="Ctrl B" OnClick="AddBookmarkHere" />
+                    <RailButton Icon="snapshot" Label="Snapshot" Keys="S" Active="_tool == ReaderTool.Snapshot" OnClick="() => SetTool(ReaderTool.Snapshot)" />
+                    <RailButton Icon="skin-layer" Label="Layers" Active='_card == "layers"' OnClick='() => ToggleCard("layers")' />
+                    <RailButton Icon="measure-tool" Label="Measure" Keys="M" Active="_measureOn" OnClick="ToggleMeasure" />
+                    <RailButton Icon="certification" Label="Signatures" Active='_card == "signatures"' OnClick='() => ToggleCard("signatures")' />
+                    <RailButton Icon="find-in-page" Label="Find" Keys="Ctrl F" Active="_findOpen" OnClick="OpenFindFromShell" />
+                    <RailButton Icon="sliders" Label="View" Class="rb-viewfold" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
+                    <RailSep />
+                    <RailButton Icon="print" Label="Print" Keys="Ctrl P" Active='_card == "print"' OnClick='() => ToggleCard("print")' />
+                    <RailButton Icon="eye" Label="Immersive" Keys="F11" Active="_reading" OnClick="ToggleReading" />
+                </SideRail>
+            }
+
+            @if (!viewOnly)
+            {
+                <SideRail Kind="view" Heading="VIEW">
+                    <RailButton Icon="zoom-in" Label="Zoom in" Keys="Ctrl +" Size="18" Disabled="@(CurScale >= 8.0)" OnClick="ZoomIn" />
+                    <RailText Title="Zoom">@ZoomPct%</RailText>
+                    <RailButton Icon="zoom-out" Label="Zoom out" Keys="Ctrl −" Size="18" Disabled="@(CurScale <= 0.1)" OnClick="ZoomOut" />
+                    <RailSep />
+                    <RailButton Icon="fit-width" Label="Fit width" Keys="@(_markup ? null : "W")" Size="18" Active="@(Tab?.FitMode == ReaderFitMode.Width)" OnClick="FitWidth" />
+                    <RailButton Icon="fit-page" Label="Fit page" Keys="@(_markup ? null : "P")" Size="18" Active="@(Tab?.FitMode == ReaderFitMode.Page)" OnClick="FitPage" />
+                    <RailSep />
+                    <RailButton Icon="page-single" Label="Single page" Size="18" Active="!TwoPageOn" OnClick="() => SetColumns(false)" />
+                    <RailButton Icon="page-facing" Label="Two-page" Size="18" Active="@(TwoPageOn && Tab?.CoverAlone != true)" OnClick="() => SetColumns(true)" />
+                    <RailButton Icon="page-cover" Label="Cover alone" Size="18" Active="@(TwoPageOn && Tab?.CoverAlone == true)" OnClick="CoverLayout" />
+                    <RailSep />
+                    <RailButton Icon="rotate-cw" Label="Rotate view" Keys="Ctrl ]" Size="18" OnClick="() => RotateScopeBy(90)" />
+                    <RailButton Icon="hand" Label="Hand" Keys="@(_markup ? null : "H")" Size="18" Active="_tool == ReaderTool.Hand" OnClick="() => SetTool(ReaderTool.Hand)" />
+                    <RailButton Icon="loupe" Label="Loupe" Keys="@(_markup ? null : "L")" Size="18" Active="_tool == ReaderTool.Loupe" OnClick="() => SetTool(ReaderTool.Loupe)" />
+                    <RailSep />
+                    <RailButton Icon="sliders" Label="More view options" Size="18" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
+                </SideRail>
+            }
+        </div>
     }
 </div>
 
@@ -1897,6 +2069,12 @@
         var m = CurrentFindMatch;
         if (m is null || _js is null) return;
         try { await _js.InvokeVoidAsync("scrollToPage", _desk, m.PageIndex); } catch { }
+        if (Tab is { } t)
+        {
+            t.CurrentPage = m.PageIndex + 1;   // keep the top-bar counter in step with the jump
+            _pageInput = t.CurrentPage.ToString();
+        }
+
         StateHasChanged();
     }
 
@@ -1939,7 +2117,7 @@
     private async Task BmGo(BookmarkNode n)
     {
         _bmSel = n;
-        if (_js is not null) { try { await _js.InvokeVoidAsync("scrollToPage", _desk, n.PageIndex); } catch { } }
+        await GoTo(n.PageIndex + 1);
     }
 
     private void BmBeginRename(BookmarkNode n) { _bmSel = n; _bmRenaming = n; }
@@ -2136,6 +2314,7 @@
     {
         if (!_markup || e.Button != 0) return;
         EnsureMarkupDoc();
+        MkBeginGesture();
         if (!await CacheLayerRect(page)) return;
 
         _mkStartX = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
@@ -2169,6 +2348,7 @@
     private void MkMove(PointerEventArgs e)
     {
         if (_mkMode == MkMode.None) return;
+        MkBeginGesture();
         var cx = Clamp01((e.ClientX - _mkRect.L) / _mkRect.W);
         var cy = Clamp01((e.ClientY - _mkRect.T) / _mkRect.H);
 
@@ -2281,6 +2461,12 @@
     }
 
     private void MkUp(PointerEventArgs e)
+    {
+        MkUpCore(e);
+        MkEndGesture();
+    }
+
+    private void MkUpCore(PointerEventArgs e)
     {
         switch (_mkMode)
         {
@@ -2551,6 +2737,7 @@
     private void AddImageBox(int page, byte[] bytes, string mime, double fx = -1, double fy = -1)
     {
         if (bytes is null || bytes.Length == 0) return;
+        MkSnap();
         var (natW, natH) = ImagePixelSize(bytes);
         double aspect = natH > 0 ? (double)natW / natH : 1.0;
 
@@ -2925,8 +3112,8 @@
     private void ToggleDocMenu() => _docMenuOpen = !_docMenuOpen;
     private void CloseDocMenu() => _docMenuOpen = false;
 
-    private void SetRead() { if (_markup) ToggleMarkup(); }
-    private void SetMark() { if (!_markup) ToggleMarkup(); }
+    private void SetRead() => SetLocalMode(DocMode.Read);
+    private void SetMark() => SetLocalMode(DocMode.Mark);
 
     private async Task DocProperties() { CloseDocMenu(); await ShowProperties(); }
     private void DocExport() { CloseDocMenu(); ShowExport(); }
@@ -2959,10 +3146,11 @@
             var format = DocumentFormatExtensions.FromPath(output);
             await Recents.TouchAsync(new RecentItem(name, output, format, DateTimeOffset.Now, false));
             await Tabs.OpenAsync(output, name, format);
+            Shell.Notify($"Flattened copy saved → {name}");
         }
         catch (Exception ex)
         {
-            await JS.InvokeVoidAsync("alert", "Couldn't flatten this PDF: " + ex.Message);
+            Shell.Notify("Couldn't flatten this PDF: " + ex.Message, isError: true);
         }
         finally
         {
@@ -2983,6 +3171,8 @@
     {
         Tabs.Changed += OnTabsChanged;
         OpenDoc.Requested += OnOpenRequestedLive;
+
+        ShellInit();
 
         // Rebuild the strip from the last session (no-op after the first time).
         await Tabs.RestoreAsync();
@@ -3061,6 +3251,8 @@
                 if (_markup) _ = CheckTaggedAsync();
             }
             RefreshDocKind(tab?.Path);
+            OnActiveDocChanged(tab);
+            ApplyShellModeForTab(tab);
         }
         else if (pageCount != _shownPageCount)
         {
@@ -3075,6 +3267,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        PublishShell();
         var tab = Tabs.Active;
         if (tab?.Session is null)
         {
@@ -3456,6 +3649,13 @@
     [JSInvokable]
     public void Undo()
     {
+        if (_markup && _mkUndo.Count > 0)
+        {
+            MkUndo();
+            StateHasChanged();
+            return;
+        }
+
         var tab = Tabs.Active;
         if (tab is null || !_undo.TryGetValue(tab, out var stack) || stack.Count == 0)
         {
@@ -3497,6 +3697,27 @@
     [JSInvokable]
     public async Task OnEscape()
     {
+        if (_measureOn)
+        {
+            CloseMeasure();
+            StateHasChanged();
+            return;
+        }
+
+        if (_card is not null)
+        {
+            CloseCard();
+            StateHasChanged();
+            return;
+        }
+
+        if (_pagesDrawer)
+        {
+            _pagesDrawer = false;
+            StateHasChanged();
+            return;
+        }
+
         if (_findOpen)
         {
             _findOpen = false;
@@ -3752,6 +3973,7 @@
 
     public async ValueTask DisposeAsync()
     {
+        ShellDispose();
         Tabs.Changed -= OnTabsChanged;
         OpenDoc.Requested -= OnOpenRequestedLive;
 

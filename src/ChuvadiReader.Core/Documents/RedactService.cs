@@ -485,6 +485,7 @@ public sealed class RedactService
         };
 
         var pageTextCache = new Dictionary<int, string>();
+        var perPageCount = new Dictionary<int, int>();
         TextExtractor? extractor = null;
 
         await foreach (var m in DocumentSearch.SearchAsync(doc, query, opts, ct).WithCancellation(ct))
@@ -514,10 +515,29 @@ public sealed class RedactService
                 catch { text = string.Empty; }
                 pageTextCache[m.PageNumber] = text;
             }
-            results.Add(new RedactSearchMatch(m.PageNumber, boxes, MakeSnippet(text, m.CharacterOffset, m.Length, query)));
+            // The search's CharacterOffset indexes the search engine's own page text, not the
+            // Layout extraction used here, so locate the same (n-th) occurrence in this text.
+            perPageCount.TryGetValue(m.PageNumber, out var nth);
+            perPageCount[m.PageNumber] = nth + 1;
+            var at = NthIndexOf(text, query, nth, caseSensitive);
+            results.Add(new RedactSearchMatch(m.PageNumber, boxes, MakeSnippet(text, at, query.Length, query)));
         }
 
         return results;
+    }
+
+    private static int NthIndexOf(string text, string query, int n, bool caseSensitive)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(query)) return -1;
+        var cmp = caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+        int i = text.IndexOf(query, cmp);
+        while (i >= 0 && n > 0)
+        {
+            i = text.IndexOf(query, i + 1, cmp);
+            n--;
+        }
+
+        return i;
     }
 
     private static string MakeSnippet(string text, int offset, int length, string fallback)

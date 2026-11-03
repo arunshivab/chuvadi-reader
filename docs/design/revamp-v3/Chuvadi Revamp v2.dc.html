@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:500;src:url("fonts/PlexMono-500.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"ss01","cv11";}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+
+<section id="turn-2" style="padding:72px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1500px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Round 2 · your seven questions</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:56px;line-height:1.02">Desks side by side, the clock back, the shelves kept.</h1>
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:8px">
+      <sc-for list="{{ answers }}" as="a" hint-placeholder-count="7">
+        <div style="display:flex;flex-direction:column;gap:6px;padding:16px 18px;border:0.5px solid #c4b497;border-radius:8px;background:#fbf7ec">
+          <div style="display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:11px">{{ a.n }}</span><span style="font-size:14.5px;font-weight:600">{{ a.t }}</span></div>
+          <div style="font-size:13.5px;line-height:1.5;color:#3a2f25;text-wrap:pretty">{{ a.d }}</div>
+          <div style="font-size:12.5px;color:#8a3a1c">See <a href="{{ a.href }}">{{ a.see }}</a></div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="font-family:'Instrument Serif';font-size:34px">Home — before and after</div>
+    <div style="display:flex;gap:40px;align-items:flex-start">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">2a</span><span style="font-size:15px">Today — rebuilt from Dashboard.razor and its .css</span></div>
+        <div id="2a" style="position:relative;width:1440px;height:900px;border-radius:10px;overflow:hidden;box-shadow:0 30px 80px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;flex-direction:column">
+          <header style="height:46px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+            <span style="font-family:'Instrument Serif';font-style:italic;font-size:20px;line-height:1">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c;margin:0 1px">ச</span>huvadi</span>
+            <span style="flex:1"></span>
+            <div style="display:flex;align-items:center;gap:7px;height:30px;padding:0 10px;border:0.5px solid #c4b497;border-radius:4px;color:#8a7c64;font-family:'IBM Plex Mono';font-size:11px"><lp-i name="search" size="13"></lp-i> find <span style="color:#1a1310;background:#e8dcc4;border-radius:3px;padding:1px 5px;font-size:10px">Ctrl F</span></div>
+            <span style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:0.5px solid #c4b497;border-radius:4px;color:#3a2f25"><lp-i name="shift-night" size="16"></lp-i></span>
+            <div style="display:flex;gap:10px;margin-left:6px"><span style="width:17px;height:17px;border-radius:50%;background:#febc2e"></span><span style="width:17px;height:17px;border-radius:50%;background:#28c840"></span><span style="width:17px;height:17px;border-radius:50%;background:#ff5f57"></span></div>
+          </header>
+          <div style="flex:1;min-height:0;display:flex">
+            <nav style="width:196px;flex:none;display:flex;flex-direction:column;gap:4px;padding:8px;background:#e8dcc4;border-right:0.5px solid #c4b497">
+              <sc-for list="{{ oldRail }}" as="r" hint-placeholder-count="7">
+                <div style="display:flex;align-items:center;gap:14px;height:48px;padding:0 16px;border-radius:4px;background:{{ r.bg }};color:{{ r.fg }};box-shadow:{{ r.sh }};font-size:15px"><lp-i name="{{ r.icon }}" size="24"></lp-i>{{ r.label }}</div>
+              </sc-for>
+              <div style="flex:1"></div>
+              <div style="height:0.5px;background:#c4b497;margin:8px 6px;opacity:.7"></div>
+              <div style="display:flex;align-items:center;gap:14px;height:48px;padding:0 16px;color:#3a2f25;font-size:15px"><lp-i name="settings" size="24"></lp-i>Settings</div>
+            </nav>
+            <div style="flex:1;min-width:0;overflow:hidden;background:#f2ead6">
+              <div style="padding:18px 18px 8px">
+                <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64"><lp-i name="clock" size="12"></lp-i> tuesday · 18:40 · workspace ready</div>
+                <h1 style="margin:6px 0 0;font-family:'Instrument Serif';font-weight:400;font-size:34px;line-height:1.05">Good evening, Arun <span style="font-family:'Tiro Tamil';color:#8a3a1c">வணக்கம்.</span></h1>
+                <div style="font-family:Fraunces;font-size:12.5px;color:#3a2f25;margin-top:4px">214 documents in your library · 6 encrypted · nothing leaves this device.</div>
+              </div>
+              <div style="padding:6px 18px 16px;display:grid;grid-template-columns:1.4fr 1fr;gap:11px">
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:118px;border:1px dashed #c4b497;border-radius:8px;background:#f2ead6;color:#8a3a1c;padding:14px">
+                  <lp-i name="upload" size="28"></lp-i>
+                  <div style="font-size:13.5px;color:#1a1310">Drop a document, or click to fetch</div>
+                  <div style="display:flex;gap:6px"><span style="font-family:'IBM Plex Mono';font-size:10px;padding:3px 8px;border-radius:20px;background:#e8dcc4;color:#3a2f25;border:0.5px solid #d9cdb4">pdf</span><span style="font-family:'IBM Plex Mono';font-size:10px;padding:3px 8px;border-radius:20px;background:#e8dcc4;color:#3a2f25;border:0.5px solid #d9cdb4">docx</span><span style="font-family:'IBM Plex Mono';font-size:10px;padding:3px 8px;border-radius:20px;background:#e8dcc4;color:#3a2f25;border:0.5px solid #d9cdb4">xlsx</span></div>
+                </div>
+                <div style="background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;padding:14px">
+                  <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64;margin-bottom:10px"><lp-i name="folder" size="13"></lp-i> watched folder</div>
+                  <div style="font-family:'IBM Plex Mono';font-size:11.5px">D:\Records\Incoming</div>
+                  <div style="font-family:Fraunces;font-size:11px;color:#8a7c64;margin-top:4px">38 documents found · scanned 4 min ago</div>
+                  <div style="display:flex;gap:6px;margin-top:10px"><span style="font-size:11px;color:#8a3a1c;border:0.5px solid #c4b497;border-radius:4px;padding:4px 9px;background:#fbf7ec">change</span><span style="display:flex;align-items:center;gap:4px;font-size:11px;border:0.5px solid #c4b497;border-radius:4px;padding:4px 9px;background:#fbf7ec"><lp-i name="plus" size="11"></lp-i> add folder</span></div>
+                </div>
+                <div style="grid-column:1/-1;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;padding:14px">
+                  <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64;margin-bottom:10px"><lp-i name="kit" size="13"></lp-i> tools</div>
+                  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                    <sc-for list="{{ oldTools }}" as="t" hint-placeholder-count="7">
+                      <div style="position:relative;display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 6px;background:#f2ead6;border:0.5px solid #d9cdb4;border-radius:4px;font-size:11.5px;opacity:{{ t.op }}">
+                        <sc-if value="{{ t.v2 }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:5px;right:6px;font-family:'IBM Plex Mono';font-size:8.5px;color:#a6651d">v2</span></sc-if>
+                        <span style="display:flex;color:{{ t.ic }}"><lp-i name="{{ t.icon }}" size="19"></lp-i></span>{{ t.label }}
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="grid-column:1/-1;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;padding:14px">
+                  <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64"><lp-i name="grid-view" size="13"></lp-i> storage map <span style="color:#3a2f25;letter-spacing:0">D:\Records</span><span style="letter-spacing:0;margin-left:6px">214 pdfs</span></div>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px;margin:10px 0 12px">
+                    <sc-for list="{{ smap }}" as="c" hint-placeholder-count="10">
+                      <div style="background:#e8dcc4;border:0.5px solid #d9cdb4;border-radius:4px;padding:11px 12px">
+                        <div style="display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:{{ c.color }}"></span><span style="font-size:13px;font-weight:500">{{ c.name }}</span></div>
+                        <div style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64;margin-top:5px">{{ c.meta }}</div>
+                        <div style="height:4px;border-radius:2px;background:#d9cdb4;margin-top:8px;overflow:hidden"><div style="height:4px;width:{{ c.pct }};background:{{ c.color }}"></div></div>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono';font-size:12px;color:#8a3a1c">Open library <lp-i name="chevron-right" size="13"></lp-i></span>
+                </div>
+                <div style="background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;padding:14px">
+                  <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64;margin-bottom:10px"><lp-i name="pin" size="13"></lp-i> pinned</div>
+                  <sc-for list="{{ oldPinned }}" as="p" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;color:{{ p.c }}"><lp-i name="{{ p.icon }}" size="17"></lp-i></span><span style="flex:1;font-size:12px">{{ p.name }}</span><span style="display:flex;color:#c47416"><lp-i name="pin" size="12"></lp-i></span></div>
+                  </sc-for>
+                </div>
+                <div style="background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;padding:14px">
+                  <div style="display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.1em;color:#8a7c64;margin-bottom:10px"><lp-i name="clock" size="13"></lp-i> recent</div>
+                  <sc-for list="{{ oldRecent }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;color:#8a3a1c"><lp-i name="file-pdf" size="16"></lp-i></span><span style="flex:1;font-size:12px">{{ r.name }}</span><span style="font-family:'IBM Plex Mono';font-size:9.5px;color:#8a7c64">{{ r.when }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+          <footer style="height:30px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.08em;color:#8a7c64"><span style="width:8px;height:8px;border-radius:50%;background:#6b7a3e"></span>offline · ready<span style="margin-left:auto">v1.0.0-preview</span></footer>
+          <sc-for list="{{ homePins }}" as="pn" hint-placeholder-count="5">
+            <span style="position:absolute;left:{{ pn.x }};top:{{ pn.y }};width:26px;height:26px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:12px;font-weight:500;box-shadow:0 0 0 3px #fbf7ec,0 4px 10px rgba(0,0,0,.3);z-index:5">{{ pn.n }}</span>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;width:1440px">
+          <sc-for list="{{ homeIssues }}" as="hi" hint-placeholder-count="5">
+            <div style="display:flex;gap:10px;padding:12px 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+              <span style="width:22px;height:22px;flex:none;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:11px">{{ hi.n }}</span>
+              <span style="font-size:13px;line-height:1.45;color:#3a2f25;text-wrap:pretty">{{ hi.d }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2b</span><span style="font-size:15px">Proposed — resume first, Library one click away, clock in the status bar</span></div>
+        <div id="2b"><dc-import name="Chuvadi App" start-screen="home" hint-size="1440px,900px"></dc-import></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2c</span><span style="font-size:15px">Library — a permanent place beside the wordmark; the shelf view is kept</span></div>
+      <div id="2c"><dc-import name="Chuvadi App" start-screen="library" hint-size="1440px,900px"></dc-import></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2d</span><span style="font-size:15px">Arrange — every desk on screen at once, so you can drag between them (1 · 2 · 3 per row)</span></div>
+      <div id="2d"><dc-import name="Chuvadi App" start-mode="arrange" hint-size="1440px,900px"></dc-import></div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2e</span><span style="font-size:15px">Password-protected Excel — unlock it right in the tab (click Open)</span></div>
+      <div id="2e"><dc-import name="Chuvadi App" start-tab="locked" hint-size="1440px,900px"></dc-import></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2f</span><span style="font-size:15px">Mac build — traffic lights on the left; kiosk clock enlarged, guest user</span></div>
+      <div id="2f"><dc-import name="Chuvadi App" start-tab="xlsx" platform="mac" kiosk-clock="{{ true }}" signed-in="{{ false }}" hint-size="1440px,900px"></dc-import></div>
+    </div>
+  </div>
+  <div style="display:flex;gap:40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2g</span><span style="font-size:15px">Arrange — the desk ⋯ menu, page hover strip, shelf search/range, badges</span></div>
+      <div id="2g"><dc-import name="Chuvadi App" start-mode="arrange" desk-menu-open="{{ true }}" hint-size="1440px,900px"></dc-import></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">2h</span><span style="font-size:15px">Read — View menu (tools, layout, look) and the document menu</span></div>
+      <div id="2h"><dc-import name="Chuvadi App" view-menu-open="{{ true }}" doc-menu-open="{{ true }}" hint-size="1440px,900px"></dc-import></div>
+    </div>
+  </div>
+  <div style="font-size:13px;color:#8a7c64">Every feature, mapped: <a href="Feature Audit.dc.html">Feature Audit</a>. The first-round review and prototype are in <a href="Chuvadi Revamp.dc.html">Chuvadi Revamp</a>.</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const answers = [
+      { n: 1, t: 'Desks stay visible together', d: 'You are right. Tabs would hide the drop target. Arrange now shows every desk at once, with your 1 · 2 · 3-per-row toggle, a drop marker and a “new desk” drop zone.', see: '2d', href: '#2d' },
+      { n: 2, t: 'No sidebar · four verbs', d: 'Kept as proposed. Home is the wordmark and Library is a permanent button beside it.', see: '2b', href: '#2b' },
+      { n: 3, t: 'Status bar returns, with more in it', d: 'It shows offline status, the signed-in user (or Guest at a kiosk), what you are doing right now, the date and a live clock. A kiosk option makes the clock larger.', see: '2f', href: '#2f' },
+      { n: 4, t: 'Traffic lights — agreed', d: 'No objection. They are part of the identity. Right side on Windows (close at the far right, as Windows users expect), left side on Mac. Keep the click area at least 28 px even though each dot is 17 px.', see: '2f', href: '#2f' },
+      { n: 5, t: 'Word & Excel: read, print, convert', d: 'Read-only, with Convert to PDF as the main action. Excel gets an “As printed” view, so you see exactly what the PDF will contain. Password-protected files unlock inside the tab.', see: '2e', href: '#2e' },
+      { n: 6, t: 'Home, before and after', d: 'The tools tile is gone (the four verbs replace it). Resume cards remember which mode you were in. Recent files show their lock state. The Library gets a shelf preview.', see: '2a / 2b', href: '#2a' },
+      { n: 7, t: 'Library is kept', d: 'I never meant to remove it. In round 1 it was tucked into Home. Now it is its own screen again, with the bookshelf view intact.', see: '2c', href: '#2c' },
+    ];
+    const oldRail = [['home', 'Home', 1], ['file-pdf', 'Reader'], ['grid-view', 'Bench'], ['redact', 'Redact'], ['library', 'Library'], ['file-pdf', 'Docs'], ['grid-view', 'Sheets']]
+      .map(([icon, label, on]) => ({ icon, label, bg: on ? 'rgba(138,58,28,.12)' : 'transparent', fg: on ? '#8a3a1c' : '#3a2f25', sh: on ? 'inset 3px 0 0 #8a3a1c' : 'none' }));
+    const oldTools = [['file-pdf', 'Reader'], ['library', 'Bench'], ['library', 'Library'], ['collapse', 'Compress', 1], ['redact', 'Redact', 1], ['signature', 'Sign', 1], ['ocr', 'OCR', 1]]
+      .map(([icon, label, v2]) => ({ icon, label, v2: !!v2, op: v2 ? 0.5 : 1, ic: v2 ? '#8a7c64' : '#8a3a1c' }));
+    const smap = [['Finance', '#3f9e8e', '28 docs · 41 MB', '62%'], ['Legal', '#5b7fb0', '19 docs · 22 MB', '34%'], ['Clinical', '#b0577f', '96 docs · 120 MB', '100%'], ['Admin', '#c98a3a', '11 docs · 6 MB', '10%'], ['HR', '#6b9e5b', '14 docs · 9 MB', '14%'], ['Invoices', '#8a6bb0', '22 docs · 12 MB', '18%'], ['Reports', '#b59a3c', '9 docs · 18 MB', '26%'], ['Licensing', '#4f8a99', '5 docs · 3 MB', '5%'], ['Personal', '#9b7b5b', '4 docs · 2 MB', '4%'], ['Insurance', '#c25f43', '6 docs · 7 MB', '9%']]
+      .map(([name, color, meta, pct]) => ({ name, color, meta, pct }));
+    const oldPinned = [{ icon: 'file-pdf', c: '#8a3a1c', name: 'Consent template — surgery.pdf' }, { icon: 'folder', c: '#6b7a3e', name: 'Discharge summaries / 2026' }, { icon: 'file-excel', c: '#8a3a1c', name: 'bed-census.xlsx' }];
+    const oldRecent = [{ name: 'discharge-summary.pdf', when: '12m' }, { name: 'lab-report-meena-r.pdf', when: '2h' }, { name: 'consent-form-signed.pdf', when: '1d' }, { name: 'referral-pack.pdf', when: '1d' }];
+    const homePins = [{ n: 1, x: '520px', y: '268px' }, { n: 2, x: '1380px', y: '440px' }, { n: 3, x: '150px', y: '96px' }, { n: 4, x: '1380px', y: '692px' }, { n: 5, x: '560px', y: '96px' }];
+    const homeIssues = [
+      { n: 1, d: 'The tools tile shows Redact and Sign as disabled “v2”, but both have shipped. Bench and Library share an icon.' },
+      { n: 2, d: 'The storage map repeats the Library page, and takes the most space on Home.' },
+      { n: 3, d: 'Home appears twice: once in the rail and again as the tiles. Seven rail items are all always visible.' },
+      { n: 4, d: 'Recent shows only file names. It does not say where you stopped or what you were doing.' },
+      { n: 5, d: 'Body text is 11–12.5 px on a 1440 px screen. The greeting is the only thing with any presence.' },
+    ];
+    return { answers, oldRail, oldTools, smap, oldPinned, oldRecent, homePins, homeIssues };
+  }
+}
+</script>
+</body>
+</html>

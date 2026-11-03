@@ -1,0 +1,79 @@
+/* Markdown on a white page (Reader Side Rails 11j): Georgia-ish serif 14.5 / 1.65, h1 30, h2 20
+   with a rule, code in the mono token on a warm tint. Sizes are em-relative so Text size scales all. */
+.mdv { height: 100%; min-height: 0; display: flex; flex-direction: column; background: var(--chvd-canvas); }
+.mdv > ::deep .sl-scroll { flex: 1 1 auto; }
+
+.mdv-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 20px 16px 40px; box-sizing: border-box; }
+
+.mdv-page, .mdv-imgbar { --w: 720px; width: var(--w); max-width: 100%; margin: 0 auto; box-sizing: border-box; }
+.w-narrow { --w: 560px; }
+.w-wide { --w: 960px; }
+
+.mdv-page {
+    min-height: calc(100% - 20px);
+    background: var(--chvd-page); color: #222;
+    box-shadow: var(--chvd-shadow-page);
+    padding: 44px 56px;
+    font-family: Georgia, "Times New Roman", var(--chvd-serif-body), serif;
+    font-size: calc(14.5px * var(--vw-scale, 1)); line-height: 1.65;
+    overflow-wrap: break-word;
+}
+@media (max-width: 640px) { .mdv-page { padding: 28px 22px; } }
+
+.mdv-imgbar {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+    padding: 7px 12px; border-radius: 7px; font-size: 12.5px;
+    background: var(--chvd-surface-hi); border: 1px solid var(--chvd-border-soft); color: var(--chvd-ink-soft);
+}
+.mdv-imgbar span { flex: 1 1 auto; }
+.mdv-imgbtn {
+    border: none; background: none; cursor: pointer; padding: 0; font: inherit;
+    color: var(--chvd-binding); text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ── rendered markdown (MarkupString children need ::deep) ── */
+.mdv-page ::deep > :first-child { margin-top: 0; }
+.mdv-page ::deep > :last-child { margin-bottom: 0; }
+.mdv-page ::deep h1, .mdv-page ::deep h2, .mdv-page ::deep h3,
+.mdv-page ::deep h4, .mdv-page ::deep h5, .mdv-page ::deep h6 {
+    font-family: Georgia, "Times New Roman", serif; font-weight: 600; color: #111; line-height: 1.25;
+    scroll-margin-top: 12px;
+}
+.mdv-page ::deep h1 { font-size: 2.07em; line-height: 1.2; margin: 0 0 .5em; }
+.mdv-page ::deep h2 { font-size: 1.38em; margin: 1.3em 0 .55em; padding-bottom: 6px; border-bottom: 1px solid #e5e1d8; }
+.mdv-page ::deep h3 { font-size: 1.15em; margin: 1.2em 0 .45em; }
+.mdv-page ::deep h4, .mdv-page ::deep h5, .mdv-page ::deep h6 { font-size: 1em; margin: 1.1em 0 .4em; }
+.mdv-page ::deep p { margin: 0 0 .85em; text-wrap: pretty; }
+.mdv-page ::deep ul, .mdv-page ::deep ol { margin: 0 0 .85em; padding-left: 1.6em; }
+.mdv-page ::deep li { margin: .2em 0; line-height: 1.55; }
+.mdv-page ::deep ul > li::marker { color: #8a3a1c; }
+.mdv-page ::deep li > p { margin: .3em 0; }
+.mdv-page ::deep ul.md-tasks { list-style: none; padding-left: .4em; }
+.mdv-page ::deep .md-check {
+    display: inline-grid; place-items: center; width: 1em; height: 1em; vertical-align: -0.12em;
+    border: 1.5px solid #8a7c64; border-radius: 3px; font-size: .85em; line-height: 1; color: #fff;
+    font-family: system-ui, sans-serif;
+}
+.mdv-page ::deep .md-task.done > .md-check { background: #6b7a3e; border-color: #6b7a3e; }
+.mdv-page ::deep .md-task.done { color: #6f6a5e; }
+.mdv-page ::deep blockquote { margin: 0 0 .85em; padding: .1em 1em; border-left: 3px solid #d9cdb4; color: #4a4238; }
+.mdv-page ::deep hr { border: none; border-top: 1px solid #e5e1d8; margin: 1.6em 0; }
+.mdv-page ::deep a { color: #8a3a1c; text-decoration: underline; text-underline-offset: 2px; }
+.mdv-page ::deep img { max-width: 100%; height: auto; }
+.mdv-page ::deep code {
+    font-family: var(--chvd-mono); font-size: .86em; padding: .1em .35em;
+    background: #f6f4ef; border: .5px solid #e2ddd2; border-radius: 4px; color: #2a2a2a;
+}
+.mdv-page ::deep pre.md-code {
+    margin: 0 0 .85em; padding: 10px 12px; overflow: auto;
+    background: #f6f4ef; border: .5px solid #e2ddd2; border-radius: 6px;
+}
+.mdv-page ::deep pre.md-code code { padding: 0; border: none; background: none; font-size: .862em; line-height: 1.6; white-space: pre; }
+.mdv-page ::deep .md-table { overflow-x: auto; margin: 0 0 .85em; }
+.mdv-page ::deep table { border-collapse: collapse; font-family: var(--chvd-sans-display); font-size: .9em; min-width: 60%; }
+.mdv-page ::deep th, .mdv-page ::deep td { padding: 6px 8px; border-bottom: 1px solid #e5e1d8; text-align: left; vertical-align: top; }
+.mdv-page ::deep th { font-weight: 600; background: #f6f4ef; }
+.mdv-page ::deep .md-img-blocked {
+    display: inline-block; padding: 1px 8px; border: 1px dashed #c4b497; border-radius: 4px;
+    font-family: var(--chvd-sans-display); font-size: .8em; color: #8a7c64; background: #faf7f0;
+}

@@ -1,0 +1,28 @@
+.sig-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 100%;
+    height: 32px;
+    box-sizing: border-box;
+    padding: 0 12px;
+    border-radius: var(--chvd-radius-md, 8px);
+    border: var(--chvd-stroke, 0.5px) solid var(--sig-accent);
+    background: color-mix(in srgb, var(--sig-accent) 12%, var(--chvd-surface-hi));
+    color: color-mix(in srgb, var(--sig-accent) 45%, var(--chvd-ink));
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    font-family: var(--chvd-sans-display);
+    font-size: 12.5px;
+    white-space: nowrap;
+}
+.sig-banner.ok { --sig-accent: var(--chvd-success, #5d7a3a); }
+.sig-banner.warn { --sig-accent: var(--chvd-warn, #a6651d); }
+.sig-banner.bad { --sig-accent: var(--chvd-error, #a83a2a); }
+.sig-banner.muted { --sig-accent: var(--chvd-ink-muted, #8a7c64); }
+.text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.details {
+    flex: none; padding: 0; border: 0; background: none;
+    font: inherit; color: var(--sig-accent); cursor: pointer;
+}
+.details:hover { text-decoration: underline; }
+.details:focus-visible { outline: 2px solid var(--chvd-binding); outline-offset: 1px; }

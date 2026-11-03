@@ -1,0 +1,31 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* One Settings section: serif title + one-line description, then a two-column grid of cards. *@
+<section class="sec" aria-labelledby="@HeadId">
+    <header class="sec-head">
+        <h2 id="@HeadId" class="sec-title">@Title</h2>
+        @if (!string.IsNullOrEmpty(Sub))
+        {
+            <span class="sec-sub">@Sub</span>
+        }
+    </header>
+    @Lead
+    @if (ChildContent is not null)
+    {
+        <div class="sec-cards">
+            @ChildContent
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Sub { get; set; }
+
+    /// <summary>Optional full-width content above the card grid (e.g. theme cards).</summary>
+    [Parameter] public RenderFragment? Lead { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private string HeadId => "sec-" + new string(Title.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+}

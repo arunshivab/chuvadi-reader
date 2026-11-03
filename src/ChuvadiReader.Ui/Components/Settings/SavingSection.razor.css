@@ -1,0 +1,9 @@
+.note {
+    margin: 4px 0 6px;
+    padding-top: 8px;
+    border-top: var(--chvd-stroke) solid var(--chvd-border-soft);
+    font-family: var(--chvd-serif-body);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--chvd-ink-muted);
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<div style="min-height:100vh;padding:40px 32px;display:flex;flex-direction:column;align-items:center;gap:22px">
+  <div style="width:1200px;max-width:100%;display:flex;align-items:flex-end;gap:20px">
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Walkthrough · scan to print</span><span style="font-family:'Instrument Serif';font-style:italic;font-size:42px;line-height:1">A lab report, start to finish.</span></div>
+    <div style="margin-left:auto;display:flex;gap:6px">
+      <sc-for list="{{ dots }}" as="d" hint-placeholder-count="6"><button onClick="{{ d.onClick }}" style="display:flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:0.5px solid {{ d.bd }};border-radius:16px;background:{{ d.bg }};color:{{ d.fg }};font-size:12.5px;cursor:pointer"><span style="font-family:'IBM Plex Mono';font-size:11px">{{ d.n }}</span>{{ d.label }}</button></sc-for>
+    </div>
+  </div>
+
+  <div style="width:1200px;height:700px;border-radius:12px;overflow:hidden;box-shadow:0 30px 80px rgba(26,19,16,.25),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;flex-direction:column">
+    <div style="height:44px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+      <span style="font-family:'Instrument Serif';font-style:italic;font-size:20px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span>
+      <span style="display:flex;align-items:center;gap:7px;height:28px;padding:0 10px;border:0.5px solid #8a3a1c;border-radius:8px;box-shadow:inset 0 -2px 0 #8a3a1c;font-family:'IBM Plex Mono';font-size:11.5px"><span style="display:flex;color:#8a3a1c"><lp-i name="file-pdf" size="13"></lp-i></span>{{ s.file }}</span>
+      <span style="margin-left:auto;display:flex;gap:10px"><span style="width:15px;height:15px;border-radius:50%;background:#febc2e"></span><span style="width:15px;height:15px;border-radius:50%;background:#28c840"></span><span style="width:15px;height:15px;border-radius:50%;background:#ff5f57"></span></span>
+    </div>
+    <div style="height:50px;flex:none;display:flex;align-items:center;justify-content:center;gap:2px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4">
+      <div style="display:flex;padding:3px;gap:2px;background:#e8dcc4;border-radius:9px"><sc-for list="{{ modes }}" as="m"><span style="height:34px;padding:0 16px;border-radius:7px;background:{{ m.bg }};color:{{ m.fg }};font-family:'Instrument Serif';font-style:italic;font-size:20px;display:flex;align-items:center">{{ m.l }}</span></sc-for></div>
+    </div>
+    <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:minmax(0,1fr)">
+      <div style="position:relative;background:#e8dcc4;overflow:hidden;display:flex;justify-content:center;padding-top:22px">
+        <sc-if value="{{ s.showPage }}" hint-placeholder-val="{{ true }}">
+          <div style="position:relative;width:440px;height:620px;background:{{ s.paper }};box-shadow:0 6px 22px rgba(0,0,0,.28);padding:38px 40px;font-family:'Times New Roman',serif;font-size:11.5px;line-height:1.75;color:#333;transform:rotate({{ s.tilt }})">
+            <div style="font-size:15px;font-weight:700;margin-bottom:8px">LABORATORY REPORT · <span style="position:relative">Oncology<sc-if value="{{ s.hl }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px -3px;background:rgba(196,116,22,.32);outline:1.5px solid #c47416"></span></sc-if></span></div>
+            <div>Patient: <span style="position:relative">MEENA RAJENDRAN<sc-if value="{{ s.box }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -4px;background:#111"></span></sc-if></span></div>
+            <div>MRN <span style="position:relative">00418-22-7731<sc-if value="{{ s.box }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -4px;background:#111"></span></sc-if></span></div>
+            <sc-for list="{{ lines }}" as="ln"><div style="position:relative">{{ ln }}<sc-if value="{{ s.ocr }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-1px -4px;outline:1px solid rgba(107,122,62,.7);background:rgba(107,122,62,.07)"></span></sc-if></div></sc-for>
+            <sc-if value="{{ s.sig }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:40px;bottom:46px;width:230px;padding:8px 10px;border:1px solid #6b7a3e;border-radius:4px;display:flex;gap:8px;align-items:center;background:#fbfdf6"><span style="display:flex;color:#6b7a3e"><lp-i name="certification" size="22"></lp-i></span><span style="display:flex;flex-direction:column"><span style="font-family:'Instrument Serif';font-style:italic;font-size:19px;color:#1f3b73;line-height:1">K. Lakshmi</span><span style="font-family:'IBM Plex Mono';font-size:8.5px;color:#555">Digitally signed · 14 Oct 2026</span></span></div></sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ s.desks }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;padding:20px;display:flex;flex-direction:column;gap:14px">
+            <sc-for list="{{ deskRows }}" as="dr"><div style="background:#fbf7ec;border:0.5px solid #c4b497;border-top:3px solid {{ dr.c }};border-radius:8px"><div style="height:38px;display:flex;align-items:center;padding:0 12px;font-family:'Instrument Serif';font-size:17px;border-bottom:0.5px solid #e8dcc4">{{ dr.n }}</div><div style="display:flex;gap:10px;padding:12px"><sc-for list="{{ dr.p }}" as="p"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:58px;height:80px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.16);border-top:3px solid {{ p.c }}"></div><span style="font-family:'IBM Plex Mono';font-size:10px">{{ p.l }}</span></div></sc-for></div></div></sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ s.drop }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:24px;border:2px dashed #8a3a1c;border-radius:14px;background:rgba(251,247,236,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px"><span style="color:#8a3a1c"><lp-i name="upload" size="34"></lp-i></span><span style="font-family:'Instrument Serif';font-size:28px">Drop to open</span><span style="font-family:'IBM Plex Mono';font-size:12px;color:#3a2f25">scan-lab-0931.pdf · 1 page · from the scanner folder</span></div>
+        </sc-if>
+        <sc-if value="{{ s.print }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:rgba(26,19,16,.30);display:flex;align-items:center;justify-content:center"><div style="width:420px;padding:20px 22px;background:#fbf7ec;border-radius:12px;box-shadow:0 30px 70px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:12px;font-size:13px"><span style="font-family:'Instrument Serif';font-size:24px">Print</span><span style="display:flex;justify-content:space-between;padding:8px 10px;border:0.5px solid #c4b497;border-radius:6px;background:#fff">Ward 4 — LaserJet<lp-i name="chevron-down" size="13"></lp-i></span><span style="display:flex;justify-content:space-between;padding:8px 10px;border:0.5px solid #c4b497;border-radius:6px;background:#fff">All 6 pages · two-sided<lp-i name="chevron-down" size="13"></lp-i></span><span style="height:38px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500"><lp-i name="print" size="16"></lp-i>Print 6 pages</span></div></div>
+        </sc-if>
+      </div>
+      <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <span style="font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a7c64">Step {{ s.n }} of 6</span>
+        <span style="font-family:'Instrument Serif';font-size:30px;line-height:1.05">{{ s.title }}</span>
+        <span style="font-family:Fraunces;font-size:14px;line-height:1.55;color:#3a2f25">{{ s.body }}</span>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px"><sc-for list="{{ s.how }}" as="h"><div style="display:flex;gap:8px;font-size:13px;line-height:1.45"><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a3a1c;flex:none;padding-top:1px">→</span><span>{{ h }}</span></div></sc-for></div>
+        <div style="margin-top:auto;display:flex;gap:8px">
+          <button onClick="{{ prev }}" style="flex:1;height:40px;border:0.5px solid #c4b497;border-radius:8px;background:none;color:#1a1310;font-size:13.5px;cursor:pointer;opacity:{{ prevOp }}">← Back</button>
+          <button onClick="{{ next }}" style="flex:2;height:40px;border:none;border-radius:8px;background:#8a3a1c;color:#fbf7ec;font-size:13.5px;font-weight:500;cursor:pointer">{{ nextLabel }}</button>
+        </div>
+      </aside>
+    </div>
+    <div style="height:30px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25"><span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:#6b7a3e"></span>offline · on this device</span><span style="width:0.5px;height:14px;background:#c4b497"></span><span style="color:#8a7c64">{{ s.status }}</span><span style="margin-left:auto;font-weight:500">18:40</span></div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { i: Number(localStorage.getItem('chuvadi-walk') || 0) };
+  go(i) { const n = Math.max(0, Math.min(5, i)); localStorage.setItem('chuvadi-walk', String(n)); this.setState({ i: n }); }
+  renderVals() {
+    const steps = [
+      { label: 'Open', file: 'scan-lab-0931.pdf', mode: 0, title: 'Drop the scan in', body: 'A lab report arrives from the ward scanner. Drag it from the folder onto Chuvadi. It opens in a new tab, in Read.', how: ['Or: Home › Open, or the watched folder notification', 'Works the same for Word, Excel and images'], status: 'Opening scan-lab-0931.pdf…', drop: true, showPage: true, paper: '#f3f1ec', tilt: '-0.8deg' },
+      { label: 'Searchable', file: 'scan-lab-0931.pdf', mode: 0, title: 'Make it searchable', body: 'Chuvadi notices this page is a picture. One click and it recognises the text on this device, in English and Tamil.', how: ['Banner › Make searchable, or Ctrl K “OCR”', 'Straightens the tilt and saves a searchable copy'], status: 'Recognising page 1 of 1 · English + Tamil', ocr: true, showPage: true, paper: '#f6f5f1', tilt: '0deg' },
+      { label: 'Redact', file: 'scan-lab-0931 (searchable).pdf', mode: 3, title: 'Remove what shouldn’t travel', body: 'This copy goes to an outside lab, so the name and MRN must go. Protect › Redact finds them; draw a box for anything else.', how: ['Find “Oncology” → review each match', 'Black box or text-only; always saved to a new file'], status: 'Protect · 2 boxes · 1 match', box: true, hl: true, showPage: true, paper: '#fff', tilt: '0deg' },
+      { label: 'Sign', file: 'scan-lab-0931 (redacted).pdf', mode: 3, title: 'Sign it properly', body: 'The pathologist signs with her certificate. Anyone opening it later sees that it is genuine and hasn’t been changed.', how: ['Protect › Sign › choose certificate', 'Lock the document after signing'], status: 'Signed by Dr K. Lakshmi · valid', box: true, sig: true, showPage: true, paper: '#fff', tilt: '0deg' },
+      { label: 'Bind', file: 'referral pack', mode: 2, title: 'Bind it with the referral', body: 'In Arrange, the signed report goes onto the referral desk next to the discharge summary and the consent. Bind makes one PDF.', how: ['Drag from the shelf onto Desk 2', 'Numbering and bookmarks are added on bind'], status: 'Arrange · Desk 2 · 6 pages', desks: true, showPage: false, paper: '#fff', tilt: '0deg' },
+      { label: 'Print', file: 'referral-pack.pdf', mode: 0, title: 'Print and hand it over', body: 'Ctrl P. The ward printer is remembered. The whole job, from scan to printed pack, stays on this computer.', how: ['Every step is recorded in the audit trail', 'Originals were never changed'], status: 'Printing 6 pages · Ward 4', print: true, box: true, sig: true, showPage: true, paper: '#fff', tilt: '0deg' },
+    ];
+    const i = this.state.i, s0 = steps[i];
+    const s = { hl: false, box: false, ocr: false, sig: false, desks: false, drop: false, print: false, ...s0, n: i + 1 };
+    const R = '#8a3a1c', M = '#c47416', O = '#6b7a3e';
+    return {
+      s,
+      modes: ['Read', 'Mark', 'Arrange', 'Protect'].map((l, k) => ({ l, bg: k === s.mode ? '#fbf7ec' : 'transparent', fg: k === s.mode ? R : '#3a2f25' })),
+      dots: steps.map((st, k) => ({ n: String(k + 1), label: st.label, onClick: () => this.go(k), bg: k === i ? R : '#fbf7ec', fg: k === i ? '#fbf7ec' : '#3a2f25', bd: k === i ? R : '#c4b497' })),
+      lines: ['Haemoglobin      11.2  g/dL   (12.0 – 15.5)', 'Total WBC         5,400 /µL', 'Platelets         2.1   lakh/µL', 'Serum creatinine  0.8   mg/dL', 'Remarks: Mild anaemia. Fit for cycle 3.'],
+      deskRows: [{ n: 'Desk 2 · referral pack', c: M, p: [{ l: 'p 1', c: R }, { l: 'p 2', c: R }, { l: 'lab ✓', c: O }, { l: 'p 1', c: M }, { l: 'p 2', c: M }, { l: 'consent', c: M }] }, { n: 'Desk 1 · discharge-summary', c: R, p: [{ l: 'p 3', c: R }, { l: 'p 4', c: R }, { l: 'p 5', c: R }] }],
+      prev: () => this.go(i - 1), next: () => this.go(i === 5 ? 0 : i + 1), prevOp: i === 0 ? 0.4 : 1, nextLabel: i === 5 ? 'Start again' : 'Next →',
+    };
+  }
+}
+</script>
+</body>
+</html>

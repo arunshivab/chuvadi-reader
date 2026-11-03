@@ -1,0 +1,45 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@*
+    One labelled row: label + optional hint on the left, the control on the right.
+    Soon = the feature isn't built yet: the row is shown greyed out with a tooltip and its
+    controls are disabled (cascaded to Segmented / Toggle / RowButton) — never hidden.
+*@
+<div class="row @(Soon ? "soon" : null) @(Stack ? "stack" : null)" title="@(Soon ? SoonText : Tooltip)" aria-disabled="@(Soon ? "true" : null)">
+    @if (!string.IsNullOrEmpty(Label) || !string.IsNullOrEmpty(Hint))
+    {
+        <span class="lbl">
+            @if (!string.IsNullOrEmpty(Label))
+            {
+                <span class="lbl-main">@Label</span>
+            }
+            @if (!string.IsNullOrEmpty(Hint))
+            {
+                <span class="lbl-hint">@Hint</span>
+            }
+        </span>
+    }
+    <span class="ctl">
+        <CascadingValue Value="Soon" Name="RowSoon">
+            @ChildContent
+        </CascadingValue>
+    </span>
+</div>
+
+@code {
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public string? Hint { get; set; }
+
+    /// <summary>Not built yet: greyed out, controls disabled, tooltip <see cref="SoonText"/>.</summary>
+    [Parameter] public bool Soon { get; set; }
+
+    [Parameter] public string SoonText { get; set; } = "Coming soon";
+
+    /// <summary>Tooltip for a working row.</summary>
+    [Parameter] public string? Tooltip { get; set; }
+
+    /// <summary>Put the control under the label (long values such as folder paths).</summary>
+    [Parameter] public bool Stack { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

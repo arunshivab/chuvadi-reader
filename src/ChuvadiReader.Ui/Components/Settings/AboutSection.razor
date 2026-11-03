@@ -1,0 +1,32 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+<SettingsSection Title="About" Sub="Versions, licences and privacy.">
+    <SettingsCard Title="Chuvadi Reader">
+        <SettingRow Label="Version"><ValueChip Text="@AppInfo.Version" Title="@AppInfo.FullVersion" /></SettingRow>
+        @foreach (var lib in AppInfo.Libraries)
+        {
+            <SettingRow Label="@lib.Role"><ValueChip Text="@($"{lib.Name} {lib.Version}")" /></SettingRow>
+        }
+        <SettingRow Label="Typeface"><ValueChip Text="LiPi Sans (OFL)" /></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Privacy">
+        <SettingRow Label="Network" Hint="offline · nothing leaves this device"><ValueChip Text="Offline" /></SettingRow>
+        <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@AppInfo.DataFolder" Wrap="true" /></SettingRow>
+        <SettingRow Label="Clear recent files & cache" Soon="true"><RowButton>Clear…</RowButton></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Help" Full="true">
+        <SettingRow Label="Keyboard shortcuts"><RowButton OnClick="OpenShortcuts">Open</RowButton></SettingRow>
+        <SettingRow Label="What’s new" Soon="true"><RowButton>Open</RowButton></SettingRow>
+        <SettingRow Label="Licences" Hint="Open-source notices" Soon="true"><RowButton>Open</RowButton></SettingRow>
+        <SettingRow Label="Send diagnostics file" Hint="Saved to Desktop — you choose who gets it" Soon="true"><RowButton>Create…</RowButton></SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    /// <summary>Raised when "Keyboard shortcuts › Open" is clicked; the page switches section.</summary>
+    [Parameter] public EventCallback OnShowShortcuts { get; set; }
+
+    private Task OpenShortcuts() => OnShowShortcuts.InvokeAsync();
+}

@@ -23,7 +23,7 @@ existing bench session).
 
 ---
 
-## Increment 1b-i — mode bar + Document menu  ✅ (built clean, 52/52)
+## Increment 1b-i — mode bar + Document menu  ✅ merged
 
 The shell takes shape: a **mode bar** (Read · Mark · Arrange · Protect) under the toolbar,
 and a **Document menu** off the filename.
@@ -49,18 +49,69 @@ Merge, Split). Toolbar still has its old buttons — expected until 1b-ii.
 
 ---
 
-## Roadmap
-- **1b-ii:** single floating leaf bar — move all view controls there, remove the toolbar +
-  View-drawer duplicates (the triplication fix). This is the big toolbar surgery.
-- **1b-iii:** ⌘K command bar + the 1–4 mode keys.
-- **1c:** Arrange = re-parent Bench (decision C — shelf = open tabs).
-- **1d:** Protect = re-parent Redact + Stamp + Flatten + Password.
-- **Phase 2:** visual — `tokens.css` (+ the 5-token reconciliation), themes, Home/Library/
-  Settings polish, the deferred icon/label audit.
-- **Phase 3:** library-gated features (Office→PDF, signature verification, OCR, layers,
-  measurement) as the library delivers each.
+## Design handoff v3 adopted (2026-11-02)
 
-## 129-feature matrix
-Built from `Feature Audit.dc.html` as the re-parenting increments (1c/1d) land — that's where
-features actually change home. 1a/1b-i only added and relocated-within-reach, so there is
-nothing re-homed to tick yet.
+The full revamp handoff (`PDF_Viewer_Design_Revamp_3`) is now the build spec. Its
+**D-10 side rails supersede** the 1b-i mode bar and the planned floating leaf bar, so
+**1b-ii is dropped** and the remaining work is re-sequenced below. Source of truth for the
+chrome: `Reader Side Rails.dc.html`; for everything else: the handoff README, plus
+`Feature Audit.dc.html` as the 129-feature Rule #11 checklist.
+
+---
+
+## Increment P0 — library 3.30 + 5-theme tokens
+
+| Change | Detail | Parity |
+|--------|--------|--------|
+| FIX | chuvadi-pdf **3.18.1 → 3.30.0** (Core + Tests pins; `ci/packages` mirror swapped 33 × 3.18.1 → 34 × 3.30.0; the new 34th package is `Chuvadi.Pdf.Fonts.Bundled`, pulled in by Authoring). No API changes needed. Brings the library-ready features (layers, measurement, signature verification), the Anjal safety APIs, and font-name validation (`DrawText` with an unknown font now throws; the LiPi font name is `"Lipi"`). | no UI change |
+| ADD | **`tokens.css`** from the handoff: 5 themes (Cream paper · Night paper · Palm leaf · Indigo ink · High contrast) + new tokens (`on-accent`, `danger`, `page`, `canvas`, highlights, `find-hit`, `scrim`, type scale, layout sizes, elevation). Radii grow slightly (4 → 6 px buttons). The four old `--chvd-shadow-soft/-medium/-deep/-rim` tokens are dropped; nothing used them. | look only |
+| FIX | Windows `index.html` pre-load dark background matches the new Night paper (`#100b08`). | — |
+
+Behaviour to expect from 3.30 (correct, not regressions): layers that are OFF in a file are now
+hidden; `Warnings` can appear after a page renders. The three new themes are inert until the
+Settings increment adds the picker.
+
+---
+
+## Increments P1–P7 — the D-10 shell, all modes, viewers, library features (one delivery)
+
+Built in one pass on chuvadi-pdf 3.30.0, then moved to **3.30.1** and **3.30.2** (same 34 packages, no API changes). 3.30.2 fixes the text drawing that put find highlights one space off (embedded Type 1C fonts); re-checked on 3.30.2: `PdfSigner.Sign` still fails and `EncryptionOptions.Permissions` is still init-only. Full feature-by-feature check: **`docs/REVAMP-V3-PARITY-MATRIX.md`**
+(121 audit rows: KEPT 79 · MOVED 40 · GREYED 1 · N/A 1 · **LOST 0**).
+
+| Increment | What changed | Parity |
+|---|---|---|
+| **P1 shell** | New `ShellService` (Core). `MainLayout`: 40 px top bar (wordmark → Home · tabs · ‹ n / N › · Document ▾ · Ctrl K field · theme moon · window controls), 62 px left bar (Read · Mark · Arrange · Protect with 3 px marker, Open · Find · Library · Home, Settings), 26 px status bar (offline · user · activity · progress · version · live clock), messages bottom-right. Rails (`Components/Rails`), Pages & outline drawer, floating cards, hover strip. Fixed the `@onauxclick` crash (middle-click now via `mouseup`). | MOVE: old 8-item nav rail → left bar (Reader/Bench/Redact → modes; Docs/Sheets → tabs + Ctrl K). Reader toolbar, View drawer, 1b-i mode bar, `rfloat` → rails / View card / top bar. Document menu → top bar. |
+| **P2 Mark** | Tools rail: Text, Image, Rectangle, Ellipse, Line, Arrow, Draw, Signature; Undo/Redo (new markup undo, 100 steps); Clear; Save; Save as new PDF. Selection settings → floating cards (Text box / shape / Image / Signature) with Duplicate + Delete (Duplicate is new). | MOVE: `mk-rail` bar → rail + cards. Highlight, Note, Fill form shown greyed (“Coming soon”). |
+| **P3 Protect** | Protect lives in the Reader: Redact box, Find & redact (open the redaction view), Stamp + Watermark (card with live preview, Save / Save as new), Flatten, Password (new), Sign with certificate (new, invisible signature). Redaction view gets the same Protect rail + View rail. | MOVE: Reader stamp drawer → Protect card; Redact `rd-top` → shell; Save redacted → rail primary. |
+| **P4 Arrange** | Bench keeps all behaviour; toolbar → Arrange Tools rail (Shelf, Fetch, Add desk, Blank page, Undo, Redo, Session…, Reset, To new desk, Compare, Combine, Bind all) + View rail (desks per row, shelf page size, collapse shelf). Option C: entering Arrange puts every open PDF tab on the shelf. | MOVE: `bench-bar` → rails. |
+| **P5** | Home and Settings rebuilt (see agent notes in the matrix); 5 themes (Cream, Night, Palm, Indigo, High contrast) with live cards; UI scale 100/125/150 and Reduce motion (`PreferencesService`); Ctrl K command bar (every feature, greyed ones listed with a reason); mode keys 1–4; narrow-window layout (< 1000 px); messages after actions. | Settings items all kept; Home tools tile → modes / Document menu / Ctrl K. |
+| **P6 viewers** | Word, Excel, Markdown, plain text and sandboxed HTML open as tabs (read-only; Mark/Arrange/Protect dimmed). Section/line/sheet counter in the top bar, outline drawer, Find, Copy all, Source view, text size, reading width, wrap. Convert to PDF greyed until the Layout library. | `/docs`, `/sheets` pages kept (Ctrl K). |
+| **P7 library features** | Layers (view-only hiding), Measure (distance / angle / file scale; click two points), signature verification (banner + card), Print (native dialog, WPF). | ADD |
+
+**Greyed — waiting on the PDF library (no app workarounds):** Sign with certificate (`PdfSigner.Sign` fails in 3.30.1) and the print / copy / change limits on Password (`EncryptionOptions.Permissions` can't be set). A password-protected copy itself works.
+
+**Greyed until built:** Highlight, Note, Fill form, Peek, Attachments tab, Show in folder, Convert to PDF, Excel “As printed”, OCR (Ctrl K), Account & roles, Kiosk, Language, and the Settings rows listed as “Coming soon”.
+
+**Library asks raised by this work** (for the chuvadi-pdf / Sheets teams): `PdfSigner.Sign` fails in 3.30 (“Could not locate /Contents…”), so signing uses `PdfCounterSigner`; no visible signature appearance; `EncryptionOptions.Permissions` is init-only; no “opened with owner password” flag; `OptionalContentGroup` lacks locked state and an id; Chuvadi.Sheets 1.1.2 fails on workbooks whose relationship targets are absolute (`/xl/worksheets/…`, as written by openpyxl and some exporters).
+
+---
+
+## Roadmap (revised)
+- **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
+  window controls), fixed left bar (modes + Open/Find/Library/Home + Settings), Tools rail and
+  View rail (Read), Pages & outline drawer, hover strip under the page, 26 px status bar.
+  Removes the old nav rail, Reader toolbar, View drawer and the 1b-i mode bar — every control
+  MOVEs to a rail.
+- **P2 — Mark** on the Tools rail + floating settings cards.
+- **P3 — Protect** = Redact re-parented + Stamp + Flatten + Password.
+- **P4 — Arrange** = Bench re-parented (shelf drawer, desks on the canvas; Option C).
+- **P5 — Home, Library, Settings** (sections + theme picker), Ctrl K, mode keys 1–4, narrow
+  window, states & feedback.
+- **P6 — Word/Excel tabs** in the shell; **HTML/MD/TXT** viewers (D-09).
+- **P7 — library-ready features:** Layers, Measure, signature verification; Print.
+- **Later:** web portal + Android, the Missing Features set, Office rendering via
+  Chuvadi.Layout (D-08) when the library lands.
+
+## Feature matrix
+Done — see `docs/REVAMP-V3-PARITY-MATRIX.md`. Note: the README says 129 features; the
+`Feature Audit.dc.html` data block actually holds 121 rows, all audited.

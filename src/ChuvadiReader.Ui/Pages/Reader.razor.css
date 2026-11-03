@@ -1,10 +1,12 @@
 .reader {
+    /* D-10: a row — [Pages drawer] [canvas] [Tools rail][View rail]. Positioning comes from
+       the global .mview / .mview-canvas / .mview-rails rules in shell.css. */
+    position: absolute;
+    inset: 0;
     display: flex;
-    flex-direction: column;
-    height: 100%;
-    position: relative;
+    flex-direction: row;
     overflow: hidden;
-    background: var(--chvd-surface-mid);
+    background: var(--chvd-canvas);
     color: var(--chvd-ink);
     font-family: var(--chvd-sans-display);
 }
@@ -165,8 +167,6 @@
     align-items: safe center;
     outline: none;
     transition: margin-right 0.18s ease;
-    border-left: 2px solid var(--chvd-border);
-    border-right: 2px solid var(--chvd-border);
     /* one-finger pan stays native; two-finger pinch + double-tap are handled in JS */
     touch-action: pan-x pan-y;
 }
@@ -840,3 +840,20 @@
     font-family: var(--chvd-mono); font-style: normal; font-size: 9.5px;
     color: var(--chvd-ink-muted); opacity: 0.8;
 }
+
+
+/* ── D-10 additions ─────────────────────────────────────────────────────── */
+.rviewer { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+.ms-layer { cursor: crosshair; z-index: 6; }
+.ms-dot { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: #2c3e8c; box-shadow: 0 0 0 2px #fff; pointer-events: none; }
+.ms-label {
+    position: absolute; transform: translate(-50%, -150%); padding: 2px 7px; border-radius: 5px;
+    background: #2c3e8c; color: #fff; font-family: var(--chvd-mono); font-size: 11px; white-space: nowrap; pointer-events: none;
+}
+.rsigbanner { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 16; display: flex; align-items: center; gap: 4px; }
+.rsigbanner-x { border: none; background: var(--chvd-surface-hi); color: var(--chvd-ink-muted); border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--chvd-shadow-float); }
+.mdrawer .bm-acts { display: flex; gap: 4px; padding: 8px 10px; border-bottom: var(--chvd-stroke) solid var(--chvd-border-soft); flex-wrap: wrap; }
+.mdrawer .bm-tree { flex: 1; min-height: 0; overflow: auto; padding: 6px 0; }
+.mdrawer .bm-foot { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); }
+.sig-preview { min-height: 56px; display: flex; align-items: center; justify-content: center; background: var(--chvd-page); border: var(--chvd-stroke) solid var(--chvd-border-soft); border-radius: 8px; color: #111; overflow: hidden; }
+.rfind { top: 12px; left: 50%; right: auto; transform: translateX(-50%); }

@@ -1,0 +1,41 @@
+/*
+ * Chuvadi Reader — user preference switches (Settings › Accessibility / Appearance).
+ * Set on <html> by theme.js:
+ *   data-ui-scale="100|125|150" + --chvd-ui-scale (1 / 1.25 / 1.5) + style.zoom
+ *   data-reduce-motion          (present = on)
+ * Link after tokens.css and app.css.
+ */
+
+:root { --chvd-ui-scale: 1; }
+
+/* ── Interface size ─────────────────────────────────────────────────────
+   <html> is zoomed, so anything sized in viewport units would grow past the
+   window. Divide those back down. The shell should size from height:100%
+   (html/body/#app are 100% in app.css); these rules cover the current
+   100vh users. */
+html[data-ui-scale="125"],
+html[data-ui-scale="150"] {
+    --chvd-hit: 44px;                       /* larger touch targets (tokens.css note) */
+}
+
+html[data-ui-scale="125"] .shell,
+html[data-ui-scale="150"] .shell {
+    height: calc(100vh / var(--chvd-ui-scale));
+}
+
+/* ── Reduce motion ───────────────────────────────────────────────────── */
+html[data-reduce-motion] {
+    --chvd-quick: 0ms;
+    --chvd-base: 0ms;
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+}

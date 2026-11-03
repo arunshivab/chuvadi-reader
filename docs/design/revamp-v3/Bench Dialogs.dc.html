@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<section id="turn-6" style="padding:72px;display:flex;flex-direction:column;gap:36px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Arrange · the eight dialogs</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:52px;line-height:1.02">One dialog shape, eight jobs.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">Every dialog uses the same layout: settings on the left, a live preview of the page on the right, and the main action at the bottom right. All the options from the current Bench dialogs are kept. The Watermark and Header &amp; footer dialogs are also used by <i>Protect › Stamp</i>.</p>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:36px">
+    <sc-for list="{{ dialogs }}" as="d" hint-placeholder-count="8">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">{{ d.id }}</span><span style="font-size:15px">{{ d.where }}</span></div>
+        <div style="width:880px;height:680px;border-radius:10px;overflow:hidden;background:rgba(26,19,16,.34);box-shadow:0 0 0 0.5px #c4b497;display:flex;align-items:center;justify-content:center">
+          <div style="width:800px;height:620px;background:#fbf7ec;border-radius:12px;box-shadow:0 30px 70px rgba(0,0,0,.35);display:flex;flex-direction:column;overflow:hidden">
+            <div style="height:58px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;color:#8a3a1c"><lp-i name="{{ d.icon }}" size="20"></lp-i></span><span style="font-family:'Instrument Serif';font-size:25px">{{ d.title }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">· Desk 1 · discharge-summary</span><span style="margin-left:auto;display:flex;color:#3a2f25"><lp-i name="close" size="16"></lp-i></span></div>
+            <div style="flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr)">
+              <div style="padding:16px 20px;display:flex;flex-direction:column;gap:14px;overflow:hidden;font-size:13px">
+                <sc-for list="{{ d.rows }}" as="r">
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8a7c64">{{ r.l }}</span>
+                    <sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ true }}"><div style="display:flex;flex-wrap:wrap;padding:3px;gap:2px;background:#e8dcc4;border-radius:7px;align-self:flex-start"><sc-for list="{{ r.opts }}" as="o"><span style="padding:6px 12px;border-radius:5px;background:{{ o.bg }};color:{{ o.fg }};box-shadow:{{ o.sh }};white-space:nowrap">{{ o.t }}</span></sc-for></div></sc-if>
+                    <sc-if value="{{ r.isField }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ r.opts }}" as="o"><span style="display:flex;align-items:center;gap:8px;height:34px;padding:0 10px;min-width:{{ o.w }};border:0.5px solid {{ o.bd }};border-radius:6px;background:#fff"><span style="font-size:11px;color:#8a7c64">{{ o.k }}</span><span style="font-family:{{ o.ff }}">{{ o.t }}</span></span></sc-for></div></sc-if>
+                    <sc-if value="{{ r.isSwatch }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;align-items:center"><sc-for list="{{ r.opts }}" as="o"><span style="width:26px;height:26px;border-radius:50%;background:{{ o.c }};outline:{{ o.o }};outline-offset:2px"></span></sc-for><span style="font-size:12px;color:#8a3a1c">Custom…</span></div></sc-if>
+                    <sc-if value="{{ r.isSlider }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:10px"><span style="flex:1;height:4px;border-radius:2px;background:linear-gradient(90deg,#8a3a1c 0 {{ r.pct }},#d9cdb4 {{ r.pct }})"></span><span style="font-family:'IBM Plex Mono';font-size:12px;width:44px;text-align:right">{{ r.val }}</span></div></sc-if>
+                    <sc-if value="{{ r.isNote }}" hint-placeholder-val="{{ false }}"><span style="font-size:12.5px;line-height:1.45;color:#3a2f25">{{ r.val }}</span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="background:#e8dcc4;border-left:0.5px solid #d9cdb4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px">
+                <sc-if value="{{ d.isCompare }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:120px;height:170px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:12px;display:flex;flex-direction:column;gap:5px;border-top:3px solid #8a3a1c"><span style="height:5px;width:60%;background:#bbb"></span><span style="height:3px;background:#e2e2e2"></span><span style="height:3px;background:#e2e2e2"></span><span style="height:30px;background:#f0f0f0;margin-top:4px"></span></div><span style="font-family:'IBM Plex Mono';font-size:10.5px">p 3 · Desk 1</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:5px"><div style="width:120px;height:170px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.22);padding:12px;display:flex;flex-direction:column;gap:5px;border-top:3px solid #c47416"><span style="height:5px;width:60%;background:#bbb"></span><span style="height:3px;background:#e2e2e2"></span><span style="height:22px;background:#f0f0f0;margin-top:4px"></span><span style="height:3px;background:#e2e2e2"></span></div><span style="font-family:'IBM Plex Mono';font-size:10.5px">p 1 · lab-report</span></div></div>
+                </sc-if>
+                <sc-if value="{{ d.isPage }}" hint-placeholder-val="{{ true }}">
+                  <div style="position:relative;width:{{ d.pw }};height:{{ d.ph }};background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.22);overflow:hidden;display:grid;grid-template-columns:{{ d.cols }};gap:{{ d.gap }};padding:{{ d.pad }}">
+                    <sc-for list="{{ d.cells }}" as="c"><div style="background:{{ c.bg }};outline:{{ c.o }};display:flex;flex-direction:column;gap:4px;padding:{{ c.p }};position:relative"><span style="height:4px;width:60%;background:#c9c4ba"></span><span style="height:3px;background:#e6e2da"></span><span style="height:3px;background:#e6e2da"></span><span style="height:3px;width:80%;background:#e6e2da"></span><span style="flex:1;max-height:30px;background:#f2efe9;margin-top:3px"></span></div></sc-for>
+                    <sc-if value="{{ d.wm }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:Helvetica,Arial;font-weight:700;font-size:30px;color:#8a3a1c;opacity:.22;transform:rotate(-45deg)">CONFIDENTIAL</span></sc-if>
+                    <sc-if value="{{ d.hf }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:0;right:0;top:0;height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-family:Helvetica;font-size:7px;color:#555;border-bottom:0.5px solid #ddd"><span>Sri Meenakshi Hospital</span><span>Discharge summary</span><span>14 Oct 2026</span></span><span style="position:absolute;left:0;right:0;bottom:0;height:22px;display:flex;align-items:center;justify-content:center;font-family:Helvetica;font-size:7px;color:#555;border-top:0.5px solid #ddd">Page iii of xii</span></sc-if>
+                    <sc-if value="{{ d.num }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:8px;bottom:6px;font-family:'IBM Plex Mono';font-size:8px;color:#1b1b1b;background:#fff8;padding:1px 3px;outline:1px dashed #8a3a1c">MRD-000043</span></sc-if>
+                    <sc-if value="{{ d.crop }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:14%;top:18%;width:70%;height:44%;outline:2px solid #8a3a1c;box-shadow:0 0 0 999px rgba(255,255,255,.72)"></span></sc-if>
+                    <sc-if value="{{ d.margin }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:10% 12%;outline:1.5px dashed #8a3a1c"></span></sc-if>
+                  </div>
+                </sc-if>
+                <span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25;text-align:center">{{ d.cap }}</span>
+              </div>
+            </div>
+            <div style="height:58px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-top:0.5px solid #d9cdb4">
+              <span style="font-size:12px;color:#8a7c64">{{ d.note }}</span>
+              <span style="margin-left:auto;height:36px;padding:0 14px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center;font-size:13px">{{ d.secondary }}</span>
+              <span style="height:36px;padding:0 16px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-size:13px;font-weight:500">{{ d.primary }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const seg = (l, opts, on) => ({ l, isSeg: true, opts: opts.map((t, i) => ({ t, bg: i === on ? '#fbf7ec' : 'transparent', fg: i === on ? '#8a3a1c' : '#3a2f25', sh: i === on ? '0 1px 2px rgba(0,0,0,.08)' : 'none' })) });
+    const fld = (l, opts) => ({ l, isField: true, opts: opts.map(([k, t, w, on]) => ({ k, t, w: w || '80px', bd: on ? '#8a3a1c' : '#c4b497', ff: "'IBM Plex Mono'" })) });
+    const sw = (l, cols, on) => ({ l, isSwatch: true, opts: cols.map((c, i) => ({ c, o: i === on ? '2px solid #8a3a1c' : 'none' })) });
+    const sl = (l, pct, val) => ({ l, isSlider: true, pct, val });
+    const note = (l, val) => ({ l, isNote: true, val });
+    const cell = (o = {}) => ({ bg: o.bg || 'transparent', o: o.o || 'none', p: o.p || '0' });
+    const page = (extra) => ({ isPage: true, isCompare: false, pw: '210px', ph: '297px', cols: '1fr', gap: '0', pad: '22px 20px', cells: [cell()], wm: false, hf: false, num: false, crop: false, margin: false, ...extra });
+    const dialogs = [
+      { id: '6a', where: 'Margin › Whole desk › Watermark (also Protect › Stamp)', icon: 'watermark', title: 'Watermark', primary: 'Set watermark', secondary: 'Remove', note: 'Applied when you Bind or Lift.', cap: 'Live preview · page 1',
+        rows: [fld('Text', [['', 'CONFIDENTIAL', '260px', 1]]), seg('Font', ['Helvetica', 'Times', 'Courier', 'B', 'I'], 0), fld('Size', [['pt', '72', '80px']]), sw('Colour', ['#8a3a1c', '#1a1310', '#1f3b73', '#a83a2a', '#6b7a3e', '#8a7c64'], 0), seg('Angle', ['Horizontal', 'Vertical', 'Diagonal ↗', 'Diagonal ↘', '45°'], 2), sl('Opacity', '25%', '25%'), seg('Apply to', ['All pages', 'Selected (2)'], 0)],
+        ...page({ wm: true }) },
+      { id: '6b', where: 'Margin › Whole desk › Header & footer', icon: 'stamp', title: 'Header & footer', primary: 'Set header & footer', secondary: 'Remove', note: 'Fit: Overlay. Shrink fits are waiting on a library fix.', cap: 'Tokens: {page} {total} {date} {file}',
+        rows: [seg('Mode', ['Quick', 'Advanced'], 1), fld('Header', [['L', 'Sri Meenakshi Hospital', '150px'], ['C', '{file}', '90px'], ['R', '{date}', '90px', 1]]), fld('Footer', [['L', '', '150px'], ['C', 'Page {page} of {total}', '150px', 1], ['R', '', '60px']]), seg('Page numbers', ['1, 2, 3', 'i, ii, iii', 'I, II, III', 'a, b, c', 'A, B, C'], 1), seg('Date', ['2026-10-14', '14 Oct 2026', '14/10/2026'], 1), seg('Fit', ['Overlay', 'Shrink page', 'Shrink if overlapping'], 0)],
+        ...page({ hf: true }) },
+      { id: '6c', where: 'Margin › Whole desk › Number pages', icon: 'go-to-page', title: 'Numbering', primary: 'Set numbering', secondary: 'Remove', note: 'Blank pages count. The numbers run on across sources.', cap: 'Bottom-right · Bates',
+        rows: [seg('Style', ['Page X', 'Page X of Y', 'Bates'], 2), fld('Bates', [['prefix', 'MRD-', '110px', 1], ['start', '43', '80px'], ['zero-pad', '6', '80px']]), seg('Position', ['↖', '↑', '↗', '↙', '↘'], 4), fld('Font size', [['pt', '9', '80px']]), fld('Range', [['from', '1', '80px'], ['to (0 = last)', '0', '110px']]), seg('First page', ['Number it', 'Skip, keep count', 'Skip & renumber'], 1)],
+        ...page({ num: true }) },
+      { id: '6d', where: 'Margin › Print layout › N-up / Booklet', icon: 'grid-view', title: 'Impose', primary: 'Make new desk', secondary: 'Cancel', note: 'Builds a new desk; this one is unchanged.', cap: '4-up · A4 · 6 mm gutter · 3 sheets',
+        rows: [seg('Layout', ['N-up', 'Booklet (saddle-stitch)'], 0), seg('Pages per sheet', ['2', '4', '6', '9', 'Custom'], 1), fld('Custom grid', [['rows', '2', '80px'], ['cols', '2', '80px']]), seg('Sheet', ['A4', 'Letter'], 0), seg('Orientation', ['Portrait', 'Landscape'], 0), fld('Gutter', [['mm', '6', '80px']]), note('Booklet', 'Pads to a multiple of 4 and puts pages in fold order. Print two-sided and fold.')],
+        ...page({ cols: '1fr 1fr', gap: '6px', pad: '10px', cells: [cell({ bg: '#fbfaf7', p: '6px' }), cell({ bg: '#fbfaf7', p: '6px' }), cell({ bg: '#fbfaf7', p: '6px' }), cell({ bg: '#fbfaf7', p: '6px' })] }) },
+      { id: '6e', where: 'Page hover strip › Crop', icon: 'crop', title: 'Crop page', primary: 'Apply', secondary: 'Cancel', note: 'Drag on the preview to choose the area.', cap: 'p 5 · drag to select the area',
+        rows: [note('How', 'Drag a rectangle on the page. Then choose what to do with it:'), seg('Mode', ['Blank rest', 'Crop to size', 'Fit to page', 'Fit + margin'], 1), note('Blank rest', 'Keep the area and blank everything else. Page size unchanged.'), note('Crop to size', 'The page shrinks to exactly the selected area.'), note('Fit to page · Fit + margin', 'The area is scaled to fill the original page size, optionally with a 0.5 in margin.'), seg('Apply to', ['This page', 'Selected (2)'], 0)],
+        ...page({ crop: true }) },
+      { id: '6f', where: 'Page hover strip › Margins', icon: 'fit-page', title: 'Add margins', primary: 'Apply', secondary: 'Cancel', note: 'The content scales to fit, centred. Page size unchanged.', cap: '0.5 in on every side',
+        rows: [seg('Unit', ['in', 'cm'], 0), seg('Preset', ['Default 0.5 in', 'Binding 1 in left', 'None'], 0), fld('Sides', [['top', '0.50', '80px'], ['right', '0.50', '80px'], ['bottom', '0.50', '80px'], ['left', '0.50', '80px', 1]]), seg('Apply to', ['This page', 'All pages on the desk'], 0), note('Note', 'On rotated pages, margins apply in page space (current v1 limit).')],
+        ...page({ margin: true }) },
+      { id: '6g', where: 'Margin footer › Export', icon: 'download', title: 'Export', primary: 'Export 12 pages', secondary: 'Cancel', note: 'Desk settings (watermark, numbering, size) are applied.', cap: 'D:\\Records\\Chuvadi\\Export',
+        rows: [seg('Format', ['PDF', 'PNG', 'JPG', 'BMP', 'SVG'], 1), seg('Resolution', ['96', '150', '300', '600 dpi'], 2), seg('Pages', ['All (12)', 'Selected (2)'], 0), fld('Folder', [['', 'D:\\Records\\Chuvadi\\Export', '280px', 1]]), fld('File names', [['', 'discharge-summary-{n}.png', '280px']]), note('Heads-up', 'PNG/JPG drop some embedded fonts until library fix LA-29 lands. SVG is exact.')],
+        ...page({}) },
+      { id: '6h', where: 'Selection bar › Compare (2 pages)', icon: 'split-view', title: 'Compare pages', primary: 'Done', secondary: 'Swap sides', note: 'Scroll and zoom move both pages together.', cap: 'Side by side · linked zoom',
+        rows: [seg('View', ['Side by side', 'Overlay (onion skin)'], 0), sl('Overlay opacity', '50%', '50%'), seg('Zoom', ['Fit', '100%', '200%'], 0), seg('Linked scrolling', ['On', 'Off'], 0), note('Tip', 'For whole documents, use Ctrl K › Compare documents.')],
+        isPage: false, isCompare: true, pw: '0', ph: '0', cols: '1fr', gap: '0', pad: '0', cells: [], wm: false, hf: false, num: false, crop: false, margin: false },
+    ];
+    return { dialogs };
+  }
+}
+</script>
+</body>
+</html>

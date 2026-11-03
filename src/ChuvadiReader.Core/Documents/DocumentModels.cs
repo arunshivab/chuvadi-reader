@@ -5,6 +5,15 @@ public enum DocumentFormat
     Pdf,
     Docx,
     Xlsx,
+
+    /// <summary>Markdown (.md, .markdown) — viewed read-only in the WebView (D-09).</summary>
+    Markdown,
+
+    /// <summary>Plain text (.txt, .log, .csv shown as text) — viewed read-only (D-09).</summary>
+    Text,
+
+    /// <summary>HTML (.html, .htm) — viewed sandboxed, read-only (D-09).</summary>
+    Html,
 }
 
 public static class DocumentFormatExtensions
@@ -15,7 +24,25 @@ public static class DocumentFormatExtensions
         DocumentFormat.Pdf => "file-pdf",
         DocumentFormat.Docx => "file-docx",
         DocumentFormat.Xlsx => "file-xlsx",
+        DocumentFormat.Markdown => "file",
+        DocumentFormat.Text => "file",
+        DocumentFormat.Html => "file",
         _ => "file-pdf",
+    };
+
+    /// <summary>True for formats that are view-only in Chuvadi (D-07, D-09): Mark, Arrange and
+    /// Protect stay dimmed until the file is converted to PDF.</summary>
+    public static bool IsViewOnly(this DocumentFormat format) => format != DocumentFormat.Pdf;
+
+    /// <summary>Short label for the format (tab tooltips, status bar).</summary>
+    public static string Label(this DocumentFormat format) => format switch
+    {
+        DocumentFormat.Docx => "Word",
+        DocumentFormat.Xlsx => "Excel",
+        DocumentFormat.Markdown => "Markdown",
+        DocumentFormat.Text => "Text",
+        DocumentFormat.Html => "HTML",
+        _ => "PDF",
     };
 
     public static DocumentFormat FromPath(string path)
@@ -25,6 +52,9 @@ public static class DocumentFormatExtensions
         {
             ".docx" => DocumentFormat.Docx,
             ".xlsx" => DocumentFormat.Xlsx,
+            ".md" or ".markdown" => DocumentFormat.Markdown,
+            ".txt" or ".log" or ".text" => DocumentFormat.Text,
+            ".html" or ".htm" => DocumentFormat.Html,
             _ => DocumentFormat.Pdf,
         };
     }

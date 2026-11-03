@@ -1,0 +1,94 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@*
+    Read-only list of keyboard shortcuts. "Works" rows mirror the real key handlers
+    (wwwroot/js/reader.js, wwwroot/js/bench.js, the Find boxes); planned ones from the
+    design are listed greyed out until the shell wires them.
+*@
+<SettingsSection Title="Shortcuts" Sub="Every shortcut. Greyed ones are planned and not wired yet.">
+    @foreach (var group in Groups)
+    {
+        <SettingsCard Title="@group.Title" Full="@group.Full">
+            <table class="keys">
+                <tbody>
+                    @foreach (var k in group.Keys)
+                    {
+                        <tr class="@(k.Works ? null : "soon")" title="@(k.Works ? null : "Coming soon")">
+                            <td class="what">
+                                <span>@k.What</span>
+                                @if (!string.IsNullOrEmpty(k.Hint))
+                                {
+                                    <span class="hint">@k.Hint</span>
+                                }
+                            </td>
+                            <td class="chord">
+                                @for (var i = 0; i < k.Chords.Length; i++)
+                                {
+                                    if (i > 0)
+                                    {
+                                        <span class="or">·</span>
+                                    }
+                                    <kbd>@k.Chords[i]</kbd>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </SettingsCard>
+    }
+</SettingsSection>
+
+@code {
+    private sealed record Key(string What, string? Hint, bool Works, params string[] Chords);
+
+    private sealed record Group(string Title, bool Full, IReadOnlyList<Key> Keys);
+
+    private static readonly IReadOnlyList<Group> Groups = new[]
+    {
+        new Group("Everywhere", false, new[]
+        {
+            new Key("Find in document", "Enter next · Shift Enter previous", true, "Ctrl F"),
+            new Key("Close tab", null, true, "Ctrl W"),
+            new Key("Close all tabs", null, true, "Ctrl Shift W"),
+            new Key("Close other tabs", null, true, "Ctrl Alt W"),
+            new Key("Next / previous tab", null, true, "Ctrl Tab", "Ctrl Shift Tab"),
+            new Key("Go to tab 1–9", null, true, "Ctrl 1 … 9"),
+            new Key("Close panel / cancel", null, true, "Esc"),
+            new Key("Find or do anything", "Command bar", false, "Ctrl K"),
+            new Key("Switch mode", "Read · Mark · Arrange · Protect", false, "1 2 3 4"),
+            new Key("Open a document", null, false, "Ctrl O"),
+            new Key("Print", null, false, "Ctrl P"),
+        }),
+        new Group("Read", false, new[]
+        {
+            new Key("Zoom in / out / reset", null, true, "Ctrl +", "Ctrl −", "Ctrl 0"),
+            new Key("Zoom toward the cursor", null, true, "Ctrl + wheel"),
+            new Key("Next / previous page", null, true, "→", "←"),
+            new Key("Scroll a little", null, true, "↓", "↑"),
+            new Key("Scroll a screenful", null, true, "Page Down", "Page Up", "Space", "Shift Space"),
+            new Key("Top / bottom of document", null, true, "Home", "End"),
+            new Key("Undo", "Page rotation", true, "Ctrl Z"),
+            new Key("Redo", null, false, "Ctrl Y"),
+            new Key("Bookmark this page", null, false, "Ctrl B"),
+            new Key("Go to page", null, false, "Ctrl G"),
+            new Key("Hand · Marquee · Loupe · Snapshot", null, false, "H", "Z", "L", "S"),
+            new Key("Immersive / full screen", null, false, "F11"),
+        }),
+        new Group("Arrange", false, new[]
+        {
+            new Key("Undo / redo", null, true, "Ctrl Z", "Ctrl Y", "Ctrl Shift Z"),
+            new Key("Select all on desk", null, true, "Ctrl A"),
+            new Key("Rotate right / left", null, true, "R", "Shift R"),
+            new Key("Duplicate page", null, true, "Ctrl D"),
+            new Key("Remove page", null, true, "Del", "Backspace"),
+            new Key("Clear selection", null, true, "Esc"),
+        }),
+        new Group("Mark & Protect", false, new[]
+        {
+            new Key("Text · Box · Draw · Sign", null, false, "T", "B", "D", "G"),
+            new Key("Highlight selection", null, false, "Ctrl Shift H"),
+            new Key("Save as new PDF", null, false, "Ctrl Shift S"),
+        }),
+    };
+}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+<section id="turn-9" style="padding:72px;display:flex;flex-direction:column;gap:40px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1000px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">App icon · splash</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:52px;line-height:1.02">The letter ச on a palm leaf.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">The icon takes the ச from the wordmark and sets it on a binding-red tile. A cream palm-leaf strip runs across it, with two binding holes like an olai manuscript. Below 32 px the strip is dropped so the letter stays readable. These are designed in type and CSS. Export them as SVG/ICO from a vector tool before shipping.</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-end">
+    <sc-for list="{{ icons }}" as="ic" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div style="position:relative;width:{{ ic.s }};height:{{ ic.s }};border-radius:{{ ic.r }};background:{{ ic.bg }};box-shadow:{{ ic.sh }};overflow:hidden;display:flex;align-items:center;justify-content:center">
+          <sc-if value="{{ ic.leaf }}" hint-placeholder-val="{{ true }}">
+            <span style="position:absolute;left:12%;right:12%;top:60%;height:{{ ic.leafH }};border-radius:999px;background:{{ ic.leafC }};opacity:.95"></span>
+            <span style="position:absolute;left:24%;top:calc(60% + {{ ic.holeT }});width:{{ ic.hole }};height:{{ ic.hole }};border-radius:50%;background:{{ ic.bg }}"></span>
+            <span style="position:absolute;right:24%;top:calc(60% + {{ ic.holeT }});width:{{ ic.hole }};height:{{ ic.hole }};border-radius:50%;background:{{ ic.bg }}"></span>
+          </sc-if>
+          <span style="position:relative;font-family:'Tiro Tamil';font-size:{{ ic.f }};line-height:1;color:{{ ic.fg }};margin-top:{{ ic.mt }}">ச</span>
+        </div>
+        <span style="font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">{{ ic.label }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:15px">Splash · 640 × 400 · shown for up to 1.2 s (can be switched off in Settings)</span>
+      <div id="9a" style="position:relative;width:640px;height:400px;border-radius:12px;overflow:hidden;background:#fbf7ec;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 0.5px #c4b497;display:flex;flex-direction:column;justify-content:space-between;padding:40px 44px">
+        <span style="position:absolute;right:-60px;top:40px;font-family:'Tiro Tamil';font-size:360px;line-height:1;color:#8a3a1c;opacity:.07">ச</span>
+        <div style="display:flex;flex-direction:column;gap:6px;position:relative"><span style="font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.14em;color:#8a7c64">READ · MARK · ARRANGE · PROTECT</span></div>
+        <div style="display:flex;flex-direction:column;gap:10px;position:relative">
+          <span style="font-family:'Instrument Serif';font-style:italic;font-size:76px;line-height:1">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c;margin:0 2px">ச</span>huvadi</span>
+          <span style="font-family:Fraunces;font-size:15px;color:#3a2f25">Documents that stay on this device.</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:14px;position:relative">
+          <span style="flex:1;height:2px;background:#e8dcc4;border-radius:1px;overflow:hidden"><span style="display:block;width:62%;height:100%;background:#8a3a1c"></span></span>
+          <span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">1.0.0 · opening 3 tabs</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:15px">Splash · Night paper</span>
+      <div id="9b" style="position:relative;width:640px;height:400px;border-radius:12px;overflow:hidden;background:#1b1410;box-shadow:0 30px 70px rgba(26,19,16,.28);display:flex;flex-direction:column;justify-content:space-between;padding:40px 44px;color:#f2ead6">
+        <span style="position:absolute;right:-60px;top:40px;font-family:'Tiro Tamil';font-size:360px;line-height:1;color:#e08a52;opacity:.08">ச</span>
+        <span style="font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.14em;color:#a3957c;position:relative">READ · MARK · ARRANGE · PROTECT</span>
+        <div style="display:flex;flex-direction:column;gap:10px;position:relative"><span style="font-family:'Instrument Serif';font-style:italic;font-size:76px;line-height:1">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#e08a52;margin:0 2px">ச</span>huvadi</span><span style="font-family:Fraunces;font-size:15px;color:#d9cdb4">Documents that stay on this device.</span></div>
+        <div style="display:flex;align-items:center;gap:14px;position:relative"><span style="flex:1;height:2px;background:#33281f;border-radius:1px;overflow:hidden"><span style="display:block;width:62%;height:100%;background:#e08a52"></span></span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#a3957c">1.0.0</span></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <span style="font-size:15px">In context · taskbar, dock, file icons</span>
+      <div style="width:520px;display:flex;flex-direction:column;gap:16px">
+        <div style="height:56px;border-radius:10px;background:#1f2633;display:flex;align-items:center;justify-content:center;gap:12px">
+          <span style="width:36px;height:36px;border-radius:8px;background:#3a4558"></span><span style="position:relative;width:36px;height:36px;border-radius:8px;background:#8a3a1c;display:flex;align-items:center;justify-content:center;font-family:'Tiro Tamil';font-size:22px;color:#fbf7ec">ச<span style="position:absolute;bottom:-6px;width:14px;height:3px;border-radius:2px;background:#9ec1ff"></span></span><span style="width:36px;height:36px;border-radius:8px;background:#3a4558"></span><span style="width:36px;height:36px;border-radius:8px;background:#3a4558"></span>
+        </div>
+        <div style="display:flex;gap:18px;padding:18px;border-radius:10px;background:#fbf7ec;border:0.5px solid #c4b497">
+          <sc-for list="{{ fileIcons }}" as="fi"><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="position:relative;width:54px;height:68px;background:#fff;border-radius:4px 14px 4px 4px;box-shadow:0 2px 6px rgba(0,0,0,.15);display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px"><span style="position:absolute;top:8px;left:8px;width:22px;height:22px;border-radius:5px;background:#8a3a1c;display:flex;align-items:center;justify-content:center;font-family:'Tiro Tamil';font-size:13px;color:#fbf7ec">ச</span><span style="font-family:'IBM Plex Mono';font-size:10px;font-weight:500;color:#fff;background:{{ fi.c }};padding:1px 5px;border-radius:3px">{{ fi.t }}</span></div><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25">.{{ fi.e }}</span></div></sc-for>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const base = (s, o) => ({ s: s + 'px', r: Math.round(s * 0.225) + 'px', bg: '#8a3a1c', fg: '#fbf7ec', leafC: '#f2ead6', leaf: true, f: Math.round(s * 0.62) + 'px', mt: '-' + Math.round(s * 0.14) + 'px', leafH: Math.round(s * 0.11) + 'px', hole: Math.round(s * 0.05) + 'px', holeT: Math.round(s * 0.03) + 'px', sh: s > 64 ? '0 20px 40px rgba(138,58,28,.3)' : '0 2px 6px rgba(0,0,0,.2)', ...o });
+    const icons = [
+      { ...base(256, {}), label: '256 · Windows / macOS' },
+      { ...base(128, { bg: '#1b1410', fg: '#e08a52', leafC: '#33281f' }), label: '128 · Night' },
+      { ...base(96, { bg: '#ffffff', fg: '#000', leafC: '#000', sh: '0 0 0 2px #000' }), label: '96 · High contrast' },
+      { ...base(64, {}), label: '64' },
+      { ...base(32, { leaf: false, mt: '0px', f: '24px' }), label: '32 · no leaf' },
+      { ...base(16, { leaf: false, mt: '0px', f: '13px', r: '3px' }), label: '16' },
+    ];
+    const fileIcons = [{ e: 'pdf', t: 'PDF', c: '#8a3a1c' }, { e: 'docx', t: 'DOC', c: '#1f3b73' }, { e: 'xlsx', t: 'XLS', c: '#6b7a3e' }, { e: 'chvd', t: 'BENCH', c: '#c47416' }];
+    return { icons, fileIcons };
+  }
+}
+</script>
+</body>
+</html>

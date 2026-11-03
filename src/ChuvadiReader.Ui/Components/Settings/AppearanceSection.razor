@@ -1,0 +1,61 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+@inject ThemeService Theme
+@inject PreferencesService Prefs
+@inject IJSRuntime JS
+
+<SettingsSection Title="Appearance" Sub="Pages stay white; only the paper around them changes.">
+    <Lead>
+        <div class="themes" role="group" aria-label="Theme">
+            @foreach (var t in Enum.GetValues<ChuvadiTheme>())
+            {
+                <ThemeCard Theme="t" Selected="Theme.Current == t" OnClick="() => SetTheme(t)" />
+            }
+        </div>
+        <div class="quick">
+            <SettingRow Label="Follow the computer's light / dark setting" Soon="true">
+                <Toggle Value="false" AriaLabel="Follow the computer's light / dark setting" />
+            </SettingRow>
+            <SettingRow Label="Reduce motion" Hint="No sliding or fading panels">
+                <Toggle Value="Prefs.ReduceMotion" ValueChanged="v => Prefs.SetReduceMotionAsync(v)" AriaLabel="Reduce motion" />
+            </SettingRow>
+        </div>
+    </Lead>
+    <ChildContent>
+        <SettingsCard Title="Interface" Full="true">
+            <SettingRow Label="Interface size" Hint="Larger for touchscreens and kiosks">
+                <Segmented Options="ScaleOptions" Value="@Prefs.UiScale.ToString()" ValueChanged="v => Prefs.SetUiScaleAsync(int.Parse(v))" AriaLabel="Interface size" />
+            </SettingRow>
+            <SettingRow Label="Density" Hint="Space between controls" Soon="true">
+                <Segmented Options="DensityOptions" Value="Comfortable" />
+            </SettingRow>
+            <SettingRow Label="Open at launch" Soon="true" SoonText="Coming soon — today Chuvadi opens at Home and restores your tabs when you open the Reader">
+                <Segmented Options="LaunchOptions" Value="Home" />
+            </SettingRow>
+            <SettingRow Label="Splash screen on launch" Hint="Off opens faster. Takes effect on the next launch.">
+                <Segmented Options="OnOffOptions" Value="@(Prefs.SplashOnLaunch ? "on" : "off")" ValueChanged='v => Prefs.SetSplashOnLaunchAsync(v == "on")' AriaLabel="Splash screen on launch" />
+            </SettingRow>
+            <SettingRow Label="Page-curl corner" Hint="Decorative, when reading" Soon="true">
+                <Segmented Options="OnOffOptions" Value="on" />
+            </SettingRow>
+        </SettingsCard>
+    </ChildContent>
+</SettingsSection>
+
+@code {
+    /// <summary>Bumped by the Settings page when any service changes, so this re-renders.</summary>
+    [Parameter] public int Rev { get; set; }
+
+    private static readonly IReadOnlyList<SegOption> ScaleOptions = PreferencesService.UiScales.Select(s => new SegOption(s.ToString(), $"{s}%")).ToArray();
+    private static readonly IReadOnlyList<SegOption> DensityOptions = SegOption.Of("Compact", "Comfortable");
+    private static readonly IReadOnlyList<SegOption> LaunchOptions = SegOption.Of("Home", "Last documents");
+    private static readonly IReadOnlyList<SegOption> OnOffOptions = new[] { new SegOption("on", "On"), new SegOption("off", "Off") };
+
+    private async Task SetTheme(ChuvadiTheme t)
+    {
+        await Theme.SetAsync(t);
+
+        // The shell applies the theme on ThemeService.Changed; applying here too keeps the
+        // live switch correct even while the shell still maps only light/dark.
+        await PreferencesInterop.ApplyThemeAsync(JS, t);
+    }
+}

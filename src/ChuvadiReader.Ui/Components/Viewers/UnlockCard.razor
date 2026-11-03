@@ -1,0 +1,41 @@
+@*
+    Locked Word/Excel file (README "Word / Excel tabs"): lock icon in a 44 px circle, a password
+    field and an Open button. The password is handed to the viewer, which keeps it only in memory
+    for that tab.
+*@
+<div class="uc">
+    <form class="uc-card" @onsubmit="Submit" @onsubmit:preventDefault>
+        <div class="uc-ic"><Icon Name="lock" Size="20" /></div>
+        <h3>This @Kind is password-protected</h3>
+        <p>Enter its password to view it here. The password stays in memory for this tab only.</p>
+        <div class="uc-row">
+            <input class="uc-pw" type="password" autocomplete="off" spellcheck="false"
+                   placeholder="Password" aria-label="Password" @bind="_pw" @bind:event="oninput" disabled="@Busy" />
+            <button class="uc-open" type="submit" disabled="@(Busy || string.IsNullOrEmpty(_pw))">
+                <Icon Name="unlock" Size="14" /> Open
+            </button>
+        </div>
+        @if (!string.IsNullOrEmpty(Error))
+        {
+            <div class="uc-err" role="alert"><Icon Name="warning" Size="13" /> @Error</div>
+        }
+    </form>
+</div>
+
+@code {
+    /// <summary>"document" or "workbook".</summary>
+    [Parameter] public string Kind { get; set; } = "document";
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public bool Busy { get; set; }
+    [Parameter] public EventCallback<string> OnUnlock { get; set; }
+
+    private string _pw = "";
+
+    private async Task Submit()
+    {
+        if (string.IsNullOrEmpty(_pw) || Busy) return;
+        var pw = _pw;
+        _pw = "";
+        await OnUnlock.InvokeAsync(pw);
+    }
+}

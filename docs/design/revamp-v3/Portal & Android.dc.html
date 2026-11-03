@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+
+<section id="turn-12" style="padding:72px;display:flex;flex-direction:column;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">D-10 on every platform · web portal · Android</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:56px;line-height:1.02">Same rails, different frames.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">The web portal and the Android tablet use the same side-rail layout as the desktop, built from the same Blazor components. The portal runs on Blazor Server, so files are processed on the server. It needs a Sangam sign-in and says so in the status bar. On an Android phone the gutters are gone, so the left bar becomes a bottom bar. The Tools and View rails become a tool strip and a sheet.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">WEB</span><span style="font-family:'Instrument Serif';font-size:32px">Portal · Blazor Server</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:44px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">12a</span><span style="font-family:'Instrument Serif';font-size:22px">Sign in with Sangam</span><span style="font-size:13px;color:#3a2f25">Required for anything on the portal.</span></div>
+        <div id="12a" style="width:1280px;height:800px;border-radius:12px;overflow:hidden;background:#dcdfe5;box-shadow:0 30px 80px rgba(26,19,16,.25);display:flex;flex-direction:column">
+          <div style="height:40px;flex:none;display:flex;align-items:flex-end;gap:6px;padding:0 12px"><div style="display:flex;gap:7px;align-self:center;margin-right:10px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></div><div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;width:250px;background:#f5f6f8;border-radius:8px 8px 0 0;font-size:12.5px;color:#222"><span style="font-family:'Tiro Tamil';color:#8a3a1c">ச</span>Chuvadi — Sign in</div></div>
+          <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:#f5f6f8;border-bottom:1px solid #d5d8de;color:#555;font-size:13px"><span>←</span><span>→</span><span>↻</span><div style="flex:1;height:28px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#e8eaee;border-radius:14px;font-family:'IBM Plex Mono';font-size:12px;color:#333"><lp-i name="lock" size="12"></lp-i>reader.chuvadi.in/sign-in</div></div>
+          <div style="flex:1;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);background:#f2ead6">
+            <div style="position:relative;overflow:hidden;background:#fbf7ec;border-right:0.5px solid #c4b497;padding:56px 60px;display:flex;flex-direction:column;justify-content:space-between">
+              <span style="position:absolute;right:-70px;bottom:-80px;font-family:'Tiro Tamil';font-size:440px;line-height:1;color:#8a3a1c;opacity:.06">ச</span>
+              <span style="font-family:'Instrument Serif';font-style:italic;font-size:30px;position:relative">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi <span style="font-style:normal;font-family:'IBM Plex Mono';font-size:12px;color:#8a7c64;vertical-align:middle">portal</span></span>
+              <div style="display:flex;flex-direction:column;gap:14px;position:relative;max-width:440px">
+                <span style="font-family:'Instrument Serif';font-size:48px;line-height:1.02">Your documents, from any browser.</span>
+                <span style="font-family:Fraunces;font-size:15px;line-height:1.6;color:#3a2f25">The same Read, Mark, Arrange and Protect as the desktop app. On the portal, files are processed on our server, encrypted at rest, and visible only to you.</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;position:relative;font-size:13px;color:#3a2f25">
+                <sc-for list="{{ promises }}" as="p"><span style="display:flex;align-items:center;gap:10px"><span style="display:flex;color:#6b7a3e"><lp-i name="{{ p.icon }}" size="16"></lp-i></span>{{ p.t }}</span></sc-for>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:center">
+              <div style="width:400px;display:flex;flex-direction:column;gap:16px;padding:32px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:14px;box-shadow:0 20px 50px rgba(26,19,16,.12)">
+                <span style="font-family:'Instrument Serif';font-size:30px;line-height:1">Sign in</span>
+                <span style="height:46px;border-radius:9px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14.5px;font-weight:500"><span style="width:22px;height:22px;border-radius:6px;background:#c47416;display:flex;align-items:center;justify-content:center;font-family:'Instrument Serif';font-style:italic;font-size:15px;color:#1a1310">S</span>Continue with Sangam</span>
+                <div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#8a7c64"><span style="flex:1;height:0.5px;background:#d9cdb4"></span>or with your Sangam ID<span style="flex:1;height:0.5px;background:#d9cdb4"></span></div>
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12.5px">Sangam ID</span><span style="height:40px;display:flex;align-items:center;padding:0 12px;border:0.5px solid #8a3a1c;border-radius:8px;background:#fff;font-family:'IBM Plex Mono';font-size:13px">arun.s@smh.sangam</span></div>
+                <div style="display:flex;flex-direction:column;gap:6px"><span style="display:flex;justify-content:space-between;font-size:12.5px">Password<a href="#" style="font-size:12px">Forgot?</a></span><span style="height:40px;display:flex;align-items:center;padding:0 12px;border:0.5px solid #c4b497;border-radius:8px;background:#fff;font-family:'IBM Plex Mono';letter-spacing:.2em">••••••••••</span></div>
+                <span style="height:42px;border-radius:9px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:500">Sign in</span>
+                <span style="font-size:12px;line-height:1.5;color:#8a7c64">Prefer to keep files on your computer? <a href="#">Download the desktop app</a> — no sign-in needed to read.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">12b</span><span style="font-family:'Instrument Serif';font-size:22px">Portal · Reader</span><span style="font-size:13px;color:#3a2f25">Same rails. No window controls; account menu instead. The status bar says where processing happens.</span></div>
+        <div id="12b" style="width:1280px;height:800px;border-radius:12px;overflow:hidden;background:#dcdfe5;box-shadow:0 30px 80px rgba(26,19,16,.25);display:flex;flex-direction:column">
+          <div style="height:40px;flex:none;display:flex;align-items:flex-end;gap:6px;padding:0 12px"><div style="display:flex;gap:7px;align-self:center;margin-right:10px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></div><div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;width:250px;background:#f5f6f8;border-radius:8px 8px 0 0;font-size:12.5px;color:#222"><span style="font-family:'Tiro Tamil';color:#8a3a1c">ச</span>discharge-summary — Chuvadi</div></div>
+          <div style="height:40px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:#f5f6f8;border-bottom:1px solid #d5d8de;color:#555;font-size:13px"><span>←</span><span>→</span><span>↻</span><div style="flex:1;height:28px;display:flex;align-items:center;gap:8px;padding:0 12px;background:#e8eaee;border-radius:14px;font-family:'IBM Plex Mono';font-size:12px;color:#333"><lp-i name="lock" size="12"></lp-i>reader.chuvadi.in/d/7f3a…/discharge-summary.pdf</div></div>
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#f2ead6">
+            <div style="height:40px;flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;padding:0 12px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="font-family:'Instrument Serif';font-style:italic;font-size:19px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span><span style="width:0.5px;height:18px;background:#d9cdb4"></span>
+                <div style="display:flex;gap:4px;min-width:0;overflow:hidden"><sc-for list="{{ webTabs }}" as="tb"><span style="display:flex;align-items:center;gap:6px;height:26px;padding:0 6px 0 9px;max-width:190px;min-width:0;flex:0 1 auto;border-radius:7px;border:0.5px solid {{ tb.bd }};background:{{ tb.bg }};color:{{ tb.fg }};box-shadow:{{ tb.sh }};font-family:'IBM Plex Mono';font-size:11px;white-space:nowrap"><span style="display:flex;color:{{ tb.c }}"><lp-i name="{{ tb.icon }}" size="12"></lp-i></span><span style="overflow:hidden;text-overflow:ellipsis">{{ tb.n }}</span><span style="display:flex;opacity:.5"><lp-i name="close" size="10"></lp-i></span></span></sc-for></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:2px;height:28px;padding:0 4px;background:#f2ead6;border:0.5px solid #d9cdb4;border-radius:8px;font-family:'IBM Plex Mono';font-size:12px;white-space:nowrap"><span style="display:flex;width:24px;justify-content:center"><lp-i name="chevron-left" size="14"></lp-i></span><span style="min-width:28px;height:20px;padding:0 6px;display:flex;align-items:center;justify-content:center;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:4px">2</span><span style="padding:0 4px">/ 13</span><span style="display:flex;width:24px;justify-content:center"><lp-i name="chevron-right" size="14"></lp-i></span></div>
+              <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px"><span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:13px">Document<lp-i name="chevron-down" size="12"></lp-i></span><span style="display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:0.5px solid #c4b497;border-radius:6px;background:#f2ead6;color:#8a7c64"><lp-i name="search" size="13"></lp-i><span style="font-family:'IBM Plex Mono';font-size:10px;color:#1a1310;background:#e8dcc4;border-radius:3px;padding:1px 5px">Ctrl K</span></span><span style="display:flex;align-items:center;gap:6px;height:30px;padding:0 4px 0 4px;border:0.5px solid #c4b497;border-radius:15px;font-size:12.5px"><span style="width:22px;height:22px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:9px">AS</span>Arun<lp-i name="chevron-down" size="11"></lp-i></span></div>
+            </div>
+            <div style="position:relative;flex:1;min-height:0">
+              <div style="position:absolute;top:0;bottom:0;left:62px;right:118px;background:#e8dcc4;display:flex;justify-content:center;padding-top:16px">
+                <div style="width:430px;height:608px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:40px 38px;display:flex;flex-direction:column;gap:9px"><span style="height:6px;width:46%;background:#cfcac0"></span><span style="height:14px;width:58%;background:#bdb7ab;margin-bottom:6px"></span><sc-for list="{{ lines14 }}" as="l"><span style="height:5px;width:{{ l }};background:#ebe8e2"></span></sc-for></div>
+              </div>
+              <div style="position:absolute;top:0;bottom:0;left:0;width:62px;display:flex;flex-direction:column;gap:2px;padding:8px;background:#fbf7ec;border-right:0.5px solid #c4b497">
+                <sc-for list="{{ railModes }}" as="it"><div style="position:relative;display:flex;align-items:center;justify-content:center;height:44px;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="20"></lp-i></div></sc-for>
+                <span style="height:0.5px;background:#d9cdb4;margin:6px 4px"></span>
+                <sc-for list="{{ railGlobalWeb }}" as="it"><div style="display:flex;align-items:center;justify-content:center;height:40px;color:#3a2f25"><lp-i name="{{ it }}" size="20"></lp-i></div></sc-for>
+                <span style="flex:1"></span>
+                <div style="display:flex;align-items:center;justify-content:center;height:40px;color:#3a2f25"><lp-i name="settings" size="20"></lp-i></div>
+              </div>
+              <div style="position:absolute;top:0;bottom:0;right:54px;width:64px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px;background:#fbf7ec;border-left:0.5px solid #c4b497"><span style="font-family:'IBM Plex Mono';font-size:8.5px;letter-spacing:.1em;color:#8a7c64;padding:2px 0 6px">TOOLS</span><sc-for list="{{ railToolsRead }}" as="it"><div style="display:flex;align-items:center;justify-content:center;width:46px;height:38px;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="19"></lp-i></div></sc-for></div>
+              <div style="position:absolute;top:0;bottom:0;right:0;width:54px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 6px;background:#f2ead6;border-left:0.5px solid #d9cdb4"><span style="font-family:'IBM Plex Mono';font-size:8.5px;letter-spacing:.1em;color:#8a7c64;padding:2px 0 6px">VIEW</span><sc-for list="{{ railView }}" as="it"><div style="display:flex;align-items:center;justify-content:center;width:40px;height:36px;border-radius:7px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="18"></lp-i></div></sc-for></div>
+              <div style="position:absolute;right:130px;top:14px;width:300px;display:flex;flex-direction:column;gap:10px;padding:14px 16px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.2);font-size:12.5px">
+                <div style="display:flex;align-items:center;gap:10px"><span style="width:34px;height:34px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:11px">AS</span><div style="display:flex;flex-direction:column"><b style="font-weight:600;font-size:13.5px">Arun S.</b><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">arun.s@smh.sangam · Records</span></div></div>
+                <div style="display:flex;flex-direction:column;gap:5px"><span style="display:flex;justify-content:space-between;color:#3a2f25">Storage<span style="font-family:'IBM Plex Mono';font-size:11px">1.8 / 10 GB</span></span><span style="height:5px;border-radius:3px;background:#e8dcc4;overflow:hidden"><span style="display:block;width:18%;height:100%;background:#6b7a3e"></span></span></div>
+                <sc-for list="{{ acctMenu }}" as="am"><span style="display:flex;align-items:center;gap:10px;height:32px;border-top:0.5px solid #ece3cf;color:{{ am.c }}"><lp-i name="{{ am.icon }}" size="15"></lp-i>{{ am.t }}</span></sc-for>
+              </div>
+            </div>
+            <div style="height:26px;flex:none;display:flex;align-items:center;gap:12px;padding:0 12px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25;white-space:nowrap">
+              <span style="display:flex;align-items:center;gap:6px"><span style="width:7px;height:7px;border-radius:50%;background:#2c3e8c"></span>processed on the server · encrypted at rest · only you can see it</span>
+              <span style="width:0.5px;height:12px;background:#c4b497"></span><span>Arun S. · Sangam</span>
+              <span style="width:0.5px;height:12px;background:#c4b497"></span><span style="color:#8a7c64">Read · fit page · autosaved to your storage 18:39</span>
+              <span style="margin-left:auto;font-weight:500">18:40:12</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">12c</span><span style="font-family:'Instrument Serif';font-size:22px">Sangam gating in the desktop app</span><span style="font-size:13px;color:#3a2f25">Reading and basic markup stay free and local. Signing, sync and sharing ask for an identity.</span></div>
+        <div id="12c" style="width:1280px;height:520px;border-radius:12px;overflow:hidden;background:rgba(26,19,16,.30);box-shadow:0 0 0 0.5px #c4b497;display:flex;align-items:center;justify-content:center;gap:28px">
+          <div style="width:420px;display:flex;flex-direction:column;gap:14px;padding:24px;background:#fbf7ec;border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.35)">
+            <span style="width:44px;height:44px;border-radius:50%;background:rgba(196,116,22,.16);color:#c47416;display:flex;align-items:center;justify-content:center"><lp-i name="certification" size="22"></lp-i></span>
+            <span style="font-family:'Instrument Serif';font-size:28px;line-height:1.08">Signing needs a Sangam identity</span>
+            <span style="font-size:13.5px;line-height:1.55;color:#3a2f25">A digital signature has to say who signed. Sign in once; your documents still stay on this computer.</span>
+            <span style="height:42px;border-radius:9px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:10px;font-size:14px;font-weight:500"><span style="width:20px;height:20px;border-radius:5px;background:#c47416;display:flex;align-items:center;justify-content:center;font-family:'Instrument Serif';font-style:italic;font-size:14px;color:#1a1310">S</span>Continue with Sangam</span>
+            <span style="height:38px;border:0.5px solid #c4b497;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px">Not now</span>
+          </div>
+          <div style="width:440px;display:flex;flex-direction:column;gap:0;padding:20px 22px;background:#fbf7ec;border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.35)">
+            <span style="font-family:'Instrument Serif';font-size:22px;margin-bottom:8px">What needs Sangam</span>
+            <sc-for list="{{ gating }}" as="g"><div style="display:flex;align-items:center;gap:10px;min-height:36px;border-top:0.5px solid #ece3cf;font-size:13px"><span style="display:flex;color:{{ g.c }}"><lp-i name="{{ g.icon }}" size="15"></lp-i></span><span style="flex:1">{{ g.t }}</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;padding:2px 7px;border-radius:4px;background:{{ g.bg }};color:{{ g.fg }}">{{ g.s }}</span></div></sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">ANDROID</span><span style="font-family:'Instrument Serif';font-size:32px">Tablet · MAUI Blazor Hybrid, on-device</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:44px;align-items:flex-start">
+      <sc-for list="{{ tablets }}" as="t" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">{{ t.id }}</span><span style="font-family:'Instrument Serif';font-size:22px">{{ t.title }}</span><span style="font-size:13px;color:#3a2f25">{{ t.note }}</span></div>
+          <div style="width:{{ t.w }};height:{{ t.h }};border-radius:26px;overflow:hidden;background:#f2ead6;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 12px #1a1310;display:flex;flex-direction:column">
+            <div style="height:28px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12.5px;font-weight:500;background:#fbf7ec"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="14"></lp-i><lp-i name="battery" size="16"></lp-i></span></div>
+            <div style="height:52px;flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;padding:0 12px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+              <div style="display:flex;align-items:center;gap:8px;min-width:0"><span style="font-family:'Instrument Serif';font-style:italic;font-size:21px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span><span style="display:flex;align-items:center;gap:6px;height:34px;padding:0 10px;border-radius:9px;border:0.5px solid #8a3a1c;box-shadow:inset 0 -2px 0 #8a3a1c;font-family:'IBM Plex Mono';font-size:11.5px;white-space:nowrap;min-width:0;max-width:220px"><span style="display:flex;color:#8a3a1c;flex:none"><lp-i name="file-pdf" size="13"></lp-i></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">discharge-summary.pdf</span></span><span style="height:34px;padding:0 10px;border-radius:9px;background:#e8dcc4;display:flex;align-items:center;font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">+3</span></div>
+              <div style="display:flex;align-items:center;gap:4px;height:40px;padding:0 4px;background:#f2ead6;border:0.5px solid #d9cdb4;border-radius:10px;font-family:'IBM Plex Mono';font-size:13px"><span style="display:flex;width:36px;height:36px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="18"></lp-i></span><span style="min-width:34px;height:28px;display:flex;align-items:center;justify-content:center;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:6px">{{ t.pageA }}</span><span style="padding:0 4px">{{ t.pageB }}</span><span style="display:flex;width:36px;height:36px;align-items:center;justify-content:center"><lp-i name="chevron-right" size="18"></lp-i></span></div>
+              <div style="display:flex;justify-content:flex-end;gap:6px"><span style="display:flex;align-items:center;gap:6px;height:40px;padding:0 12px;font-size:14px">Document<lp-i name="chevron-down" size="13"></lp-i></span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="search" size="19"></lp-i></span></div>
+            </div>
+            <div style="position:relative;flex:1;min-height:0">
+              <div style="position:absolute;top:0;bottom:0;left:72px;right:{{ t.cr }};background:#e8dcc4;display:flex;justify-content:center;padding-top:{{ t.pt }}">
+                <sc-if value="{{ t.isRead }}" hint-placeholder-val="{{ true }}">
+                  <div style="position:relative;width:{{ t.pw }};height:{{ t.ph }};background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:7% 8%;display:flex;flex-direction:column;gap:9px"><span style="height:6px;width:46%;background:#cfcac0"></span><span style="height:14px;width:58%;background:#bdb7ab;margin-bottom:6px"></span><sc-for list="{{ lines14 }}" as="l"><span style="height:5px;width:{{ l }};background:#ebe8e2"></span></sc-for>
+                    <sc-if value="{{ t.ink }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:16%;top:56%;font-family:'Instrument Serif';font-style:italic;font-size:44px;color:#1f3b73;transform:rotate(-5deg)">A. Shiva</span><span style="position:absolute;left:12%;top:47%;width:58%;height:16px;background:rgba(232,190,60,.5)"></span></sc-if>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ t.isArrange }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:0;padding:16px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-content:start">
+                    <sc-for list="{{ tDesks }}" as="dk"><div style="background:#fbf7ec;border:0.5px solid #c4b497;border-top:3px solid {{ dk.c }};border-radius:10px"><div style="height:48px;display:flex;align-items:center;gap:8px;padding:0 8px 0 14px;border-bottom:0.5px solid #ece3cf"><span style="font-family:'Instrument Serif';font-size:18px;flex:1">{{ dk.n }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ dk.k }}</span><span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><lp-i name="more-horizontal" size="18"></lp-i></span></div><div style="display:flex;flex-wrap:wrap;gap:14px;padding:14px"><sc-for list="{{ dk.p }}" as="pg"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><div style="width:76px;height:106px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.16);outline:{{ pg.o }};outline-offset:3px;border-bottom:3px solid {{ pg.c }}"></div><span style="font-family:'IBM Plex Mono';font-size:10.5px">{{ pg.l }}</span></div></sc-for></div></div></sc-for>
+                  </div>
+                </sc-if>
+              </div>
+              <div style="position:absolute;top:0;bottom:0;left:0;width:72px;display:flex;flex-direction:column;gap:4px;padding:10px 10px;background:#fbf7ec;border-right:0.5px solid #c4b497">
+                <sc-for list="{{ t.modes }}" as="it"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:60px;border-radius:12px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="22"></lp-i><span style="font-family:'Instrument Serif';font-style:italic;font-size:14px">{{ it.label }}</span></div></sc-for>
+                <span style="height:0.5px;background:#d9cdb4;margin:6px 4px"></span>
+                <sc-for list="{{ railGlobalTab }}" as="it"><div style="display:flex;align-items:center;justify-content:center;height:48px;color:#3a2f25"><lp-i name="{{ it }}" size="21"></lp-i></div></sc-for>
+                <span style="flex:1"></span><div style="display:flex;align-items:center;justify-content:center;height:48px;color:#3a2f25"><lp-i name="settings" size="21"></lp-i></div>
+              </div>
+              <div style="position:absolute;top:0;bottom:0;right:{{ t.vw }};width:72px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;background:#fbf7ec;border-left:0.5px solid #c4b497"><span style="font-family:'IBM Plex Mono';font-size:9px;letter-spacing:.1em;color:#8a7c64;padding:2px 0 4px">TOOLS</span><sc-for list="{{ t.tools }}" as="it"><div style="display:flex;align-items:center;justify-content:center;width:52px;height:48px;border-radius:12px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="21"></lp-i></div></sc-for></div>
+              <sc-if value="{{ t.hasView }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;top:0;bottom:0;right:0;width:60px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;background:#f2ead6;border-left:0.5px solid #d9cdb4"><span style="font-family:'IBM Plex Mono';font-size:9px;letter-spacing:.1em;color:#8a7c64;padding:2px 0 4px">VIEW</span><sc-for list="{{ t.view }}" as="it"><div style="display:flex;align-items:center;justify-content:center;width:48px;height:46px;border-radius:10px;background:{{ it.bg }};color:{{ it.fg }}"><lp-i name="{{ it.icon }}" size="20"></lp-i></div></sc-for></div></sc-if>
+            </div>
+            <div style="height:24px;flex:none;display:flex;align-items:center;justify-content:center;background:#fbf7ec"><span style="width:120px;height:4px;border-radius:2px;background:#1a1310;opacity:.5"></span></div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">ANDROID</span><span style="font-family:'Instrument Serif';font-size:32px">Phone · the rails fold</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;max-width:1200px">
+      <sc-for list="{{ foldRules }}" as="fr"><div style="display:flex;flex-direction:column;gap:5px;padding:12px 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px"><span style="font-family:'Instrument Serif';font-size:18px">{{ fr.t }}</span><span style="font-size:12.5px;line-height:1.45;color:#3a2f25">{{ fr.d }}</span></div></sc-for>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+      <sc-for list="{{ phones }}" as="ph" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:10px;width:392px">
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">{{ ph.id }}</span><span style="font-family:'Instrument Serif';font-size:20px">{{ ph.title }}</span></div>
+          <div style="position:relative;width:392px;height:850px;border-radius:38px;overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column">
+            <div style="height:34px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;font-size:13px;font-weight:500;background:#fbf7ec"><span>18:40</span><span style="width:12px;height:12px;border-radius:50%;background:#1a1310"></span><span style="display:flex;gap:5px"><lp-i name="wifi" size="14"></lp-i><lp-i name="battery" size="16"></lp-i></span></div>
+            <div style="height:56px;flex:none;display:flex;align-items:center;gap:4px;padding:0 6px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+              <span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><lp-i name="arrow-left" size="21"></lp-i></span>
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-size:15.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ph.doc }}</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">{{ ph.sub }}</span></span>
+              <span style="display:flex;align-items:center;gap:2px;height:36px;padding:0 6px;background:#f2ead6;border:0.5px solid #d9cdb4;border-radius:9px;font-family:'IBM Plex Mono';font-size:12px">{{ ph.pager }}</span>
+              <span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><lp-i name="more-vertical" size="20"></lp-i></span>
+            </div>
+            <div style="position:relative;flex:1;min-height:0;display:flex;justify-content:center;padding-top:12px;overflow:hidden">
+              <sc-if value="{{ ph.isPage }}" hint-placeholder-val="{{ true }}">
+                <div style="position:relative;width:364px;height:515px;flex:none;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);padding:28px 26px;display:flex;flex-direction:column;gap:7px"><span style="height:5px;width:46%;background:#cfcac0"></span><span style="height:12px;width:58%;background:#bdb7ab;margin-bottom:5px"></span><sc-for list="{{ lines14 }}" as="l"><span style="height:4px;width:{{ l }};background:#ebe8e2"></span></sc-for>
+                  <sc-if value="{{ ph.marks }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:24px;top:210px;width:210px;padding:6px 8px;outline:1.5px dashed #8a3a1c;font-family:Helvetica;font-size:12px;color:#1f3b73;background:rgba(255,255,255,.8)">Reviewed and approved.</div></sc-if>
+                  <sc-if value="{{ ph.redacts }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:26px;top:96px;width:120px;height:9px;background:#111"></span><span style="position:absolute;left:180px;top:96px;width:100px;height:9px;background:#111"></span><span style="position:absolute;left:60px;top:168px;width:70px;height:9px;background:rgba(196,116,22,.35);outline:1.5px solid #c47416"></span><span style="position:absolute;left:150px;top:250px;width:70px;height:9px;background:rgba(196,116,22,.35);outline:1.5px solid #c47416"></span></sc-if>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ph.isDesks }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;inset:0;padding:12px;display:flex;flex-direction:column;gap:12px">
+                  <sc-for list="{{ tDesks }}" as="dk"><div style="background:#fbf7ec;border:0.5px solid #c4b497;border-top:3px solid {{ dk.c }};border-radius:12px;overflow:hidden"><div style="height:46px;display:flex;align-items:center;gap:8px;padding:0 4px 0 14px"><span style="font-family:'Instrument Serif';font-size:17px;flex:1">{{ dk.n }}</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">{{ dk.k }}</span><span style="display:flex;width:44px;height:44px;align-items:center;justify-content:center"><lp-i name="more-horizontal" size="18"></lp-i></span></div><div style="display:flex;gap:10px;padding:2px 14px 14px;overflow:hidden"><sc-for list="{{ dk.p }}" as="pg"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:none"><div style="width:58px;height:82px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.16);outline:{{ pg.o }};outline-offset:3px;border-bottom:3px solid {{ pg.c }}"></div><span style="font-family:'IBM Plex Mono';font-size:10px">{{ pg.l }}</span></div></sc-for></div></div></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ph.sheet }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;gap:10px;padding:8px 16px 14px;background:#fbf7ec;border-top:0.5px solid #c4b497;border-radius:22px 22px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.14)">
+                  <span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#c4b497"></span>
+                  <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Instrument Serif';font-size:21px">{{ ph.sheetTitle }}</span><span style="font-size:13px;color:#8a3a1c">{{ ph.sheetAct }}</span></div>
+                  <sc-for list="{{ ph.sheetRows }}" as="sr"><div style="display:flex;align-items:center;gap:10px;min-height:44px;border-top:0.5px solid #ece3cf;font-size:13.5px"><span style="display:flex;color:#3a2f25"><lp-i name="{{ sr.icon }}" size="18"></lp-i></span><span style="flex:1">{{ sr.t }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ sr.v }}</span></div></sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ ph.fab }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:16px;bottom:16px;width:56px;height:56px;border-radius:16px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.25)"><lp-i name="{{ ph.fabIcon }}" size="22"></lp-i></span></sc-if>
+            </div>
+            <sc-if value="{{ ph.strip }}" hint-placeholder-val="{{ false }}">
+              <div style="height:62px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;background:#f2ead6;border-top:0.5px solid #d9cdb4;overflow:hidden">
+                <sc-for list="{{ ph.stripItems }}" as="si"><div style="width:52px;height:50px;flex:none;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:{{ si.bg }};color:{{ si.fg }};font-size:10px"><lp-i name="{{ si.icon }}" size="19"></lp-i>{{ si.l }}</div></sc-for>
+              </div>
+            </sc-if>
+            <div style="height:80px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px 14px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+              <sc-for list="{{ ph.nav }}" as="n"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:{{ n.fg }}"><span style="display:flex;align-items:center;justify-content:center;width:60px;height:32px;border-radius:16px;background:{{ n.pill }}"><lp-i name="{{ n.icon }}" size="20"></lp-i></span><span style="font-family:'Instrument Serif';font-style:italic;font-size:15px">{{ n.label }}</span></div></sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const R = '#8a3a1c', M = '#c47416', O = '#6b7a3e';
+    const modeDefs = [['read', 'reading-mode', 'Read'], ['mark', 'edit', 'Mark'], ['arrange', 'grid-view', 'Arrange'], ['protect', 'redact', 'Protect']];
+    const on = (a) => ({ bg: a ? 'rgba(138,58,28,.12)' : 'transparent', fg: a ? R : '#3a2f25' });
+    const modes = (m) => modeDefs.map(([id, icon, label]) => ({ icon, label, ...on(id === m) }));
+    const tl = (arr, act) => arr.map((icon, i) => ({ icon, ...(icon === 'download-primary' ? { icon: 'download', bg: R, fg: '#fbf7ec' } : on(i === act)) }));
+    const readTools = ['page-single', 'bookmark', 'snapshot', 'skin-layer', 'measure-tool', 'certification', 'print', 'eye'];
+    const view = ['zoom-in', 'zoom-out', 'fit-width', 'fit-page', 'page-single', 'page-facing', 'rotate-cw', 'hand', 'loupe'];
+    const lines14 = ['100%', '96%', '100%', '88%', '100%', '72%', '100%', '94%', '100%', '60%', '100%', '90%', '100%', '80%'];
+    const tab = (n, icon, c, a) => ({ n, icon, c, bd: a ? R : '#d9cdb4', bg: a ? '#fbf7ec' : '#e8dcc4', fg: a ? '#1a1310' : '#8a7c64', sh: a ? 'inset 0 -2px 0 ' + R : 'none' });
+    const pg = (l, c, s) => ({ l, c, o: s ? '2px solid ' + R : 'none' });
+    const tDesks = [
+      { n: 'Desk 1', k: '8 pg', c: R, p: [pg('p 1', R), pg('p 2', R), pg('p 3', R, 1), pg('p 4', R, 1), pg('p 5', R), pg('p 6', R)] },
+      { n: 'Desk 2', k: '6 pg', c: M, p: [pg('p 1', M), pg('p 2', M), pg('p 9', R), pg('p 3', M), pg('img', O)] },
+    ];
+    const navFor = (m) => modeDefs.map(([id, icon, label]) => ({ icon, label, fg: id === m ? R : '#3a2f25', pill: id === m ? 'rgba(138,58,28,.16)' : 'transparent' }));
+    const S = (icon, l, a) => ({ icon, l, bg: a ? 'rgba(138,58,28,.12)' : 'transparent', fg: a ? R : '#3a2f25' });
+    return {
+      lines14, tDesks,
+      promises: [{ icon: 'lock', t: 'Encrypted at rest, per-user storage' }, { icon: 'user', t: 'Only your Sangam identity can open your files' }, { icon: 'trash', t: 'Delete a file and it is gone from the server' }],
+      webTabs: [tab('discharge-summary.pdf', 'file-pdf', R, 1), tab('lab-report.pdf', 'file-pdf', R), tab('ot-checklist.docx', 'file-word', '#1f3b73')],
+      railModes: modes('read'), railGlobalWeb: ['upload', 'find-in-page', 'library', 'home'], railGlobalTab: ['folder', 'find-in-page', 'library'],
+      railToolsRead: tl(readTools, 0), railView: tl(view, 3),
+      acctMenu: [{ icon: 'library', t: 'My files', c: '#1a1310' }, { icon: 'doc-share', t: 'Shared with me', c: '#1a1310' }, { icon: 'download', t: 'Get the desktop app', c: '#1a1310' }, { icon: 'settings', t: 'Account settings', c: '#1a1310' }, { icon: 'log-out', t: 'Sign out', c: '#a83a2a' }],
+      gating: [['reading-mode', 'Read, find, print', 'free · local'], ['edit', 'Basic markup: text, shapes, highlight', 'free · local'], ['grid-view', 'Arrange, bind, split, compress', 'free · local'], ['redact', 'Redact, stamp, flatten, password', 'free · local'], ['certification', 'Sign with a certificate', 'Sangam'], ['refresh', 'Sync across devices', 'Sangam'], ['doc-share', 'Share a link', 'Sangam'], ['library', 'Anything on the web portal', 'Sangam']]
+        .map(([icon, t, s]) => ({ icon, t, s, c: s === 'Sangam' ? M : O, bg: s === 'Sangam' ? 'rgba(196,116,22,.14)' : 'rgba(107,122,62,.12)', fg: s === 'Sangam' ? '#8a4f00' : '#3f4a1f' })),
+      tablets: [
+        { id: '12d', title: 'Tablet · Read', note: 'Landscape 1280 × 800. Rails 72 / 72 / 60 px for touch (48 px targets). Page fits by height.', w: '1280px', h: '800px', cr: '132px', vw: '60px', hasView: true, isRead: true, isArrange: false, ink: false, pw: '480px', ph: '660px', pt: '12px', pageA: '2', pageB: '/ 13', modes: modes('read'), tools: tl(readTools, -1), view: tl(view, 3) },
+        { id: '12e', title: 'Tablet · Mark with a pen', note: 'Pen draws, finger pans. Tools rail = markup set; Save as new at its foot.', w: '1280px', h: '800px', cr: '132px', vw: '60px', hasView: true, isRead: true, isArrange: false, ink: true, pw: '480px', ph: '660px', pt: '12px', pageA: '2', pageB: '/ 13', modes: modes('mark'), tools: tl(['text-box', 'file-image', 'shape-rect', 'freehand', 'signature', 'highlight', 'sticky-note', 'undo', 'download-primary'], 3), view: tl(view, 3) },
+        { id: '12f', title: 'Tablet · Arrange, portrait', note: 'Portrait 800 × 1280: View rail folds into Tools; desks stack two across.', w: '800px', h: '1280px', cr: '72px', vw: '0px', hasView: false, isRead: false, isArrange: true, ink: false, pw: '0', ph: '0', pt: '0', pageA: '2', pageB: 'desks', modes: modes('arrange'), tools: tl(['shelf', 'folder', 'plus', 'page-add', 'undo', 'redo', 'page-facing', 'doc-merge'], 0), view: [] },
+      ],
+      foldRules: [
+        { t: 'Left bar → bottom bar', d: 'Read · Mark · Arrange · Protect. Open, Find, Library and Settings move to the ⋮ menu.' },
+        { t: 'Tools rail → tool strip', d: 'A row above the bottom bar, only in Mark and Protect. Read keeps the page clear.' },
+        { t: 'View rail → pinch + sheet', d: 'Pinch, double-tap and swipe do zoom and paging. Fit, layout and rotate live in a View sheet from ⋮.' },
+      ],
+      phones: [
+        { id: '12g', title: 'Read', doc: 'Discharge summary — Meena R.', sub: '1 of 4 tabs', pager: '2 / 13', isPage: true, nav: navFor('read'), strip: false, fab: false },
+        { id: '12h', title: 'Mark', doc: 'Discharge summary — Meena R.', sub: '2 unsaved', pager: '2 / 13', isPage: true, marks: true, nav: navFor('mark'), strip: true, stripItems: [S('text-box', 'Text', 1), S('highlight', 'Mark'), S('sticky-note', 'Note'), S('file-image', 'Image'), S('shape-rect', 'Box'), S('freehand', 'Draw'), S('signature', 'Sign')], fab: true, fabIcon: 'download' },
+        { id: '12i', title: 'Arrange', doc: '3 desks · 20 pages', sub: 'long-press a page to drag', pager: 'Bind all', isDesks: true, isPage: false, nav: navFor('arrange'), strip: false, fab: true, fabIcon: 'plus' },
+        { id: '12j', title: 'Protect · View sheet', doc: 'Discharge summary — Meena R.', sub: 'redacting · 2 boxes', pager: '1 / 13', isPage: true, redacts: true, nav: navFor('protect'), strip: true, stripItems: [S('redact', 'Box', 1), S('find-in-page', 'Find'), S('stamp', 'Stamp'), S('compress', 'Flatten'), S('doc-lock', 'Lock'), S('certification', 'Sign')], sheet: true, sheetTitle: 'View', sheetAct: 'Done', sheetRows: [{ icon: 'fit-width', t: 'Fit width', v: '✓' }, { icon: 'fit-page', t: 'Fit page', v: '' }, { icon: 'page-facing', t: 'Two-page', v: 'landscape only' }, { icon: 'rotate-cw', t: 'Rotate view', v: '0°' }, { icon: 'loupe', t: 'Loupe', v: '2×' }], fab: false },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

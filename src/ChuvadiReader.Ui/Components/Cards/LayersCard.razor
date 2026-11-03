@@ -1,0 +1,133 @@
+@namespace ChuvadiReader.Ui.Components.Cards
+@*
+    Layers (PDF optional content). Eye toggles change only this view: the session re-renders
+    its pages with the override, the file is never touched, and Print/Save keep the file's
+    own layer states. Raises OnLayersChanged after a toggle so the host can re-request the
+    visible pages (the session has already dropped its render cache and bumped RenderGeneration).
+*@
+
+<section class="chvd-card" aria-label="Layers">
+    <header class="head">
+        <span class="title">Layers</span>
+        <span class="meta">@MetaText</span>
+        <button type="button" class="close" title="Close" aria-label="Close" @onclick="OnClose">
+            <Icon Name="close" Size="14" />
+        </button>
+    </header>
+
+    @if (_layers.Count == 0)
+    {
+        <div class="empty">
+            <Icon Name="skin-layer" Size="16" />
+            <span>@(Session is null ? "Open a PDF to see its layers." : "This file has no layers.")</span>
+        </div>
+    }
+    else
+    {
+        <ul class="rows" role="list">
+            @foreach (var layer in _layers)
+            {
+                var canToggle = CanToggle && !layer.IsLocked;
+                <li class="row @(layer.IsVisible ? null : "off")">
+                    <button type="button"
+                            class="eye"
+                            aria-pressed="@(layer.IsVisible ? "true" : "false")"
+                            aria-label="@((layer.IsVisible ? "Hide " : "Show ") + layer.Name)"
+                            title="@ToggleTitle(layer)"
+                            disabled="@(!canToggle)"
+                            @onclick="() => ToggleAsync(layer)">
+                        <Icon Name="@(layer.IsVisible ? "eye" : "eye-off")" Size="15" />
+                    </button>
+                    <span class="name" title="@layer.Name">@DisplayName(layer)</span>
+                    @if (layer.IsLocked)
+                    {
+                        <span class="lock" title="Locked by the file"><Icon Name="lock" Size="12" /></span>
+                    }
+                    <span class="tag">@Tag(layer)</span>
+                </li>
+            }
+        </ul>
+    }
+
+    <span class="note">Hiding a layer only changes the view. Print and Save keep the layers as the file sets them.</span>
+
+    @if (_layers.Any(l => l.IsOverridden))
+    {
+        <button type="button" class="link" @onclick="ResetAsync">Show layers as the file sets them</button>
+    }
+</section>
+
+@code {
+    /// <summary>The file's path (informational; the layers come from <see cref="Session"/>).</summary>
+    [Parameter] public string? Path { get; set; }
+
+    /// <summary>The open document whose view the toggles change.</summary>
+    [Parameter] public IPdfSession? Session { get; set; }
+
+    [Parameter] public int CurrentPage { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>Raised for toasts (e.g. a toggle that couldn't apply).</summary>
+    [Parameter] public EventCallback<string> OnMessage { get; set; }
+
+    /// <summary>Raised after the view's layer visibility changed — re-render the visible pages.</summary>
+    [Parameter] public EventCallback OnLayersChanged { get; set; }
+
+    private IReadOnlyList<PdfLayerInfo> _layers = Array.Empty<PdfLayerInfo>();
+
+    private bool CanToggle => Session?.CanToggleLayers == true;
+
+    private string MetaText => _layers.Count switch
+    {
+        0 => "none in this file",
+        1 => "1 in this file",
+        var n => $"{n} in this file",
+    };
+
+    protected override void OnParametersSet() => Refresh();
+
+    private void Refresh() => _layers = Session?.Layers ?? Array.Empty<PdfLayerInfo>();
+
+    private async Task ToggleAsync(PdfLayerInfo layer)
+    {
+        if (Session is null || layer.IsLocked || !CanToggle)
+        {
+            return;
+        }
+
+        try
+        {
+            Session.SetLayerVisible(layer.Id, !layer.IsVisible);
+        }
+        catch (Exception ex)
+        {
+            await OnMessage.InvokeAsync("Couldn't change the layer: " + ex.Message);
+            return;
+        }
+
+        Refresh();
+        await OnLayersChanged.InvokeAsync();
+    }
+
+    private async Task ResetAsync()
+    {
+        Session?.ResetLayerVisibility();
+        Refresh();
+        await OnLayersChanged.InvokeAsync();
+    }
+
+    private static string DisplayName(PdfLayerInfo l) =>
+        (string.IsNullOrWhiteSpace(l.Name) ? "Untitled layer" : l.Name) + (l.GroupCount > 1 ? $" ×{l.GroupCount}" : string.Empty);
+
+    private static string Tag(PdfLayerInfo l)
+    {
+        var tag = l.IsVisibleByDefault ? "OCG" : "OCG · hidden";
+        return l.IsOverridden ? tag + " · view" : tag;
+    }
+
+    private string ToggleTitle(PdfLayerInfo l) =>
+        l.IsLocked ? "The file locks this layer"
+        : !CanToggle ? "Layers can't be hidden in this file"
+        : l.IsVisible ? "Hide in this view" : "Show in this view";
+}

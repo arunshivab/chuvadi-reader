@@ -1,0 +1,70 @@
+/* ── card frame (shared look, repeated per card because scoped CSS can't be shared) ── */
+.chvd-card {
+    width: 290px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--chvd-surface-hi);
+    border: var(--chvd-stroke, 0.5px) solid var(--chvd-border);
+    border-radius: 12px;
+    box-shadow: var(--chvd-shadow-popover, 0 18px 44px rgba(0, 0, 0, 0.24));
+    font-family: var(--chvd-sans-display);
+    font-size: 12.5px;
+    color: var(--chvd-ink);
+}
+.head { display: flex; align-items: baseline; gap: 8px; }
+.title { font-family: var(--chvd-serif-display); font-size: 21px; line-height: 1.1; }
+.meta { margin-left: auto; font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); white-space: nowrap; }
+.close {
+    align-self: center;
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; padding: 0; margin-right: -4px;
+    border: 0; border-radius: var(--chvd-radius-sm, 4px);
+    background: transparent; color: var(--chvd-ink-muted); cursor: pointer;
+}
+.close:hover { background: var(--chvd-binding-soft); color: var(--chvd-ink); }
+.note { font-size: 11.5px; line-height: 1.45; color: var(--chvd-ink-muted); }
+button:focus-visible { outline: 2px solid var(--chvd-binding); outline-offset: 1px; }
+
+/* ── signatures ── */
+.empty {
+    display: flex; align-items: center; gap: 8px;
+    min-height: 32px;
+    border-top: var(--chvd-stroke, 0.5px) solid var(--chvd-border-soft);
+    color: var(--chvd-ink-muted);
+}
+.empty.bad { color: var(--chvd-error); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.sig {
+    display: flex; flex-direction: column; gap: 6px;
+    padding-top: 10px;
+    border-top: var(--chvd-stroke, 0.5px) solid var(--chvd-border-soft);
+}
+.sig-banner {
+    display: flex; align-items: center; gap: 8px;
+    height: 32px; box-sizing: border-box; padding: 0 10px;
+    border-radius: var(--chvd-radius-md, 8px);
+    border: var(--chvd-stroke, 0.5px) solid var(--sig-accent);
+    background: color-mix(in srgb, var(--sig-accent) 12%, var(--chvd-surface-hi));
+    color: color-mix(in srgb, var(--sig-accent) 45%, var(--chvd-ink));
+}
+.sig-banner.ok { --sig-accent: var(--chvd-success, #5d7a3a); }
+.sig-banner.warn { --sig-accent: var(--chvd-warn, #a6651d); }
+.sig-banner.bad { --sig-accent: var(--chvd-error, #a83a2a); }
+.sig-banner.muted { --sig-accent: var(--chvd-ink-muted, #8a7c64); }
+.who { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { margin-left: auto; flex: none; font-family: var(--chvd-mono); font-size: 10px; }
+.summary { line-height: 1.45; color: var(--chvd-ink-soft); }
+.grid {
+    display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 0;
+    font-family: var(--chvd-mono); font-size: 11px;
+}
+.grid dt { color: var(--chvd-ink-muted); }
+.grid dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.link {
+    align-self: flex-start; padding: 0; border: 0; background: none;
+    font: inherit; font-size: 12px; color: var(--chvd-binding); cursor: pointer;
+}
+.link:hover { text-decoration: underline; }

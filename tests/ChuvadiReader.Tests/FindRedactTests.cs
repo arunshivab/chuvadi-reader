@@ -144,3 +144,18 @@ public class FindRedactTests
         Assert.NotEmpty(RedactService.PatternPresets["Medical"]);
     }
 }
+
+public class FindSnippetTests
+{
+    [Fact]
+    public async Task Each_match_gets_the_snippet_around_its_own_occurrence()
+    {
+        var path = TestPdf.TextPage("alpha patient beta patient gamma", 420, 120);
+        var svc = new ChuvadiReader.Core.Documents.RedactService();
+        var r = await svc.SearchAsync(path, "patient", false, false);
+        Assert.Equal(2, r.Count);
+        Assert.Contains("alpha", r[0].Snippet);
+        Assert.Contains("gamma", r[1].Snippet);
+        Assert.All(r, m => Assert.Contains("patient", m.Snippet));
+    }
+}

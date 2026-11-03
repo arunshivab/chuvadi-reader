@@ -41,6 +41,8 @@ public sealed class ThemeService
         Changed?.Invoke();
     }
 
+    /// <summary>Quick light/dark flip (title-bar moon). From any light-family theme it goes to
+    /// Night paper; from Night paper it returns to Cream paper.</summary>
     public Task ToggleAsync(CancellationToken ct = default)
-        => SetAsync(Current == ChuvadiTheme.Light ? ChuvadiTheme.Dark : ChuvadiTheme.Light, ct);
+        => SetAsync(Current == ChuvadiTheme.Dark ? ChuvadiTheme.Light : ChuvadiTheme.Dark, ct);
 }

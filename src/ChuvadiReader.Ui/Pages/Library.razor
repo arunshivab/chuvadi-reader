@@ -14,7 +14,6 @@
 
 <div class="libp">
     <div class="libp-bar">
-        <a href="/" class="libp-back"><Icon Name="chevron-left" Size="14" /> dashboard</a>
         <span class="libp-title">Library</span>
         <span class="libp-folder">@Lib.FolderPath</span>
         <span class="libp-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>

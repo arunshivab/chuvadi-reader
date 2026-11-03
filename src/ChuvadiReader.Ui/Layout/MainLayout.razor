@@ -1,5 +1,5 @@
 @inherits LayoutComponentBase
-@implements IDisposable
+@implements IAsyncDisposable
 @inject ThemeService Theme
 @inject SaveFolderService SaveFolders
 @inject IJSRuntime JS
@@ -11,81 +11,148 @@
 @inject RecentFilesService Recents
 @inject OpenDocumentService OpenDoc
 @inject IEntitlements Entitlements
+@inject IAppStorage Storage
+@inject ShellService Shell
+@inject BenchService Bench
+@inject UserProfileService Profile
 
 @*
-    The persistent app shell: a window title bar (always present, with drag,
-    double-click maximize, and the min/max/close buttons), a left navigation
-    rail, a bottom status bar, and a content slot. Pages render only into the
-    content area, so the chrome never disappears on navigation.
+    D-10 shell. One thin 40 px top bar (wordmark · tabs · ‹ n / N › · Document ▾ · Ctrl K ·
+    window controls), a fixed 62 px left bar (Read · Mark · Arrange · Protect, then Open ·
+    Find · Library · Home, Settings at the foot) that expands over the canvas on hover, the
+    page's own Tools/View rails on the right (rendered by each mode view), and a 26 px status
+    bar. Ctrl K opens the command bar. Pages render only into the content slot.
 *@
 
 <div class="shell">
+    <ChuvadiReader.Ui.Components.Settings.PreferencesHost />
 
-    <header class="titlebar" @onmousedown="StartDrag">
-        <BrandMark Size="20" />
-        @if (Tabs.Tabs.Count > 0)
-        {
+    <header class="topbar @(_leftOpen ? "lb-open" : null)" @onmousedown="StartDrag">
+        <div class="tb-left">
+            <div class="tb-brandbox">
+                <button class="tb-brand" @onclick='() => Go("/")' @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true" title="Home">
+                    @if (_leftOpen)
+                    {
+                        <BrandMark Size="19" />
+                    }
+                    else
+                    {
+                        <span class="cv-brand" style="font-size:19px">C<span class="cv-brand-ta">ச</span></span>
+                    }
+                </button>
+            </div>
             <div class="rtabs">
                 @foreach (var t in Tabs.Tabs)
                 {
-                    <div class="rtab @(t.Id == Tabs.Active?.Id ? "active" : null)" @key="t.Id"
+                    var isActive = t.Id == Tabs.Active?.Id && OnDocView;
+                    <div class="rtab @(isActive ? "active" : null) fmt-@t.Format.ToString().ToLowerInvariant()" @key="t.Id"
                          data-tab-id="@t.Id" @onclick="() => SwitchTab(t.Id)" title="@t.Path"
                          @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true"
-                         @onauxclick:stopPropagation="true" @onauxclick:preventDefault="true" @onauxclick="(e) => OnTabAux(e, t.Id)">
-                        <Icon Name="@t.Format.IconName()" Size="13" />
+                         @onmouseup="(e) => OnTabMouseUp(e, t.Id)">
+                        <span class="rtab-ic"><Icon Name="@t.Format.IconName()" Size="12" /></span>
                         <span class="rtab-name">@t.FileName</span>
                         <button class="rtab-x" @onclick:stopPropagation="true" @onclick="() => CloseTab(t.Id)" aria-label="Close tab"><Icon Name="x" Size="11" /></button>
                     </div>
                 }
-                <button class="rtab-add" @onmousedown:stopPropagation="true" @onclick="AddTab" aria-label="Open document"><Icon Name="plus" Size="13" /></button>
-            </div>
-            <div class="rtabs-actions" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
-                <button class="rtabs-menu" @onclick="ToggleTabMenu" title="Tab actions" aria-label="Tab actions"><Icon Name="more-horizontal" Size="15" /></button>
-                @if (_tabMenuOpen)
+                @if (Tabs.Tabs.Count > 1)
                 {
-                    <div class="rtabs-menu-overlay" @onclick="CloseTabMenu"></div>
-                    <div class="rtabs-pop">
-                        <button class="rtabs-mi" @onclick="MenuCloseActive"><span>Close active tab</span><span class="rtabs-k">Ctrl+W</span></button>
-                        <button class="rtabs-mi" @onclick="MenuCloseOthers" disabled="@(Tabs.Tabs.Count < 2)"><span>Close inactive tabs</span><span class="rtabs-k">Ctrl+Alt+W</span></button>
-                        <div class="rtabs-msep"></div>
-                        <button class="rtabs-mi" @onclick="MenuCloseAll"><span>Close all tabs</span><span class="rtabs-k">Ctrl+Shift+W</span></button>
-                    </div>
+                    <span class="rtab-more" title="@(Tabs.Tabs.Count - 1) more tabs">+@(Tabs.Tabs.Count - 1)</span>
                 }
+                <button class="rtab-add" @onmousedown:stopPropagation="true" @onclick="AddTab" title="Open document (Ctrl O)" aria-label="Open document"><Icon Name="plus" Size="13" /></button>
             </div>
-        }
-        else
-        {
-            <div class="tb-spacer"></div>
-        }
-        <div class="tb-controls" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
-            <div class="find-pill"><Icon Name="search" Size="13" /> find <span class="kbd">Ctrl F</span></div>
-            <button class="icon-btn" @onclick="ToggleTheme" aria-label="@(Theme.Current == ChuvadiTheme.Dark ? "Switch to light theme" : "Switch to dark theme")"><Icon Name="@(Theme.Current == ChuvadiTheme.Dark ? "shift-day" : "shift-night")" Size="16" /></button>
+            @if (Tabs.Tabs.Count > 0)
+            {
+                <span class="rtabs-actions" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+                    <button class="rtabs-menu @(_tabMenuOpen ? "on" : null)" @onclick="ToggleTabMenu" title="Tab actions" aria-label="Tab actions"><Icon Name="more-horizontal" Size="14" /></button>
+                    @if (_tabMenuOpen)
+                    {
+                        <div class="pop-scrim" @onclick="CloseTabMenu"></div>
+                        <div class="pop tabmenu-pop">
+                            <button class="pop-item" @onclick="MenuCloseActive"><Icon Name="close" Size="14" /><span class="pop-l">Close active tab</span><span class="pop-k">Ctrl W</span></button>
+                            <button class="pop-item" @onclick="MenuCloseOthers" disabled="@(Tabs.Tabs.Count < 2)"><Icon Name="close" Size="14" /><span class="pop-l">Close inactive tabs</span><span class="pop-k">Ctrl Alt W</span></button>
+                            <div class="pop-sep"></div>
+                            <button class="pop-item" @onclick="MenuCloseAll"><Icon Name="close" Size="14" /><span class="pop-l">Close all tabs</span><span class="pop-k">Ctrl Shift W</span></button>
+                        </div>
+                    }
+                </span>
+            }
+        </div>
+
+        <div class="tb-mid" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+            @if (Shell.HasCounter && OnDocView)
+            {
+                <div class="tb-pager" title="@CounterTitle">
+                    <button class="tb-pg-btn" @onclick="() => Shell.GoToAsync(Shell.CounterCurrent - Shell.CounterStep)" disabled="@(Shell.CounterCurrent <= 1)" aria-label="Previous @Shell.CounterUnit"><Icon Name="chevron-left" Size="14" /></button>
+                    <input class="tb-pg-box" value="@Shell.CounterCurrent" @onchange="OnPagerChange" @onkeydown="OnPagerKey" inputmode="numeric" aria-label="@Shell.CounterUnit number" />
+                    <span class="tb-pg-total">@CounterPrefix/ @Shell.CounterTotal</span>
+                    <button class="tb-pg-btn" @onclick="() => Shell.GoToAsync(Shell.CounterCurrent + Shell.CounterStep)" disabled="@(Shell.CounterCurrent >= Shell.CounterTotal)" aria-label="Next @Shell.CounterUnit"><Icon Name="chevron-right" Size="14" /></button>
+                </div>
+            }
+        </div>
+
+        <div class="tb-right" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+            @if (Shell.DocumentMenu.Count > 0 && OnDocView)
+            {
+                <span class="tb-doc-wrap">
+                    <button class="tb-doc @(_docMenuOpen ? "on" : null)" @onclick="() => _docMenuOpen = !_docMenuOpen" title="Document actions">Document<Icon Name="chevron-down" Size="12" /></button>
+                    @if (_docMenuOpen)
+                    {
+                        <div class="pop-scrim" @onclick="() => _docMenuOpen = false"></div>
+                        <div class="pop tb-docmenu">
+                            @foreach (var c in Shell.DocumentMenu)
+                            {
+                                @if (c.Id.StartsWith("sep", StringComparison.Ordinal))
+                                {
+                                    <div class="pop-sep"></div>
+                                }
+                                else
+                                {
+                                    <button class="pop-item" disabled="@(!c.IsEnabled)" title="@(c.DisabledReason ?? c.Label)" @onclick="() => RunDocCommand(c)">
+                                        <Icon Name="@c.Icon" Size="15" /><span class="pop-l">@c.Label</span><span class="pop-k">@c.Keys</span>
+                                    </button>
+                                }
+                            }
+                        </div>
+                    }
+                </span>
+            }
+            <button class="tb-cmd" @onclick="OpenCommandBar" title="Find or do anything (Ctrl K)">
+                <Icon Name="search" Size="13" /><span class="tb-cmd-t">Find or do anything…</span><span class="kbd">Ctrl K</span>
+            </button>
+            <button class="tb-icon" @onclick="ToggleTheme" title="@(Theme.Current.IsDark() ? "Switch to Cream paper" : "Switch to Night paper")" aria-label="Toggle light and dark"><Icon Name="@(Theme.Current.IsDark() ? "shift-day" : "shift-night")" Size="16" /></button>
             <div class="traffic">
-                <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="11" /></button>
-                <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="10" /></button>
-                <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="11" /></button>
+                <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
+                <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
+                <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
             </div>
         </div>
     </header>
 
-    <div class="shell-body @(_railExpanded ? "rail-open" : "rail-closed")">
-        <nav class="rail @(_railExpanded ? "expanded" : null)" aria-label="Primary">
-            <NavLink class="rail-tab" href="/" Match="NavLinkMatch.All" title="Home"><Icon Name="home" Size="24" /><span class="rail-label">Home</span></NavLink>
-            <NavLink class="rail-tab" href="/reader" title="Reader"><Icon Name="reader" Size="24" /><span class="rail-label">Reader</span></NavLink>
-            <NavLink class="rail-tab" href="/bench" title="Bench"><Icon Name="grid-view" Size="24" /><span class="rail-label">Bench</span></NavLink>
-            @if (Entitlements.CanRedact)
+    <div class="shell-body @(_leftOpen ? "lb-open" : null)">
+        <nav class="leftbar @(_leftOpen ? "open" : null)" aria-label="Modes and places">
+            @foreach (var (mode, icon, label, key) in _modeDefs)
             {
-                <NavLink class="rail-tab" href="/redact" title="Redact"><Icon Name="redact" Size="24" /><span class="rail-label">Redact</span></NavLink>
+                var m = mode;
+                var active = OnDocView && Shell.Mode == m;
+                var why = ModeDisabledReason(m);
+                <button class="lb-btn lb-mode @(active ? "on" : null)" disabled="@(why is not null)" title="@(why ?? $"{label} ({key})")" @onclick="() => RequestMode(m)">
+                    @if (active)
+                    {
+                        <span class="lb-mark"></span>
+                    }
+                    <Icon Name="@icon" Size="20" />
+                    <span class="lb-l lb-verb">@label</span><span class="lb-k">@key</span>
+                </button>
             }
-            <NavLink class="rail-tab" href="/library" title="Library"><Icon Name="library" Size="24" /><span class="rail-label">Library</span></NavLink>
-            <NavLink class="rail-tab" href="/docs" title="Docs"><Icon Name="reader" Size="24" /><span class="rail-label">Docs</span></NavLink>
-            <NavLink class="rail-tab" href="/sheets" title="Sheets"><Icon Name="grid-view" Size="24" /><span class="rail-label">Sheets</span></NavLink>
-            <div class="rail-spacer"></div>
-            <div class="rail-divider"></div>
-            <NavLink class="rail-tab" href="/settings" title="Settings"><Icon Name="settings" Size="24" /><span class="rail-label">Settings</span></NavLink>
+            <span class="lb-sep"></span>
+            <button class="lb-btn" @onclick="AddTab" title="Open (Ctrl O)"><Icon Name="folder" Size="19" /><span class="lb-l">Open</span><span class="lb-k">Ctrl O</span></button>
+            <button class="lb-btn" @onclick="FindNow" title="Find (Ctrl F)"><Icon Name="find-in-page" Size="19" /><span class="lb-l">Find</span><span class="lb-k">Ctrl F</span></button>
+            <button class="lb-btn @(IsAt("/library") ? "here" : null)" @onclick='() => Go("/library")' title="Library"><Icon Name="library" Size="19" /><span class="lb-l">Library</span><span class="lb-k"></span></button>
+            <button class="lb-btn @(IsAt("/") ? "here" : null)" @onclick='() => Go("/")' title="Home"><Icon Name="home" Size="19" /><span class="lb-l">Home</span><span class="lb-k"></span></button>
+            <span class="lb-spacer"></span>
+            <button class="lb-btn @(IsAt("/settings") ? "here" : null)" @onclick='() => Go("/settings")' title="Settings"><Icon Name="settings" Size="19" /><span class="lb-l">Settings</span><span class="lb-k"></span></button>
+            <button class="lb-btn lb-toggle" @onclick="ToggleLeft" title="@(_leftOpen ? "Collapse the side bar" : "Expand the side bar")" aria-label="@(_leftOpen ? "Collapse the side bar" : "Expand the side bar")"><Icon Name="@(_leftOpen ? "chevron-left" : "chevron-right")" Size="17" /><span class="lb-l">Collapse</span><span class="lb-k"></span></button>
         </nav>
-
-        <button class="rail-handle" @onclick="ToggleRail" aria-label="@(_railExpanded ? "Collapse sidebar" : "Expand sidebar")"><Icon Name="chevron-left" Size="14" /></button>
 
         <main class="content">
             @Body
@@ -93,23 +160,236 @@
     </div>
 
     <footer class="statusbar">
-        <span class="status-dot"></span>
-        <span>offline · ready</span>
-        <span class="status-right">v1.0.0-preview</span>
+        <span class="sb-item"><span class="status-dot"></span>offline · on this device</span>
+        <span class="sb-div"></span>
+        <span class="sb-item"><span class="sb-avatar">@Initials</span>@(Profile.Name ?? "This computer")</span>
+        @if (!string.IsNullOrEmpty(Shell.Activity))
+        {
+            <span class="sb-div"></span>
+            <span class="sb-activity">@Shell.Activity</span>
+        }
+        @if (Shell.Progress is { } p)
+        {
+            <span class="sb-progress" title="@Shell.ProgressLabel"><span style="width:@((int)(p * 100))%"></span></span>
+            <span class="sb-activity">@Shell.ProgressLabel</span>
+        }
+        <span class="sb-right">
+            <span class="sb-ver">v1.0.0-preview</span>
+            <span class="sb-clock">@_clock</span>
+        </span>
     </footer>
 
+    @if (Shell.Messages.Count > 0)
+    {
+        <div class="msgs">
+            @foreach (var m in Shell.Messages)
+            {
+                var mm = m;
+                <div class="msg @(mm.IsError ? "err" : "ok")" @key="mm.Id">
+                    <Icon Name="@(mm.IsError ? "warning" : "check-circle")" Size="16" />
+                    <span class="msg-t">@mm.Text</span>
+                    @if (mm.ActionLabel is not null && mm.Action is not null)
+                    {
+                        <button class="msg-a" @onclick="() => RunMessageAction(mm)">@mm.ActionLabel</button>
+                    }
+                    <button class="msg-x" @onclick="() => Shell.Dismiss(mm.Id)" aria-label="Dismiss"><Icon Name="x" Size="12" /></button>
+                </div>
+            }
+        </div>
+    }
+
+    <CommandBar @ref="_cmdBar" Commands="AllCommands" FindText="@(OnDocView ? Shell.FindTextHandler : null)" />
 </div>
 
 @code {
+    private static readonly (DocMode Mode, string Icon, string Label, string Key)[] _modeDefs =
+    {
+        (DocMode.Read, "reading-mode", "Read", "1"),
+        (DocMode.Mark, "edit", "Mark", "2"),
+        (DocMode.Arrange, "grid-view", "Arrange", "3"),
+        (DocMode.Protect, "redact", "Protect", "4"),
+    };
+
+    private DotNetObjectReference<MainLayout>? _self;
+    private IJSObjectReference? _shellJs;
+    private CommandBar? _cmdBar;
+    private bool _tabMenuOpen;
+    private bool _docMenuOpen;
+    private bool _leftOpen = true;
+
+    private async Task ToggleLeft()
+    {
+        _leftOpen = !_leftOpen;
+        try
+        {
+            await Storage.SetAsync("leftbar.open", _leftOpen ? "1" : "0");
+        }
+        catch
+        {
+            // remembering the choice is a nicety
+        }
+    }
+    private string _clock = DateTime.Now.ToString("HH:mm:ss");
+    private System.Threading.Timer? _clockTimer;
+    private readonly HashSet<Guid> _fading = new();
+
     protected override void OnInitialized()
     {
         Theme.Changed += OnThemeChanged;
         Win.StateChanged += OnWinChanged;
         Tabs.Changed += OnTabsChanged;
+        Shell.Changed += OnShellChanged;
+        Shell.CommandBarRequested += OpenCommandBarFromService;
         OpenDoc.Requested += OnOpenRequested;
+        Nav.LocationChanged += OnLocationChanged;
+        _clockTimer = new System.Threading.Timer(_ =>
+        {
+            _clock = DateTime.Now.ToString("HH:mm:ss");
+            _ = InvokeAsync(StateHasChanged);
+        }, null, 1000, 1000);
     }
 
+    // ── where are we ──────────────────────────────────────────────────────
+    private string Path => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+
+    private bool IsAt(string p) => p == "/" ? Path == "/" : Path.StartsWith(p, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Reader, Arrange (bench) and Protect (redact) are the document views.</summary>
+    private bool OnDocView => IsAt("/reader") || IsAt("/bench") || IsAt("/redact");
+
+    private string CounterPrefix => Shell.CounterUnit switch
+    {
+        "section" => "§ ",
+        "line" => "ln ",
+        "sheet" => "sheet ",
+        _ => "",
+    };
+
+    private string CounterTitle => $"{Shell.CounterUnit} {Shell.CounterCurrent} of {Shell.CounterTotal}";
+
+    private string Initials
+    {
+        get
+        {
+            var n = (Profile.Name ?? string.Empty).Trim();
+            if (n.Length == 0)
+            {
+                return "·";
+            }
+
+            var parts = n.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return parts.Length == 1
+                ? parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant()
+                : (parts[0][0].ToString() + parts[^1][0]).ToUpperInvariant();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _docMenuOpen = false;
+        if (!OnDocView)
+        {
+            Shell.SetActivity(null);
+            Shell.ClearCounter();
+            Shell.SetDocumentMenu(null);
+        }
+
+        StateHasChanged();
+    }
+
+    private void Go(string path) => Nav.NavigateTo(path);
+
+    // ── modes ─────────────────────────────────────────────────────────────
+    private string? ModeDisabledReason(DocMode m)
+    {
+        var active = Tabs.Active;
+        if (m != DocMode.Read && active is not null && active.Format.IsViewOnly() && IsAt("/reader"))
+        {
+            return $"{m} — convert to PDF first ({active.Format.Label()} files are view-only)";
+        }
+
+        return null;
+    }
+
+    private async Task RequestMode(DocMode m)
+    {
+        if (ModeDisabledReason(m) is not null)
+        {
+            return;
+        }
+
+        if (IsAt("/reader") && Shell.ModeHandler is not null && await Shell.ModeHandler(m))
+        {
+            return;
+        }
+
+        var active = Tabs.Active;
+        switch (m)
+        {
+            case DocMode.Read:
+            case DocMode.Mark:
+                Shell.SetMode(m, active?.Id);
+                Nav.NavigateTo("/reader");
+                break;
+            case DocMode.Arrange:
+                await SyncShelfAsync();
+                Shell.SetMode(m, active?.Id);
+                Nav.NavigateTo("/bench");
+                break;
+            case DocMode.Protect:
+                // Protect lives in the Reader (Stamp, Watermark, Flatten, Password, Sign); its
+                // Redact tools open the redaction view from there.
+                Shell.SetMode(m, active?.Id);
+                Nav.NavigateTo("/reader");
+                break;
+        }
+    }
+
+    /// <summary>Arrange (Option C): the shelf takes every open PDF tab, active first. Additive —
+    /// files already on the shelf stay; nothing is removed.</summary>
+    private async Task SyncShelfAsync()
+    {
+        var ordered = Tabs.Tabs
+            .Where(t => !t.Format.IsViewOnly() && t.Error is null && System.IO.File.Exists(t.Path))
+            .OrderBy(t => t.Id == Tabs.Active?.Id ? 0 : 1)
+            .ToList();
+        foreach (var t in ordered)
+        {
+            try
+            {
+                await Bench.AddSourceAsync(t.Path, t.FileName);
+            }
+            catch (Exception ex)
+            {
+                Shell.Notify($"Couldn't put {t.FileName} on the shelf: {ex.Message}", isError: true);
+            }
+        }
+    }
+
+    private async Task FindNow()
+    {
+        if (Shell.FindHandler is not null && OnDocView)
+        {
+            await Shell.FindHandler();
+            return;
+        }
+
+        Nav.NavigateTo("/library");
+    }
+
+    // ── tabs ──────────────────────────────────────────────────────────────
     private void OnTabsChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnShellChanged()
+    {
+        foreach (var m in Shell.Messages.Where(m => !m.IsError && _fading.Add(m.Id)).ToList())
+        {
+            var id = m.Id;
+            _ = Task.Delay(6000).ContinueWith(_ => InvokeAsync(() => Shell.Dismiss(id)));
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
 
     // A file dropped on the window (handled WPF-side) sets a pending open; bring
     // the reader forward so it consumes it.
@@ -118,27 +398,45 @@
     private async Task SwitchTab(string id)
     {
         await Tabs.ActivateAsync(id);
-        Nav.NavigateTo("/reader");
+        var mode = Shell.ModeFor(id);
+        var tab = Tabs.Active;
+        if (tab is not null && tab.Format.IsViewOnly())
+        {
+            mode = DocMode.Read;
+        }
+
+        // Each tab remembers its mode; Arrange and Protect are shared workspaces.
+        switch (mode)
+        {
+            case DocMode.Arrange:
+                Shell.SetMode(mode, id);
+                Nav.NavigateTo("/bench");
+                break;
+            default:
+                Shell.SetMode(mode, id);
+                Nav.NavigateTo("/reader");
+                break;
+        }
     }
 
     private async Task CloseTab(string id)
     {
         await Tabs.CloseAsync(id);
-        if (Tabs.Tabs.Count == 0)
+        Shell.ForgetTab(id);
+        if (Tabs.Tabs.Count == 0 && IsAt("/reader"))
         {
             Nav.NavigateTo("/");
         }
     }
 
-    private bool _tabMenuOpen;
-
     private void ToggleTabMenu() => _tabMenuOpen = !_tabMenuOpen;
 
     private void CloseTabMenu() => _tabMenuOpen = false;
 
-    private async Task OnTabAux(MouseEventArgs e, string id)
+    // Middle-click closes a tab; Ctrl + middle-click closes all. (Blazor has no auxclick
+    // event, so this listens on mouseup and checks the button.)
+    private async Task OnTabMouseUp(MouseEventArgs e, string id)
     {
-        // Middle button only (0 = left, 1 = middle, 2 = right).
         if (e.Button != 1)
         {
             return;
@@ -146,8 +444,7 @@
 
         if (e.CtrlKey)
         {
-            await Tabs.CloseAllAsync();
-            Nav.NavigateTo("/");
+            await MenuCloseAll();
         }
         else
         {
@@ -189,10 +486,113 @@
         var name = System.IO.Path.GetFileName(path);
         var format = DocumentFormatExtensions.FromPath(path);
         await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
-        await Tabs.OpenAsync(path, name, format);
+        var tab = await Tabs.OpenAsync(path, name, format);
+        Shell.SetMode(DocMode.Read, tab.Id);
         Nav.NavigateTo("/reader");
     }
 
+    // ── top bar pager + Document menu ─────────────────────────────────────
+    private async Task OnPagerChange(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var n))
+        {
+            await Shell.GoToAsync(n);
+        }
+
+        StateHasChanged();
+    }
+
+    private Task OnPagerKey(KeyboardEventArgs e) => Task.CompletedTask;
+
+    private async Task RunDocCommand(ShellCommand c)
+    {
+        _docMenuOpen = false;
+        if (c.IsEnabled)
+        {
+            await c.Run();
+        }
+    }
+
+    private async Task RunMessageAction(ShellMessage m)
+    {
+        Shell.Dismiss(m.Id);
+        if (m.Action is not null)
+        {
+            await m.Action();
+        }
+    }
+
+    // ── Ctrl K ────────────────────────────────────────────────────────────
+    private void OpenCommandBar() => _cmdBar?.Open();
+
+    private void OpenCommandBarFromService() => InvokeAsync(OpenCommandBar);
+
+    private IReadOnlyList<ShellCommand> AllCommands => GlobalCommands().Concat(Shell.Commands).ToList();
+
+    private IEnumerable<ShellCommand> GlobalCommands()
+    {
+        yield return new("go.home", "Home", "Go to", "home", null, () => { Go("/"); return Task.CompletedTask; });
+        yield return new("go.library", "Library", "Go to", "library", null, () => { Go("/library"); return Task.CompletedTask; }, Keywords: "files shelf search");
+        yield return new("go.settings", "Settings", "Go to", "settings", null, () => { Go("/settings"); return Task.CompletedTask; }, Keywords: "preferences options");
+        yield return new("file.open", "Open a file…", "File", "folder", "Ctrl O", AddTab, Keywords: "fetch pdf word excel markdown text html");
+        foreach (var (mode, icon, label, key) in _modeDefs)
+        {
+            var m = mode;
+            yield return new("mode." + label.ToLowerInvariant(), label + " mode", "Modes", icon, key, () => RequestMode(m), ModeDisabledReason(m));
+        }
+
+        yield return new("tools.merge", "Merge files…", "Tools", "merge", null, () => { Go("/merge"); return Task.CompletedTask; }, Keywords: "combine join");
+        yield return new("tools.split", "Split pages…", "Tools", "split", null, () => { Go("/split"); return Task.CompletedTask; }, Keywords: "extract separate");
+        yield return new("tools.docs", "Word viewer page", "Tools", "file-word", null, () => { Go("/docs"); return Task.CompletedTask; }, Keywords: "docx");
+        yield return new("tools.sheets", "Excel viewer page", "Tools", "file-excel", null, () => { Go("/sheets"); return Task.CompletedTask; }, Keywords: "xlsx");
+        yield return new("tools.ocr", "OCR — recognise text", "Tools", "ocr", null, () => Task.CompletedTask, "Coming soon — OCR is in development", "scan recognise");
+        foreach (var th in Enum.GetValues<ChuvadiTheme>())
+        {
+            var t = th;
+            yield return new("theme." + t.Key(), "Theme: " + t.DisplayName(), "Appearance", t.IsDark() ? "shift-night" : "contrast", null, () => Theme.SetAsync(t), Keywords: "colour color dark light");
+        }
+
+        if (Tabs.Tabs.Count > 0)
+        {
+            yield return new("tab.close", "Close tab", "Tabs", "close", "Ctrl W", MenuCloseActive);
+            yield return new("tab.closeOthers", "Close inactive tabs", "Tabs", "close", "Ctrl Alt W", MenuCloseOthers, Tabs.Tabs.Count < 2 ? "Only one tab is open" : null);
+            yield return new("tab.closeAll", "Close all tabs", "Tabs", "close", "Ctrl Shift W", MenuCloseAll);
+            foreach (var t in Tabs.Tabs)
+            {
+                var id = t.Id;
+                yield return new("tab.go." + id, "Switch to " + t.FileName, "Tabs", t.Format.IconName(), null, () => SwitchTab(id));
+            }
+        }
+    }
+
+    /// <summary>Keys from shell.js (Ctrl K, Ctrl O, bare 1–4 and any key a registered command
+    /// declares, e.g. "Ctrl P", "T"). Typing in fields never reaches here.</summary>
+    [JSInvokable]
+    public async Task OnShellKey(string combo)
+    {
+        switch (combo)
+        {
+            case "Ctrl K":
+                OpenCommandBar();
+                StateHasChanged();
+                return;
+            case "Ctrl O":
+                await AddTab();
+                return;
+            case "1": await RequestMode(DocMode.Read); return;
+            case "2": await RequestMode(DocMode.Mark); return;
+            case "3": await RequestMode(DocMode.Arrange); return;
+            case "4": await RequestMode(DocMode.Protect); return;
+        }
+
+        var cmd = Shell.Commands.FirstOrDefault(c => c.IsEnabled && string.Equals(c.Keys, combo, StringComparison.OrdinalIgnoreCase));
+        if (cmd is not null)
+        {
+            await cmd.Run();
+        }
+    }
+
+    // ── lifecycle / theme / window ────────────────────────────────────────
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
@@ -203,8 +603,26 @@
         try
         {
             await SaveFolders.HydrateAsync();
+            await Profile.HydrateAsync();
             await Theme.HydrateAsync();
             await ApplyThemeAsync();
+            try
+            {
+                _leftOpen = await Storage.GetAsync("leftbar.open") != "0";
+            }
+            catch
+            {
+            }
+
+            if (!OnDocView)
+            {
+                Shell.SetActivity(null);
+                Shell.ClearCounter();
+            }
+
+            _self = DotNetObjectReference.Create(this);
+            _shellJs = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/shell.js");
+            await _shellJs.InvokeVoidAsync("init", _self);
         }
         catch
         {
@@ -213,12 +631,9 @@
         finally
         {
             Ready.SignalReady();
+            StateHasChanged();
         }
     }
-
-    private bool _railExpanded = true;
-
-    private void ToggleRail() => _railExpanded = !_railExpanded;
 
     private async Task ToggleTheme() => await Theme.ToggleAsync();
 
@@ -256,21 +671,37 @@
 
     private async Task ApplyThemeAsync()
     {
-        var name = Theme.Current == ChuvadiTheme.Dark ? "dark" : "light";
         try
         {
-            await JS.InvokeVoidAsync("chuvadiTheme.set", name);
+            await JS.InvokeVoidAsync("chuvadiTheme.set", Theme.Current.Key());
         }
         catch (JSException)
         {
         }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         Theme.Changed -= OnThemeChanged;
         Win.StateChanged -= OnWinChanged;
         Tabs.Changed -= OnTabsChanged;
+        Shell.Changed -= OnShellChanged;
+        Shell.CommandBarRequested -= OpenCommandBarFromService;
         OpenDoc.Requested -= OnOpenRequested;
+        Nav.LocationChanged -= OnLocationChanged;
+        _clockTimer?.Dispose();
+        try
+        {
+            if (_shellJs is not null)
+            {
+                await _shellJs.InvokeVoidAsync("dispose");
+                await _shellJs.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+
+        _self?.Dispose();
     }
 }

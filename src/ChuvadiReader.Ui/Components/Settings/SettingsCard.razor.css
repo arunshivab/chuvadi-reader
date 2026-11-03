@@ -1,0 +1,20 @@
+.card {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 16px 8px;
+    background: var(--chvd-surface-hi);
+    border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: var(--chvd-radius-lg);
+    min-width: 0;
+}
+.card.full { grid-column: 1 / -1; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.card-title { font-family: var(--chvd-serif-display); font-size: var(--chvd-fs-title-s); color: var(--chvd-ink); }
+.new-chip {
+    font-family: var(--chvd-mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: var(--chvd-radius-sm);
+    background: var(--chvd-marigold);
+    color: var(--chvd-on-accent);
+}

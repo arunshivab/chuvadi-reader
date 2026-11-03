@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Tamil.woff2") format("woff2-variations");unicode-range:U+0B82-0BFA;}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+
+<section id="turn-5" style="padding:72px;display:flex;flex-direction:column;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Missing features · 15 mockups</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:56px;line-height:1.02">Everything on the wish list, given a home.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">Each mockup is a close-up of the part of the app the feature lives in, in the same Cream-paper theme. Four of them are already in development (marked <span style="font-family:'IBM Plex Mono';font-size:12px;padding:1px 6px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">in development</span>), so treat those as a design reference for the build.</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">NOW</span><span style="font-family:'Instrument Serif';font-size:32px">Build next</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:36px">
+
+      <!-- 5a Highlight & comments -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5a</span><span style="font-size:15px">Highlight, underline, strike-through and comments · <i style="font-family:'Instrument Serif';font-size:17px;color:#8a3a1c">Mark</i></span></div>
+        <div id="5a" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <div style="position:relative;display:flex;justify-content:center;padding-top:28px;min-height:0;overflow:hidden">
+            <div style="width:520px;height:640px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:44px 48px;font-size:11px;line-height:1.7;color:#1b1b1b">
+              <div style="font-size:17px;font-weight:600;margin-bottom:14px">Course in hospital</div>
+              <p style="margin:0 0 12px">Admitted for cycle 3 of AC chemotherapy. <span style="background:rgba(232,190,60,.55)">Pre-treatment counts were within range.</span> Treatment was tolerated well with <span style="text-decoration:underline;text-decoration-color:#8a3a1c;text-decoration-thickness:2px;text-underline-offset:2px">grade 1 nausea managed with ondansetron</span>. No febrile episodes.</p>
+              <p style="margin:0 0 12px;position:relative">Reviewed by the Oncology nurse specialist on day 4 regarding <span style="background:rgba(120,170,220,.45)">line care and diet</span>.<span style="position:absolute;right:-30px;top:0;width:20px;height:20px;border-radius:4px 4px 4px 0;background:#c47416;color:#fff;display:flex;align-items:center;justify-content:center"><lp-i name="comment" size="12"></lp-i></span></p>
+              <p style="margin:0 0 12px"><span style="text-decoration:line-through;text-decoration-color:#a83a2a;text-decoration-thickness:1.5px">Port flush scheduled for day 6.</span> Port site clean on discharge. Patient and family counselled on warning signs and when to return.</p>
+              <p style="margin:0">Follow-up in Oncology OPD on 30 Oct 2026 with CBC, LFT and RFT for cycle 4.</p>
+            </div>
+            <div style="position:absolute;left:190px;top:236px;display:flex;align-items:center;gap:2px;padding:4px;background:#1a1310;border-radius:9px;box-shadow:0 10px 24px rgba(0,0,0,.3);color:#f2ead6;font-size:12px">
+              <span style="display:flex;gap:4px;padding:0 6px"><span style="width:14px;height:14px;border-radius:50%;background:#e8be3c;outline:2px solid #fbf7ec;outline-offset:1px"></span><span style="width:14px;height:14px;border-radius:50%;background:#78aadc"></span><span style="width:14px;height:14px;border-radius:50%;background:#8fc07a"></span><span style="width:14px;height:14px;border-radius:50%;background:#e59a9a"></span></span>
+              <span style="width:0.5px;height:18px;background:#5a4a3a"></span>
+              <span style="display:flex;align-items:center;gap:5px;height:28px;padding:0 8px;border-radius:6px;background:#3a2f25"><lp-i name="highlight" size="14"></lp-i>Highlight</span><span style="display:flex;align-items:center;height:28px;padding:0 8px"><lp-i name="underline" size="14"></lp-i></span><span style="display:flex;align-items:center;height:28px;padding:0 8px"><lp-i name="strikethrough" size="14"></lp-i></span><span style="display:flex;align-items:center;gap:5px;height:28px;padding:0 8px"><lp-i name="comment" size="14"></lp-i>Comment</span><span style="display:flex;align-items:center;gap:5px;height:28px;padding:0 8px"><lp-i name="copy" size="14"></lp-i>Copy</span>
+            </div>
+          </div>
+          <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;display:flex;flex-direction:column">
+            <div style="padding:16px 18px 10px;border-bottom:0.5px solid #d9cdb4;display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:22px">Comments</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">3 open · 1 resolved</span></div>
+            <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px;font-size:13px">
+              <div style="display:flex;flex-direction:column;gap:8px;padding:12px;border:0.5px solid #c47416;border-radius:8px;background:#fff">
+                <div style="display:flex;align-items:center;gap:8px"><span style="width:24px;height:24px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:10px">AS</span><b style="font-weight:600">Dr A. Shiva</b><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64;margin-left:auto">p1 · 18:20</span></div>
+                <div style="font-size:12px;color:#8a7c64;border-left:2px solid #78aadc;padding-left:8px">“line care and diet”</div>
+                <div style="line-height:1.45">Please attach the diet chart given by the dietitian.</div>
+                <div style="display:flex;gap:8px;padding-top:8px;border-top:0.5px solid #e8dcc4"><span style="width:20px;height:20px;border-radius:50%;background:#6b7a3e;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:9px">PR</span><span style="line-height:1.45;color:#3a2f25">Added as page 13 in the referral desk.</span></div>
+                <div style="display:flex;gap:8px"><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;padding:0 10px;display:flex;align-items:center;color:#8a7c64">Reply…</span><span style="height:30px;padding:0 10px;border-radius:6px;background:#e8dcc4;display:flex;align-items:center;gap:5px"><lp-i name="check" size="13"></lp-i>Resolve</span></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid #d9cdb4;border-radius:8px"><span style="width:10px;height:10px;border-radius:2px;background:#e8be3c"></span><span style="flex:1">Highlight · “Pre-treatment counts…”</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">p1</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:0.5px solid #d9cdb4;border-radius:8px"><span style="width:10px;height:2px;background:#a83a2a"></span><span style="flex:1">Strike · “Port flush scheduled…”</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">p1</span></div>
+              <div style="font-size:12px;color:#8a7c64">Saved as real PDF annotations, so they open in any reader.</div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 5b Forms -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5b</span><span style="font-size:15px">Fill in PDF forms · <i style="font-family:'Instrument Serif';font-size:17px;color:#8a3a1c">Mark › Form</i></span></div>
+        <div id="5b" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <div style="display:flex;justify-content:center;padding-top:28px;position:relative;min-height:0;overflow:hidden">
+            <div style="width:520px;height:640px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:40px 46px;font-size:11px;color:#1b1b1b;display:flex;flex-direction:column;gap:14px">
+              <div style="font-size:17px;font-weight:600">Consent for Anaesthesia</div>
+              <sc-for list="{{ formFields }}" as="ff" hint-placeholder-count="5">
+                <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:9.5px;color:#555">{{ ff.label }}<span style="color:#a83a2a">{{ ff.req }}</span></span><span style="height:26px;display:flex;align-items:center;padding:0 8px;border-radius:3px;background:{{ ff.bg }};outline:{{ ff.o }};font-size:12px;color:#1f3b73">{{ ff.v }}</span></div>
+              </sc-for>
+              <div style="display:flex;gap:18px;font-size:11px"><span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:2px;background:#8a3a1c;color:#fff;display:flex;align-items:center;justify-content:center"><lp-i name="check" size="10" sw="2.6"></lp-i></span>General anaesthesia</span><span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:2px;background:rgba(80,120,200,.12);outline:1px solid #8aa4d6"></span>Spinal</span><span style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:2px;background:rgba(80,120,200,.12);outline:1px solid #8aa4d6"></span>Regional block</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:9.5px;color:#555">Signature of patient / guardian<span style="color:#a83a2a"> *</span></span><span style="height:54px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:3px;background:rgba(80,120,200,.10);outline:1px dashed #8aa4d6;color:#5b6f9a;font-size:12px"><lp-i name="signature" size="16"></lp-i>Tap to sign</span></div>
+            </div>
+          </div>
+          <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;display:flex;flex-direction:column">
+            <div style="padding:16px 18px 12px;border-bottom:0.5px solid #d9cdb4"><div style="font-family:'Instrument Serif';font-size:22px">Form</div><div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span style="flex:1;height:6px;border-radius:3px;background:#e8dcc4;overflow:hidden"><span style="display:block;width:57%;height:100%;background:#6b7a3e"></span></span><span style="font-family:'IBM Plex Mono';font-size:11px">4 of 7</span></div></div>
+            <div style="flex:1;padding:8px 10px;display:flex;flex-direction:column;font-size:13px">
+              <sc-for list="{{ formList }}" as="fl" hint-placeholder-count="7"><div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 8px;border-radius:6px;background:{{ fl.bg }}"><span style="display:flex;color:{{ fl.c }}"><lp-i name="{{ fl.icon }}" size="14"></lp-i></span><span style="flex:1">{{ fl.label }}</span><span style="font-size:11px;color:#a83a2a">{{ fl.req }}</span></div></sc-for>
+            </div>
+            <div style="padding:12px 18px;border-top:0.5px solid #d9cdb4;display:flex;flex-direction:column;gap:8px;font-size:12.5px">
+              <label style="display:flex;align-items:center;justify-content:space-between">Flatten when saving<span style="width:34px;height:20px;border-radius:10px;background:#8a3a1c;position:relative"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+              <div style="display:flex;gap:8px"><span style="flex:1;height:32px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center">Clear form</span><span style="flex:1;height:32px;border-radius:6px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-weight:500">Next field ⇥</span></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 5c Print -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5c</span><span style="font-size:15px">Print · <span style="font-family:'IBM Plex Mono';font-size:12px">Ctrl P</span>, from any mode</span></div>
+        <div id="5c" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:rgba(26,19,16,.32);display:flex;align-items:center;justify-content:center">
+          <div style="width:820px;height:564px;background:#fbf7ec;border-radius:12px;box-shadow:0 30px 70px rgba(0,0,0,.35);display:grid;grid-template-columns:minmax(0,1fr) 340px;overflow:hidden">
+            <div style="background:#e8dcc4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+              <div style="display:flex;gap:14px"><sc-for list="{{ printPages }}" as="pp" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:92px;height:130px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);opacity:{{ pp.op }};padding:10px;display:flex;flex-direction:column;gap:4px"><span style="height:4px;width:60%;background:#bbb"></span><span style="height:3px;background:#e2e2e2"></span><span style="height:3px;background:#e2e2e2"></span><span style="height:16px;background:#f0f0f0;margin-top:4px"></span></div><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25">{{ pp.l }}</span></div></sc-for></div>
+              <span style="font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">4 pages · 2 sheets (two-sided) · marks included</span>
+            </div>
+            <div style="padding:22px 24px;display:flex;flex-direction:column;gap:14px;font-size:13.5px">
+              <span style="font-family:'Instrument Serif';font-size:26px">Print</span>
+              <sc-for list="{{ printRows }}" as="pr" hint-placeholder-count="6"><div style="display:flex;flex-direction:column;gap:5px"><span style="font-size:12px;color:#8a7c64">{{ pr.l }}</span><span style="height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 10px;border:0.5px solid #c4b497;border-radius:6px;background:#fff">{{ pr.v }}<lp-i name="chevron-down" size="13"></lp-i></span></div></sc-for>
+              <div style="margin-top:auto;display:flex;gap:8px"><span style="flex:1;height:38px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center;justify-content:center">Cancel</span><span style="flex:2;height:38px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500"><lp-i name="print" size="16"></lp-i>Print 4 pages</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5d Kiosk -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5d</span><span style="font-size:15px">Kiosk mode · locked full screen, big clock, idle reset · High-contrast theme</span></div>
+        <div id="5d" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #1a1a1a;background:#f5f5f2;display:flex;flex-direction:column;color:#000">
+          <div style="height:64px;flex:none;display:flex;align-items:center;gap:16px;padding:0 28px;background:#fff;border-bottom:1.5px solid #1a1a1a">
+            <span style="font-family:'Instrument Serif';font-style:italic;font-size:28px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#7a240c">ச</span>huvadi</span><span style="font-size:15px">Records desk · Ward 4</span>
+            <span style="margin-left:auto;display:flex;flex-direction:column;align-items:flex-end"><span style="font-family:'IBM Plex Mono';font-size:30px;font-weight:500;line-height:1">18:40:12</span><span style="font-size:13px">Wednesday 14 October 2026</span></span>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:34px 28px">
+            <sc-for list="{{ kioskTiles }}" as="kt" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;justify-content:space-between;padding:24px;border:1.5px solid #1a1a1a;border-radius:14px;background:{{ kt.bg }};color:{{ kt.fg }}"><lp-i name="{{ kt.icon }}" size="40"></lp-i><div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Instrument Serif';font-size:34px;line-height:1">{{ kt.t }}</span><span style="font-size:15px;line-height:1.4">{{ kt.d }}</span></div></div></sc-for>
+          </div>
+          <div style="height:58px;flex:none;display:flex;align-items:center;gap:14px;padding:0 28px;background:#000;color:#fff;font-size:15px"><lp-i name="clock" size="18"></lp-i>This screen resets after 2 minutes without a touch — open documents are closed and nothing is kept.<span style="margin-left:auto;font-family:'IBM Plex Mono';font-size:13px;opacity:.8">Staff exit · hold logo 3 s + PIN</span></div>
+        </div>
+      </div>
+
+      <!-- 5e Users roles audit -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5e</span><span style="font-size:15px">Users, roles and an audit trail · Settings › Account &amp; roles</span></div>
+        <div id="5e" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;padding:24px 28px;display:flex;flex-direction:column;gap:18px">
+          <div style="display:flex;align-items:center;gap:14px"><span style="width:48px;height:48px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:16px">AS</span><div style="display:flex;flex-direction:column"><span style="font-family:'Instrument Serif';font-size:26px;line-height:1.1">Arun S.</span><span style="font-size:13px;color:#3a2f25">Records officer · signed in with hospital ID · 2 h ago</span></div><span style="margin-left:auto;height:34px;padding:0 14px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center;gap:6px;font-size:13px;background:#fbf7ec"><lp-i name="log-out" size="15"></lp-i>Sign out</span></div>
+          <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:18px;flex:1;min-height:0">
+            <div style="background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px">
+              <span style="font-family:'Instrument Serif';font-size:20px">What each role can do</span>
+              <div style="display:grid;grid-template-columns:minmax(0,1.4fr) repeat(4,48px);gap:0;font-size:12px;align-items:center">
+                <span></span><sc-for list="{{ roles }}" as="ro"><span style="font-family:'IBM Plex Mono';font-size:9.5px;text-align:center;color:{{ ro.c }};padding:6px 0">{{ ro.n }}</span></sc-for>
+                <sc-for list="{{ perms }}" as="pm"><span style="padding:7px 0;border-top:0.5px solid #e8dcc4">{{ pm.l }}</span><sc-for list="{{ pm.v }}" as="pv"><span style="display:flex;justify-content:center;padding:7px 0;border-top:0.5px solid #e8dcc4;color:{{ pv.c }}"><lp-i name="{{ pv.i }}" size="13" sw="2.2"></lp-i></span></sc-for></sc-for>
+              </div>
+            </div>
+            <div style="background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden">
+              <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:20px">Audit trail</span><span style="font-size:12px;color:#8a3a1c">Export CSV</span></div>
+              <sc-for list="{{ audit }}" as="au" hint-placeholder-count="7"><div style="display:grid;grid-template-columns:44px 74px minmax(0,1fr);gap:10px;align-items:baseline;padding:7px 0;border-top:0.5px solid #e8dcc4;font-size:12.5px"><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ au.t }}</span><span style="font-weight:500">{{ au.u }}</span><span style="color:#3a2f25"><b style="font-weight:600;color:{{ au.c }}">{{ au.a }}</b> {{ au.d }}</span></div></sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#c47416;color:#fbf7ec">NEXT</span><span style="font-family:'Instrument Serif';font-size:32px">Bigger pieces — four already in development</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:36px">
+
+      <!-- 5f OCR -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5f</span><span style="font-size:15px">OCR — make a scan searchable</span><span style="font-family:'IBM Plex Mono';font-size:11px;padding:1px 6px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">in development</span></div>
+        <div id="5f" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <div style="position:relative;display:flex;flex-direction:column;align-items:center;padding-top:16px;gap:14px;min-height:0;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 8px 0 14px;background:#fbf7ec;border:0.5px solid #c47416;border-radius:8px;font-size:13px"><span style="display:flex;color:#c47416"><lp-i name="scanner" size="16"></lp-i></span>This page is a scanned image. Find, copy and redact can't see its text yet.<span style="height:28px;padding:0 10px;border-radius:6px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-weight:500">Make searchable</span></div>
+            <div style="position:relative;width:500px;height:620px;background:#f3f1ec;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:44px 46px;font-family:'Times New Roman',serif;font-size:12px;line-height:1.7;color:#333;transform:rotate(-.6deg);filter:contrast(.9)">
+              <div style="font-size:16px;font-weight:700;margin-bottom:10px;letter-spacing:.02em">LABORATORY REPORT</div>
+              <sc-for list="{{ ocrLines }}" as="ol" hint-placeholder-count="10"><div style="position:relative;margin-bottom:6px"><span>{{ ol.t }}</span><sc-if value="{{ ol.done }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;inset:-2px -4px;outline:1px solid rgba(107,122,62,.7);background:rgba(107,122,62,.08)"></span></sc-if></div></sc-for>
+            </div>
+          </div>
+          <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;padding:18px;display:flex;flex-direction:column;gap:16px;font-size:13px">
+            <span style="font-family:'Instrument Serif';font-size:22px">Make searchable</span>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="color:#3a2f25">Recognising page 3 of 8</span><span style="height:6px;border-radius:3px;background:#e8dcc4;overflow:hidden"><span style="display:block;width:34%;height:100%;background:#6b7a3e"></span></span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">about 40 s left · on this device</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span style="color:#3a2f25">Languages</span><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="padding:4px 10px;border-radius:14px;border:0.5px solid #8a3a1c;color:#8a3a1c;background:rgba(138,58,28,.12)">English</span><span style="padding:4px 10px;border-radius:14px;border:0.5px solid #8a3a1c;color:#8a3a1c;background:rgba(138,58,28,.12)">தமிழ்</span><span style="padding:4px 10px;border-radius:14px;border:0.5px solid #c4b497">हिन्दी</span><span style="padding:4px 10px;border-radius:14px;border:0.5px dashed #c4b497">+</span></div></div>
+            <label style="display:flex;justify-content:space-between;align-items:center">Straighten tilted pages<span style="width:34px;height:20px;border-radius:10px;background:#8a3a1c;position:relative"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+            <label style="display:flex;justify-content:space-between;align-items:center">Keep the original image<span style="width:34px;height:20px;border-radius:10px;background:#8a3a1c;position:relative"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+            <div style="margin-top:auto;font-size:12px;color:#8a7c64;line-height:1.5">Saves a new searchable copy. Library search, Find and Redact then work on scanned pages too.</div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 5g Password -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5g</span><span style="font-size:15px">Password-protect / remove a password · <i style="font-family:'Instrument Serif';font-size:17px;color:#8a3a1c">Protect › Password</i></span><span style="font-family:'IBM Plex Mono';font-size:11px;padding:1px 6px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">in development</span></div>
+        <div id="5g" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <div style="display:flex;justify-content:center;padding-top:28px;position:relative;min-height:0;overflow:hidden"><div style="width:500px;height:640px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);opacity:.9"></div><div style="position:absolute;top:220px;display:flex;flex-direction:column;align-items:center;gap:10px;padding:20px 26px;background:rgba(251,247,236,.94);border:0.5px solid #c4b497;border-radius:12px"><span style="display:flex;color:#8a3a1c"><lp-i name="doc-lock" size="34"></lp-i></span><span style="font-family:'Instrument Serif';font-size:22px">The copy will need a password to open</span><span style="font-size:12.5px;color:#3a2f25">The original stays as it is.</span></div></div>
+          <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;display:flex;flex-direction:column">
+            <div style="padding:14px 18px 0;border-bottom:0.5px solid #d9cdb4;display:flex;gap:18px;font-size:13.5px"><span style="padding-bottom:10px;color:#8a7c64">Redact</span><span style="padding-bottom:10px;color:#8a7c64">Stamp</span><span style="padding-bottom:10px;color:#8a7c64">Flatten</span><span style="padding-bottom:10px;border-bottom:2px solid #1a1310;font-weight:500">Password</span></div>
+            <div style="flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:14px;font-size:13px">
+              <div style="display:flex;flex-direction:column;gap:6px"><span>Password to open</span><span style="height:38px;display:flex;align-items:center;padding:0 12px;border:0.5px solid #8a3a1c;border-radius:7px;background:#fff;font-family:'IBM Plex Mono';letter-spacing:.2em">••••••••••<span style="margin-left:auto;letter-spacing:0;font-family:'LiPi Sans';font-size:11.5px;color:#8a3a1c">show</span></span><span style="display:flex;gap:3px"><span style="flex:1;height:4px;border-radius:2px;background:#6b7a3e"></span><span style="flex:1;height:4px;border-radius:2px;background:#6b7a3e"></span><span style="flex:1;height:4px;border-radius:2px;background:#6b7a3e"></span><span style="flex:1;height:4px;border-radius:2px;background:#d9cdb4"></span></span><span style="font-size:11.5px;color:#6b7a3e">Strong · 12 characters</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px"><span>Confirm</span><span style="height:38px;display:flex;align-items:center;padding:0 12px;border:0.5px solid #c4b497;border-radius:7px;background:#fff;font-family:'IBM Plex Mono';letter-spacing:.2em">••••••••••<span style="margin-left:auto;display:flex;color:#6b7a3e;letter-spacing:0"><lp-i name="check" size="14"></lp-i></span></span></div>
+              <div style="display:flex;flex-direction:column;gap:2px"><span style="font-family:'IBM Plex Mono';font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a7c64;margin-bottom:4px">Once opened, allow</span>
+                <sc-for list="{{ allow }}" as="al"><label style="display:flex;justify-content:space-between;align-items:center;height:32px">{{ al.l }}<span style="width:34px;height:20px;border-radius:10px;background:{{ al.bg }};position:relative"><span style="position:absolute;left:{{ al.x }};top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label></sc-for>
+              </div>
+              <span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">AES-256 · works in Acrobat and browsers</span>
+            </div>
+            <div style="padding:12px 18px;border-top:0.5px solid #d9cdb4;display:flex;flex-direction:column;gap:8px"><span style="height:36px;border-radius:7px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:8px;font-size:13px;font-weight:500"><lp-i name="lock" size="15"></lp-i>Save protected copy</span><span style="font-size:12px;color:#3a2f25">Opened a locked file? <a href="#">Remove its password</a></span></div>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 5h Certificate signature -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5h</span><span style="font-size:15px">Certificate signatures + validation · <i style="font-family:'Instrument Serif';font-size:17px;color:#8a3a1c">Protect › Sign</i></span><span style="font-family:'IBM Plex Mono';font-size:11px;padding:1px 6px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">in development</span></div>
+        <div id="5h" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <div style="display:flex;flex-direction:column;align-items:center;padding-top:16px;gap:14px;min-height:0;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;background:#eef2e4;border:0.5px solid #6b7a3e;border-radius:8px;font-size:13px;color:#2f3d14"><lp-i name="certification" size="17"></lp-i><b style="font-weight:600">Signed by Dr A. Shiva</b> · certificate valid · not changed since signing · 14 Oct 18:31<span style="color:#6b7a3e;margin-left:6px">Details</span></div>
+            <div style="position:relative;width:500px;height:600px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:44px 46px">
+              <div style="height:10px;width:46%;background:#d4d0c8;margin-bottom:12px"></div><div style="height:6px;background:#ebe8e2;margin-bottom:8px"></div><div style="height:6px;background:#ebe8e2;margin-bottom:8px"></div><div style="height:6px;width:80%;background:#ebe8e2;margin-bottom:8px"></div><div style="height:90px;background:#f4f2ed;margin:14px 0"></div><div style="height:6px;background:#ebe8e2;margin-bottom:8px"></div>
+              <div style="position:absolute;left:46px;bottom:60px;width:250px;padding:10px 12px;border:1px solid #6b7a3e;border-radius:4px;display:flex;gap:10px;align-items:center;background:#fbfdf6"><span style="display:flex;color:#6b7a3e"><lp-i name="certification" size="26"></lp-i></span><div style="display:flex;flex-direction:column"><span style="font-family:'Instrument Serif';font-style:italic;font-size:22px;color:#1f3b73;line-height:1">A. Shiva</span><span style="font-family:'IBM Plex Mono';font-size:9px;color:#555">Digitally signed · 2026-10-14 18:31 IST<br>Reason: approved for discharge</span></div></div>
+            </div>
+          </div>
+          <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;padding:18px;display:flex;flex-direction:column;gap:14px;font-size:13px">
+            <span style="font-family:'Instrument Serif';font-size:22px">Sign with a certificate</span>
+            <div style="display:flex;flex-direction:column;gap:6px"><span>Certificate</span><div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:0.5px solid #8a3a1c;border-radius:8px;background:#fff"><span style="display:flex;color:#6b7a3e"><lp-i name="certification" size="20"></lp-i></span><div style="display:flex;flex-direction:column;flex:1"><b style="font-weight:600">Dr A. Shiva, MD DM</b><span style="font-size:11.5px;color:#8a7c64">USB token · valid to Mar 2028</span></div><lp-i name="chevron-down" size="13"></lp-i></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span>Reason</span><span style="height:34px;display:flex;align-items:center;padding:0 10px;border:0.5px solid #c4b497;border-radius:6px;background:#fff">Approved for discharge</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px"><span>Place</span><span style="height:34px;display:flex;align-items:center;padding:0 10px;border:0.5px solid #c4b497;border-radius:6px;background:#fff">Madurai</span></div>
+            <label style="display:flex;justify-content:space-between;align-items:center">Lock the document after signing<span style="width:34px;height:20px;border-radius:10px;background:#8a3a1c;position:relative"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+            <label style="display:flex;justify-content:space-between;align-items:center">Add a timestamp from the server<span style="width:34px;height:20px;border-radius:10px;background:#d9cdb4;position:relative"><span style="position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+            <span style="margin-top:auto;height:36px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500"><lp-i name="esign" size="16"></lp-i>Drag a box on the page, then sign</span>
+          </aside>
+        </div>
+      </div>
+
+      <!-- 5i Compare -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5i</span><span style="font-size:15px">Compare two documents</span><span style="font-family:'IBM Plex Mono';font-size:11px;padding:1px 6px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">in development</span></div>
+        <div id="5i" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:flex;flex-direction:column">
+          <div style="height:48px;flex:none;display:flex;align-items:center;gap:12px;padding:0 16px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4;font-size:13px">
+            <span style="font-family:'IBM Plex Mono';font-size:11.5px;padding:4px 8px;border-radius:5px;background:#fbf7ec;border:0.5px solid #c4b497">line-care-policy v2.pdf</span><span style="color:#8a7c64">→</span><span style="font-family:'IBM Plex Mono';font-size:11.5px;padding:4px 8px;border-radius:5px;background:#fbf7ec;border:0.5px solid #8a3a1c">line-care-policy v3.pdf</span>
+            <span style="margin-left:auto;display:flex;gap:10px;font-family:'IBM Plex Mono';font-size:11px"><span style="color:#5d7a3a">+6 added</span><span style="color:#a83a2a">−5 removed</span><span style="color:#c47416">3 changed</span></span>
+            <span style="display:flex;padding:2px;gap:2px;background:#e8dcc4;border-radius:6px;font-size:12px"><span style="padding:4px 10px;border-radius:4px;background:#fbf7ec;color:#8a3a1c">Side by side</span><span style="padding:4px 10px">Overlay</span></span>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr 230px;gap:0;min-height:0">
+            <sc-for list="{{ cmpCols }}" as="cc" hint-placeholder-count="2">
+              <div style="display:flex;justify-content:center;padding-top:18px;border-right:0.5px solid #d9cdb4">
+                <div style="width:380px;height:560px;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.22);padding:30px 32px;font-family:Georgia,serif;font-size:10.5px;line-height:1.65;color:#222">
+                  <div style="font-family:Arial;font-size:14px;font-weight:700;color:#1f3b73;margin-bottom:10px">3. Daily care</div>
+                  <sc-for list="{{ cc.lines }}" as="cl"><p style="margin:0 0 8px;padding:2px 4px;background:{{ cl.bg }};text-decoration:{{ cl.td }};border-left:3px solid {{ cl.bd }}">{{ cl.t }}</p></sc-for>
+                </div>
+              </div>
+            </sc-for>
+            <aside style="background:#fbf7ec;padding:14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;overflow:hidden">
+              <span style="font-family:'Instrument Serif';font-size:20px">14 changes</span>
+              <sc-for list="{{ cmpList }}" as="cx"><div style="display:flex;gap:8px;padding:8px;border-radius:6px;background:{{ cx.bg }}"><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:{{ cx.c }};width:14px">{{ cx.s }}</span><span style="flex:1;line-height:1.4">{{ cx.t }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">p{{ cx.p }}</span></div></sc-for>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5j Links & attachments -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5j</span><span style="font-size:15px">Clickable links and an attachments panel · <i style="font-family:'Instrument Serif';font-size:17px;color:#8a3a1c">Read</i></span></div>
+        <div id="5j" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;display:grid;grid-template-columns:240px minmax(0,1fr);grid-template-rows:minmax(0,1fr);background:#e8dcc4">
+          <aside style="background:#f2ead6;border-right:0.5px solid #d9cdb4;display:flex;flex-direction:column">
+            <div style="height:38px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:0.5px solid #d9cdb4;font-size:12.5px"><span style="color:#8a7c64">Pages</span><span style="color:#8a7c64">Outline</span><span style="padding:10px 0 9px;border-bottom:2px solid #8a3a1c;color:#8a3a1c">Attachments · 3</span></div>
+            <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
+              <sc-for list="{{ attach }}" as="at" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:10px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px"><span style="display:flex;color:{{ at.c }}"><lp-i name="{{ at.i }}" size="20"></lp-i></span><div style="display:flex;flex-direction:column;flex:1;min-width:0"><span style="font-family:'IBM Plex Mono';font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ at.n }}</span><span style="font-size:11px;color:#8a7c64">{{ at.m }}</span></div></div></sc-for>
+              <div style="display:flex;gap:6px;font-size:12px"><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#fbf7ec">Open</span><span style="flex:1;height:30px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center;background:#fbf7ec">Save all…</span></div>
+            </div>
+          </aside>
+          <div style="position:relative;display:flex;justify-content:center;padding-top:28px;min-height:0;overflow:hidden">
+            <div style="width:500px;height:640px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:44px 48px;font-size:11.5px;line-height:1.7;color:#1b1b1b">
+              <div style="font-size:17px;font-weight:600;margin-bottom:12px">Contents</div>
+              <div style="display:flex;justify-content:space-between;border-bottom:1px dotted #bbb;padding:4px 0">1. Summary<span>1</span></div>
+              <div style="display:flex;justify-content:space-between;border-bottom:1px dotted #bbb;padding:4px 0;background:rgba(44,62,140,.08);outline:1px solid rgba(44,62,140,.4)">2. Medication on discharge<span>7</span></div>
+              <div style="display:flex;justify-content:space-between;border-bottom:1px dotted #bbb;padding:4px 0">3. Follow-up<span>9</span></div>
+              <p style="margin:18px 0 0">Guidelines: <span style="color:#1f3b73;text-decoration:underline">nccn.org/guidelines/breast</span> — see also the enclosed lab report (attachment 1).</p>
+            </div>
+            <div style="position:absolute;left:calc(50% + 20px);top:150px;display:flex;align-items:center;gap:8px;padding:8px 12px;background:#1a1310;color:#fbf7ec;border-radius:8px;font-size:12px;box-shadow:0 8px 20px rgba(0,0,0,.25)"><lp-i name="go-to-page" size="14"></lp-i>Go to page 7 · Medication</div>
+            <div style="position:absolute;left:calc(50% - 70px);top:300px;display:flex;flex-direction:column;gap:6px;padding:10px 12px;width:280px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:9px;box-shadow:0 10px 26px rgba(0,0,0,.2);font-size:12.5px"><span style="display:flex;align-items:center;gap:6px;font-weight:600"><lp-i name="external-link" size="14"></lp-i>Open a website?</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">https://nccn.org/guidelines/breast</span><span style="font-size:11.5px;color:#8a7c64">This leaves Chuvadi and needs the internet.</span><span style="display:flex;gap:6px"><span style="flex:1;height:28px;border:0.5px solid #c4b497;border-radius:6px;display:flex;align-items:center;justify-content:center">Copy link</span><span style="flex:1;height:28px;border-radius:6px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center">Open in browser</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:18px">
+    <div style="display:flex;align-items:center;gap:12px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 10px;border-radius:4px;background:#6b7a3e;color:#fbf7ec">LATER</span><span style="font-family:'Instrument Serif';font-size:32px">Polish that makes it feel finished</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:36px">
+
+      <!-- 5k Tamil -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5k</span><span style="font-size:15px">Tamil interface · Settings › Language</span></div>
+        <div id="5k" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;flex-direction:column">
+          <div style="height:46px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:#fbf7ec;border-bottom:0.5px solid #c4b497">
+            <span style="font-family:'Instrument Serif';font-style:italic;font-size:21px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span>
+            <span style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:0.5px solid #d9cdb4;border-radius:7px;font-size:13px"><lp-i name="library" size="15"></lp-i>நூலகம்</span>
+            <span style="display:flex;align-items:center;gap:7px;height:28px;padding:0 10px;border:0.5px solid #8a3a1c;border-radius:8px;box-shadow:inset 0 -2px 0 #8a3a1c;font-family:'IBM Plex Mono';font-size:11.5px">discharge-summary.pdf</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px;height:30px;width:240px;padding:0 10px;background:#f2ead6;border:0.5px solid #c4b497;border-radius:6px;color:#8a7c64;font-size:13px"><lp-i name="search" size="14"></lp-i>தேடு அல்லது செய்…</span>
+          </div>
+          <div style="height:56px;flex:none;display:flex;align-items:center;justify-content:center;background:#f2ead6;border-bottom:0.5px solid #d9cdb4">
+            <div style="display:flex;padding:3px;gap:2px;background:#e8dcc4;border-radius:9px">
+              <sc-for list="{{ taModes }}" as="tm" hint-placeholder-count="4"><span style="display:flex;flex-direction:column;align-items:center;height:42px;justify-content:center;padding:0 20px;border-radius:7px;background:{{ tm.bg }};color:{{ tm.fg }}"><span style="font-family:'Tiro Tamil';font-size:18px;line-height:1.1">{{ tm.ta }}</span><span style="font-family:'IBM Plex Mono';font-size:9px;color:#8a7c64">{{ tm.en }}</span></span></sc-for>
+            </div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px">
+            <div style="background:#e8dcc4;display:flex;justify-content:center;padding-top:24px"><div style="width:400px;height:520px;background:#fff;box-shadow:0 6px 22px rgba(0,0,0,.28)"></div></div>
+            <aside style="background:#fbf7ec;border-left:0.5px solid #c4b497;padding:18px;display:flex;flex-direction:column;gap:12px">
+              <span style="font-family:'Instrument Serif';font-size:22px">Language · மொழி</span>
+              <sc-for list="{{ langs }}" as="lg"><div style="display:flex;align-items:center;gap:10px;height:42px;padding:0 12px;border:0.5px solid {{ lg.bd }};border-radius:8px;background:{{ lg.bg }}"><span style="font-size:16px;flex:1">{{ lg.n }}</span><span style="font-size:12px;color:#8a7c64">{{ lg.e }}</span></div></sc-for>
+              <label style="display:flex;justify-content:space-between;align-items:center;font-size:13px">Show English under each verb<span style="width:34px;height:20px;border-radius:10px;background:#8a3a1c;position:relative"><span style="position:absolute;right:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff"></span></span></label>
+            </aside>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5l Accessibility -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5l</span><span style="font-size:15px">Accessibility and interface size · keyboard focus, labels, 100 → 150%</span></div>
+        <div id="5l" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#e8dcc4;display:grid;grid-template-columns:1fr 1fr">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;border-right:0.5px solid #c4b497">
+            <span style="font-family:'IBM Plex Mono';font-size:12px;color:#3a2f25">100% · mouse</span>
+            <div style="display:flex;align-items:center;gap:2px;padding:5px 8px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.14)">
+              <span style="display:flex;width:30px;height:30px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="16"></lp-i></span><span style="font-family:'IBM Plex Mono';font-size:11px">1 / 12</span><span style="display:flex;width:30px;height:30px;align-items:center;justify-content:center"><lp-i name="chevron-right" size="16"></lp-i></span><span style="width:0.5px;height:20px;background:#c4b497;margin:0 5px"></span><span style="display:flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:7px;outline:2px solid #8a3a1c;outline-offset:2px"><lp-i name="zoom-in" size="15"></lp-i></span><span style="display:flex;width:30px;height:30px;align-items:center;justify-content:center"><lp-i name="fit-width" size="17"></lp-i></span>
+            </div>
+            <div style="max-width:360px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:#3a2f25;padding:14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px">
+              <span style="display:flex;gap:8px"><span style="color:#8a3a1c">●</span>Focus ring: 2 px binding red, offset 2 px. Always visible when you use the keyboard.</span>
+              <span style="display:flex;gap:8px"><span style="color:#8a3a1c">●</span>Every icon button has a spoken name, e.g. “Zoom in, Ctrl plus”.</span>
+              <span style="display:flex;gap:8px"><span style="color:#8a3a1c">●</span>Tab order: tabs → mode switch → ribbon → page → margin.</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
+            <span style="font-family:'IBM Plex Mono';font-size:12px;color:#3a2f25">150% · touch / kiosk</span>
+            <div style="display:flex;align-items:center;gap:4px;padding:8px 12px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:18px;box-shadow:0 10px 28px rgba(0,0,0,.14)">
+              <span style="display:flex;width:46px;height:46px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="24"></lp-i></span><span style="font-family:'IBM Plex Mono';font-size:16px">1 / 12</span><span style="display:flex;width:46px;height:46px;align-items:center;justify-content:center"><lp-i name="chevron-right" size="24"></lp-i></span><span style="width:0.5px;height:30px;background:#c4b497;margin:0 6px"></span><span style="display:flex;width:46px;height:46px;align-items:center;justify-content:center"><lp-i name="zoom-in" size="22"></lp-i></span><span style="display:flex;width:46px;height:46px;align-items:center;justify-content:center"><lp-i name="fit-width" size="25"></lp-i></span>
+            </div>
+            <div style="display:flex;padding:4px;gap:3px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px">
+              <span style="font-family:'Instrument Serif';font-style:italic;font-size:28px;padding:6px 22px;border-radius:9px;background:#e8dcc4;color:#8a3a1c">Read</span><span style="font-family:'Instrument Serif';font-style:italic;font-size:28px;padding:6px 22px">Mark</span><span style="font-family:'Instrument Serif';font-style:italic;font-size:28px;padding:6px 22px">Arrange</span>
+            </div>
+            <div style="display:flex;padding:3px;gap:2px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:8px;font-size:13px"><span style="padding:6px 14px">100%</span><span style="padding:6px 14px">125%</span><span style="padding:6px 14px;border-radius:6px;background:#8a3a1c;color:#fbf7ec">150%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5m Batch library -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5m</span><span style="font-size:15px">Batch actions in the Library · table view</span></div>
+        <div id="5m" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;padding:20px 24px;display:flex;flex-direction:column;gap:10px;position:relative">
+          <div style="display:flex;align-items:baseline;gap:12px"><span style="font-family:'Instrument Serif';font-size:30px">Library</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25">D:\Records · Clinical</span><span style="margin-left:auto;display:flex;gap:4px"><span style="display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono';font-size:12px;color:#8a3a1c;background:rgba(138,58,28,.12);border:0.5px solid #8a3a1c;border-radius:7px;padding:5px 11px"><lp-i name="menu" size="13"></lp-i>Table</span><span style="display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono';font-size:12px;background:#e8dcc4;border:0.5px solid #d9cdb4;border-radius:7px;padding:5px 11px"><lp-i name="library" size="13"></lp-i>Shelf</span></span></div>
+          <div style="display:grid;grid-template-columns:26px minmax(0,1.6fr) minmax(0,1.2fr) 56px 64px 70px;gap:12px;padding:0 8px 8px;border-bottom:0.5px solid #d9cdb4;font-family:'IBM Plex Mono';font-size:10px;letter-spacing:.08em;color:#8a7c64"><span></span><span>name</span><span>tags</span><span style="text-align:right">pages</span><span style="text-align:right">size</span><span style="text-align:right">updated</span></div>
+          <sc-for list="{{ libRows }}" as="lr" hint-placeholder-count="9"><div style="display:grid;grid-template-columns:26px minmax(0,1.6fr) minmax(0,1.2fr) 56px 64px 70px;gap:12px;align-items:center;padding:7px 8px;border-bottom:0.5px solid #d9cdb4;background:{{ lr.bg }}"><span style="width:15px;height:15px;border-radius:3px;border:1px solid {{ lr.cb }};background:{{ lr.cf }};display:flex;align-items:center;justify-content:center;color:#fff"><lp-i name="check" size="10" sw="2.6"></lp-i></span><span style="display:flex;flex-direction:column;min-width:0"><span style="display:flex;align-items:center;gap:7px;font-size:13px"><span style="display:flex;color:#8a3a1c"><lp-i name="file-pdf" size="14"></lp-i></span>{{ lr.n }}</span><span style="font-family:'IBM Plex Mono';font-size:10px;color:#8a7c64">{{ lr.p }}</span></span><span style="display:flex;gap:4px"><span style="display:inline-flex;align-items:center;gap:5px;font-family:'IBM Plex Mono';font-size:10px;padding:2px 7px;border-radius:20px;border:0.5px solid #c4b497;background:#fbf7ec"><span style="width:7px;height:7px;border-radius:50%;background:#b0577f"></span>Clinical</span></span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64;text-align:right">{{ lr.pg }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64;text-align:right">{{ lr.sz }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64;text-align:right">{{ lr.u }}</span></div></sc-for>
+          <div style="position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;gap:2px;padding:5px 6px 5px 14px;background:#1a1310;border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.28);color:#f2ead6;font-size:12.5px;white-space:nowrap">
+            <span style="font-family:'IBM Plex Mono';font-size:11px;margin-right:8px">5 selected · 48 MB</span>
+            <sc-for list="{{ batch }}" as="bt"><span style="display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:7px;background:{{ bt.bg }}"><lp-i name="{{ bt.i }}" size="15"></lp-i>{{ bt.l }}</span></sc-for>
+          </div>
+          <div style="position:absolute;right:120px;bottom:70px;width:340px;padding:14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:10px;box-shadow:0 18px 44px rgba(0,0,0,.22);display:flex;flex-direction:column;gap:8px;font-size:12.5px">
+            <span style="font-family:'Instrument Serif';font-size:19px">Rename 5 files</span>
+            <span style="height:32px;display:flex;align-items:center;padding:0 10px;border:0.5px solid #8a3a1c;border-radius:6px;background:#fff;font-family:'IBM Plex Mono';font-size:11.5px">{category}-{mrn}-{date}</span>
+            <span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#3a2f25;line-height:1.6">discharge-summary.pdf → <b>Clinical-00418-2026-10-09.pdf</b><br>lab-report-meena-r.pdf → <b>Clinical-00418-2026-10-08.pdf</b></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5n Autosave -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5n</span><span style="font-size:15px">Autosave and crash recovery · Home</span></div>
+        <div id="5n" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:#f2ead6;display:flex;flex-direction:column">
+          <div style="flex:1;padding:40px 48px;display:flex;flex-direction:column;gap:22px">
+            <span style="font-family:'Instrument Serif';font-size:44px;line-height:1">Welcome back, Arun.</span>
+            <div style="display:flex;flex-direction:column;gap:14px;padding:20px 22px;background:#fbf7ec;border:1px solid #c47416;border-radius:12px;box-shadow:0 10px 30px rgba(196,116,22,.12)">
+              <div style="display:flex;align-items:center;gap:10px"><span style="display:flex;color:#c47416"><lp-i name="refresh" size="20"></lp-i></span><span style="font-family:'Instrument Serif';font-size:24px">Chuvadi closed unexpectedly. Your work was kept.</span></div>
+              <sc-for list="{{ recover }}" as="rv" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:0.5px solid #d9cdb4;border-radius:8px;background:#fff"><span style="display:flex;color:#8a3a1c"><lp-i name="{{ rv.i }}" size="18"></lp-i></span><div style="display:flex;flex-direction:column;flex:1"><span style="font-size:14px">{{ rv.n }}</span><span style="font-size:12px;color:#3a2f25">{{ rv.d }}</span></div><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">saved {{ rv.t }}</span><span style="width:18px;height:18px;border-radius:4px;background:#8a3a1c;color:#fff;display:flex;align-items:center;justify-content:center"><lp-i name="check" size="11" sw="2.6"></lp-i></span></div></sc-for>
+              <div style="display:flex;gap:10px"><span style="height:38px;padding:0 18px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;gap:8px;font-weight:500"><lp-i name="refresh" size="15"></lp-i>Restore all three</span><span style="height:38px;padding:0 16px;border-radius:7px;border:0.5px solid #c4b497;display:flex;align-items:center">Discard</span><span style="margin-left:auto;align-self:center;font-size:12px;color:#8a7c64">Kept on this device for 7 days</span></div>
+            </div>
+          </div>
+          <div style="height:30px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;background:#fbf7ec;border-top:0.5px solid #c4b497;font-family:'IBM Plex Mono';font-size:11px;color:#3a2f25"><span style="display:flex;align-items:center;gap:7px"><span style="width:8px;height:8px;border-radius:50%;background:#6b7a3e"></span>offline · on this device</span><span style="width:0.5px;height:14px;background:#c4b497"></span><span style="display:flex;align-items:center;gap:6px;color:#6b7a3e"><lp-i name="check" size="12"></lp-i>autosaved 18:39</span><span style="margin-left:auto;font-weight:500">18:40:12</span></div>
+        </div>
+      </div>
+
+      <!-- 5o Properties -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#1a1310;color:#fbf7ec">5o</span><span style="font-size:15px">Edit document properties · Doc menu › Properties</span></div>
+        <div id="5o" style="width:1000px;height:620px;border-radius:10px;overflow:hidden;box-shadow:0 24px 60px rgba(26,19,16,.22),0 0 0 0.5px #c4b497;background:rgba(26,19,16,.32);display:flex;align-items:center;justify-content:center">
+          <div style="width:640px;background:#fbf7ec;border-radius:12px;box-shadow:0 30px 70px rgba(0,0,0,.35);padding:22px 26px;display:flex;flex-direction:column;gap:14px;font-size:13px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between"><span style="font-family:'Instrument Serif';font-size:26px">Properties</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">discharge-summary.pdf</span></div>
+            <div style="display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px 14px;align-items:center">
+              <sc-for list="{{ props }}" as="pr"><span style="color:#8a7c64">{{ pr.k }}</span><span style="min-height:32px;display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:0 10px;border:{{ pr.bd }};border-radius:6px;background:{{ pr.bg }};font-family:{{ pr.ff }}">{{ pr.v }}</span></sc-for>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;padding-top:6px;border-top:0.5px solid #d9cdb4"><span style="font-size:12px;color:#8a7c64">Read-only: pages, size, PDF version, producer, encryption, tagged</span><span style="margin-left:auto;height:34px;padding:0 14px;border:0.5px solid #c4b497;border-radius:7px;display:flex;align-items:center">Cancel</span><span style="height:34px;padding:0 14px;border-radius:7px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-weight:500">Save to a copy</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const formFields = [
+      { label: 'Patient name', req: ' *', v: 'Meena Rajendran', bg: 'rgba(80,120,200,.06)', o: 'none' },
+      { label: 'MRN', req: ' *', v: '00418-22-7731', bg: 'rgba(80,120,200,.06)', o: 'none' },
+      { label: 'Procedure', req: ' *', v: 'Port removal, left chest', bg: 'rgba(80,120,200,.06)', o: '2px solid #8a3a1c' },
+      { label: 'Date', req: '', v: '', bg: 'rgba(80,120,200,.12)', o: '1px solid #8aa4d6' },
+      { label: 'Anaesthetist', req: '', v: '', bg: 'rgba(80,120,200,.12)', o: '1px solid #8aa4d6' },
+    ];
+    const formList = [['check-circle', 'Patient name', 1], ['check-circle', 'MRN', 1], ['edit', 'Procedure', 2], ['check-circle', 'Anaesthesia type', 1], ['calendar', 'Date', 0], ['user', 'Anaesthetist', 0], ['signature', 'Signature', 0, 1]]
+      .map(([icon, label, st, req]) => ({ icon, label, req: req ? 'required' : '', c: st === 1 ? '#6b7a3e' : st === 2 ? '#8a3a1c' : '#8a7c64', bg: st === 2 ? 'rgba(138,58,28,.12)' : 'transparent' }));
+    const printPages = [{ l: 'p 1', op: 1 }, { l: 'p 2', op: 1 }, { l: 'p 3', op: 1 }, { l: 'p 8', op: 1 }];
+    const printRows = [{ l: 'Printer', v: 'Ward 4 — LaserJet (last used)' }, { l: 'Pages', v: '1-3, 8' }, { l: 'Copies', v: '1' }, { l: 'Sides', v: 'Two-sided, long edge' }, { l: 'Colour', v: 'Black & white' }, { l: 'Include', v: 'Page + marks + stamps' }];
+    const kioskTiles = [
+      { icon: 'barcode-scan', t: 'Scan your token', d: 'Hold the slip under the reader to see your report.', bg: '#7a240c', fg: '#ffffff' },
+      { icon: 'file-pdf', t: 'Open a document', d: 'From the Ward 4 folder only.', bg: '#ffffff', fg: '#000' },
+      { icon: 'print', t: 'Print a copy', d: 'Up to 10 pages per visit.', bg: '#ffffff', fg: '#000' },
+    ];
+    const roles = [['Viewer', '#3a2f25'], ['Clerk', '#3a2f25'], ['Records', '#8a3a1c'], ['Admin', '#3a2f25']].map(([n, c]) => ({ n, c }));
+    const Y = { i: 'check', c: '#6b7a3e' }, N = { i: 'minus', c: '#c4b497' };
+    const perms = [['Read & print', [Y, Y, Y, Y]], ['Mark & sign', [N, Y, Y, Y]], ['Arrange & bind', [N, Y, Y, Y]], ['Redact', [N, N, Y, Y]], ['Password & certificates', [N, N, Y, Y]], ['Kiosk & settings', [N, N, N, Y]], ['See audit trail', [N, N, Y, Y]]].map(([l, v]) => ({ l, v }));
+    const audit = [['18:39', 'Arun S.', 'Redacted', '2 boxes, 15 matches → discharge-summary (redacted).pdf', '#1a1310'], ['18:31', 'Dr A. Shiva', 'Signed', 'discharge-summary.pdf with a certificate', '#6b7a3e'], ['18:12', 'Arun S.', 'Bound', 'Desk 2 · referral pack → referral-pack.pdf (5 pp)', '#8a3a1c'], ['17:58', 'Priya R.', 'Printed', 'lab-report-meena-r.pdf · 3 pages · Ward 4', '#3a2f25'], ['17:40', 'Kiosk W4', 'Opened', 'bed-census.xlsx (read-only)', '#3a2f25'], ['17:22', 'Arun S.', 'Protected', 'consent-form-signed.pdf with a password', '#8a3a1c'], ['16:05', 'Admin', 'Changed role', 'Priya R. → Clerk', '#c47416']].map(([t, u, a, d, c]) => ({ t, u, a, d, c }));
+    const ocrLines = ['Patient: MEENA RAJENDRAN      MRN 00418-22-7731', 'Sample: Blood (EDTA)          Collected 08-10-2026 07:40', 'Haemoglobin           11.2   g/dL    (12.0 – 15.5)', 'Total WBC count       5,400  /µL     (4,000 – 11,000)', 'Neutrophils           62     %', 'Platelets             2.1    lakh/µL', 'Serum creatinine      0.8    mg/dL', 'SGPT (ALT)            34     U/L', 'Remarks: Mild anaemia. Fit for cycle 3.', 'Pathologist: Dr K. Lakshmi'].map((t, i) => ({ t, done: i < 4 }));
+    const allow = [['Printing', 1], ['Copying text', 0], ['Editing and marks', 0], ['Filling forms', 1]].map(([l, on]) => ({ l, bg: on ? '#8a3a1c' : '#d9cdb4', x: on ? '16px' : '2px' }));
+    const L = (t, k) => ({ t, bg: k === '+' ? 'rgba(93,122,58,.14)' : k === '-' ? 'rgba(168,58,42,.10)' : k === '~' ? 'rgba(196,116,22,.14)' : 'transparent', td: k === '-' ? 'line-through' : 'none', bd: k === '+' ? '#5d7a3a' : k === '-' ? '#a83a2a' : k === '~' ? '#c47416' : 'transparent' });
+    const cmpCols = [
+      { lines: [L('Inspect the site every shift.'), L('Transparent dressings are changed every five days.', '-'), L('Flush the line with 10 mL saline before and after each use.'), L('Document the score on the phlebitis chart.', '~'), L('Report redness to the ward nurse.', '-')] },
+      { lines: [L('Inspect the site every shift.'), L('Transparent dressings are changed every seven days, or sooner if damp, loose or soiled.', '+'), L('Flush the line with 10 mL saline before and after each use.'), L('Document the score on the visual infusion phlebitis (VIP) chart.', '~'), L('Escalate a VIP score of 2 or more to the IV team within 1 hour.', '+')] },
+    ];
+    const cmpList = [['−', 'Dressing every five days', '#a83a2a', 'rgba(168,58,42,.08)', 3], ['+', 'Dressing every seven days, or sooner…', '#5d7a3a', 'rgba(93,122,58,.10)', 3], ['~', 'Phlebitis chart → VIP chart', '#c47416', 'rgba(196,116,22,.10)', 3], ['−', 'Report redness to the ward nurse', '#a83a2a', 'transparent', 3], ['+', 'Escalate VIP ≥ 2 to the IV team', '#5d7a3a', 'transparent', 3], ['+', 'New section 3.3 · Line access', '#5d7a3a', 'transparent', 4]].map(([s, t, c, bg, p]) => ({ s, t, c, bg, p }));
+    const attach = [{ i: 'file-pdf', c: '#8a3a1c', n: 'lab-report-08-10.pdf', m: '3 pages · 220 KB' }, { i: 'file-image', c: '#6b7a3e', n: 'port-site-photo.jpg', m: '1.1 MB' }, { i: 'file-excel', c: '#6b7a3e', n: 'chemo-schedule.xlsx', m: '18 KB' }];
+    const taModes = [['படி', 'Read', 1], ['குறி', 'Mark'], ['அடுக்கு', 'Arrange'], ['காப்பு', 'Protect']].map(([ta, en, on]) => ({ ta, en, bg: on ? '#fbf7ec' : 'transparent', fg: on ? '#8a3a1c' : '#3a2f25' }));
+    const langs = [['English', 'English', 0], ['தமிழ்', 'Tamil', 1], ['हिन्दी', 'Hindi', 0], ['മലയാളം', 'Malayalam', 0], ['తెలుగు', 'Telugu', 0]].map(([n, e, on]) => ({ n, e, bd: on ? '#8a3a1c' : '#d9cdb4', bg: on ? 'rgba(138,58,28,.10)' : '#fff' }));
+    const libRows = [['discharge-summary.pdf', 1, '12', '1.4 MB', '12 min'], ['lab-report-meena-r.pdf', 1, '3', '220 KB', '2 h'], ['consent-form-signed.pdf', 1, '2', '410 KB', '1 d'], ['radiology-chest.pdf', 0, '4', '8.2 MB', '2 d'], ['referral-redhills.pdf', 1, '5', '640 KB', '3 d'], ['ot-notes-s21.pdf', 1, '6', '1.9 MB', '4 d'], ['nursing-handover-oct.pdf', 0, '22', '3.1 MB', '5 d'], ['icu-flow-sheet.pdf', 0, '30', '12 MB', '6 d'], ['pathology-biopsy.pdf', 0, '7', '900 KB', '1 w']]
+      .map(([n, sel, pg, sz, u]) => ({ n, p: 'D:\\Records\\Clinical\\' + n, pg, sz, u, bg: sel ? 'rgba(138,58,28,.10)' : 'transparent', cb: sel ? '#8a3a1c' : '#c4b497', cf: sel ? '#8a3a1c' : '#fff' }));
+    const batch = [['compress', 'Press', 0], ['file-pdf', 'Convert', 0], ['watermark', 'Watermark', 0], ['edit', 'Rename…', 1], ['tag', 'Tag', 0], ['doc-merge', 'Combine', 0]].map(([i, l, on]) => ({ i, l, bg: on ? '#3a2f25' : 'transparent' }));
+    const recover = [{ i: 'edit', n: 'discharge-summary.pdf', d: 'Mark · 2 marks, 1 signature, not yet saved', t: '18:39' }, { i: 'grid-view', n: 'Arrange session', d: '3 desks · 20 pages from 3 files', t: '18:38' }, { i: 'redact', n: 'consent-form.pdf', d: 'Protect · 4 redaction boxes', t: '18:21' }];
+    const ed = (k, v) => ({ k, v, bd: '0.5px solid #c4b497', bg: '#fff', ff: "'LiPi Sans'" }), ro = (k, v) => ({ k, v, bd: '0.5px solid transparent', bg: '#f2ead6', ff: "'IBM Plex Mono'" });
+    const props = [ed('Title', 'Discharge Summary — Meena R.'), ed('Author', 'Dr A. Shiva'), ed('Subject', 'Medical Oncology · cycle 3'), ed('Keywords', 'discharge, oncology, AC chemo'), ro('Created', '09-10-2026 14:02'), ro('Modified', '14-10-2026 18:39'), ro('Producer', 'chuvadi-pdf 3.17.1'), ro('Pages · size', '12 · 1.4 MB · PDF 1.7 · tagged')];
+    return { formFields, formList, printPages, printRows, kioskTiles, roles, perms, audit, ocrLines, allow, cmpCols, cmpList, attach, taModes, langs, libRows, batch, recover, props };
+  }
+}
+</script>
+</body>
+</html>

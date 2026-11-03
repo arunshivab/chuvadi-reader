@@ -1,0 +1,27 @@
+@*
+    Floating settings card in the right gutter beside the Tools rail (replaces the old
+    296 px margin panel). Never covers the page centre.
+*@
+<section class="fcard @Class" style="@(Width is null ? null : $"width:{Width}px")">
+    <header class="fcard-h">
+        <span class="fcard-t">@Title</span>
+        @if (Meta is not null)
+        {
+            <span class="fcard-m">@Meta</span>
+        }
+        @if (OnClose.HasDelegate)
+        {
+            <button class="fcard-x" @onclick="OnClose" aria-label="Close"><Icon Name="x" Size="13" /></button>
+        }
+    </header>
+    @ChildContent
+</section>
+
+@code {
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string? Meta { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public int? Width { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

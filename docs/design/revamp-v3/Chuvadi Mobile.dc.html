@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<script src="lipicons.js"></script>
+<style>
+@font-face{font-family:"LiPi Sans";font-weight:100 900;src:url("fonts/LiPi-Sans-Latin.woff2") format("woff2-variations");}
+@font-face{font-family:"Instrument Serif";font-style:italic;src:url("fonts/InstrumentSerif-Italic.woff2") format("woff2");}
+@font-face{font-family:"Instrument Serif";font-style:normal;src:url("fonts/InstrumentSerif.woff2") format("woff2");}
+@font-face{font-family:"IBM Plex Mono";font-weight:400;src:url("fonts/PlexMono-400.woff2") format("woff2");}
+@font-face{font-family:"Tiro Tamil";src:url("fonts/TiroTamil.woff2") format("woff2");}
+@font-face{font-family:"Fraunces";src:url("fonts/Fraunces.woff2") format("woff2");}
+html,body{margin:0;background:#e6dcc8;color:#1a1310;font-family:"LiPi Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+*{box-sizing:border-box;}
+a{color:#8a3a1c;} a:hover{color:#c47416;}
+</style>
+</helmet>
+
+<section id="turn-m" style="padding:72px;display:flex;flex-direction:column;gap:40px">
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:1100px">
+    <div style="font-family:'IBM Plex Mono';font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#8a3a1c">Phone · tablet</div>
+    <h1 style="margin:0;font-family:'Instrument Serif';font-style:italic;font-weight:400;font-size:52px;line-height:1.02">The four verbs move to your thumb.</h1>
+    <p style="margin:0;font-family:Fraunces;font-size:16px;line-height:1.6;color:#3a2f25;text-wrap:pretty">On a phone the modes become a bottom bar, the right margin becomes a bottom sheet, and the page ribbon becomes a swipe-up strip. Desks stack vertically and scroll sideways, so you can still drag a page from one desk to another. A tablet keeps the desktop layout, with the panels set to touch sizes (44 px targets).</p>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start">
+    <sc-for list="{{ phones }}" as="ph" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;gap:10px;width:390px">
+        <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">{{ ph.id }}</span><span style="font-size:14px">{{ ph.label }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start;margin-top:-30px">
+    <!-- 4a Home -->
+    <div id="4a" style="width:390px;height:844px;border-radius:44px;overflow:hidden;background:#f2ead6;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+      <div style="height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:15px;font-weight:600"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="16"></lp-i><lp-i name="battery" size="18"></lp-i></span></div>
+      <div style="flex:1;min-height:0;overflow:hidden;padding:8px 20px 0;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-family:'Instrument Serif';font-style:italic;font-size:24px">C<span style="font-family:'Tiro Tamil';font-style:normal;color:#8a3a1c">ச</span>huvadi</span><span style="width:34px;height:34px;border-radius:50%;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono';font-size:12px">AS</span></div>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font-family:'Instrument Serif';font-size:34px;line-height:1.05">Good evening, Arun. <span style="font-family:'Tiro Tamil';font-size:26px;color:#8a3a1c">வணக்கம்.</span></span><span style="font-family:Fraunces;font-size:13px;color:#3a2f25">214 documents · nothing leaves this phone.</span></div>
+        <div style="display:flex;align-items:center;gap:10px;height:46px;padding:0 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px;color:#8a7c64;font-size:15px"><lp-i name="search" size="18"></lp-i>Find or do anything…</div>
+        <div style="display:flex;flex-direction:column;gap:10px"><span style="font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8a7c64">Pick up where you left off</span>
+          <div style="display:flex;gap:12px;overflow:hidden">
+            <sc-for list="{{ resume }}" as="r" hint-placeholder-count="2">
+              <div style="width:220px;flex:none;display:flex;gap:12px;padding:12px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:12px">
+                <div style="width:48px;height:66px;flex:none;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.15);border-top:3px solid {{ r.dot }}"></div>
+                <div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span style="font-family:'IBM Plex Mono';font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span><span style="font-size:12px;color:#3a2f25">{{ r.where }}</span><span style="margin-top:auto;font-family:'Instrument Serif';font-style:italic;font-size:17px;color:#8a3a1c">{{ r.mode }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column"><span style="font-family:'IBM Plex Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8a7c64;margin-bottom:4px">Recent</span>
+          <sc-for list="{{ recents }}" as="rc" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:12px;height:52px;border-bottom:0.5px solid #d9cdb4;font-size:14.5px"><span style="display:flex;color:{{ rc.c }}"><lp-i name="{{ rc.icon }}" size="20"></lp-i></span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ rc.name }}</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">{{ rc.when }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="position:absolute;right:20px;bottom:104px;height:56px;padding:0 22px;border-radius:28px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:500;box-shadow:0 10px 24px rgba(138,58,28,.35)"><lp-i name="plus" size="18"></lp-i>Open</div>
+      <div style="height:84px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:8px 8px 26px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+        <sc-for list="{{ homeNav }}" as="hn" hint-placeholder-count="4">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:{{ hn.fg }};font-size:11px"><lp-i name="{{ hn.icon }}" size="22"></lp-i>{{ hn.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+
+    <!-- 4b Read -->
+    <div id="4b" style="width:390px;height:844px;border-radius:44px;overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+      <div style="height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:15px;font-weight:600;background:#f2ead6"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="16"></lp-i><lp-i name="battery" size="18"></lp-i></span></div>
+      <div style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="22"></lp-i></span><span style="flex:1;min-width:0;display:flex;flex-direction:column"><span style="font-family:'Instrument Serif';font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Discharge summary — Meena R.</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">12 pages · 1 of 4 tabs</span></span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="search" size="20"></lp-i></span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="more-vertical" size="20"></lp-i></span></div>
+      <div style="flex:1;min-height:0;position:relative;overflow:hidden;display:flex;justify-content:center;padding-top:14px">
+        <div style="width:362px;height:512px;flex:none;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);padding:30px 26px;font-size:7.4px;line-height:1.5;color:#1b1b1b">
+          <div style="border-bottom:1px solid #1b1b1b;padding-bottom:6px"><div style="font-size:6px;letter-spacing:.12em;color:#555">SRI MEENAKSHI HOSPITAL · MADURAI</div><div style="font-size:13px;font-weight:600">Discharge Summary</div></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 10px;margin:10px 0 12px"><div><div style="color:#777;font-size:6px">Patient</div>Meena Rajendran</div><div><div style="color:#777;font-size:6px">MRN</div>00418-22-7731</div><div><div style="color:#777;font-size:6px">Age / Sex</div>54 / F</div></div>
+          <div style="font-weight:600;font-size:8px;margin-bottom:3px">Diagnosis</div><p style="margin:0 0 9px">Carcinoma of the left breast, stage IIA (T2 N0 M0), ER/PR positive, HER2 negative. Post left modified radical mastectomy, cycle 3 of adjuvant chemotherapy.</p>
+          <div style="font-weight:600;font-size:8px;margin-bottom:3px">Course in hospital</div><p style="margin:0 0 9px">Admitted for cycle 3 of AC chemotherapy. Pre-treatment counts were within range. Treatment was tolerated well with grade 1 nausea managed with ondansetron. No febrile episodes. Reviewed by the Oncology nurse specialist on day 4.</p>
+          <div style="font-weight:600;font-size:8px;margin-bottom:3px">Medication on discharge</div><div style="height:46px;background:#f4f1ea"></div>
+        </div>
+        <div style="position:absolute;left:50%;bottom:92px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;background:#fbf7ec;border:0.5px solid #c4b497;border-radius:20px;box-shadow:0 8px 20px rgba(0,0,0,.16);font-family:'IBM Plex Mono';font-size:12px"><span>1 / 12</span><span style="width:0.5px;height:18px;background:#c4b497"></span><span>Fit width</span><span style="width:0.5px;height:18px;background:#c4b497"></span><lp-i name="loupe" size="16"></lp-i></div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:#f2ead6;border-top:0.5px solid #c4b497;border-radius:18px 18px 0 0;display:flex;flex-direction:column;align-items:center;padding-top:6px;gap:6px">
+          <span style="width:36px;height:4px;border-radius:2px;background:#c4b497"></span>
+          <div style="display:flex;gap:8px;padding:0 12px;overflow:hidden;width:100%"><sc-for list="{{ strip }}" as="st" hint-placeholder-count="7"><div style="width:36px;height:50px;flex:none;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);outline:{{ st.o }};outline-offset:2px"></div></sc-for></div>
+        </div>
+      </div>
+      <div style="height:84px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 26px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+        <sc-for list="{{ modesRead }}" as="m" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ m.fg }}"><lp-i name="{{ m.icon }}" size="20"></lp-i><span style="font-family:'Instrument Serif';font-style:italic;font-size:16px">{{ m.label }}</span></div></sc-for>
+      </div>
+    </div>
+
+    <!-- 4c Mark -->
+    <div id="4c" style="width:390px;height:844px;border-radius:44px;overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+      <div style="height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:15px;font-weight:600;background:#f2ead6"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="16"></lp-i><lp-i name="battery" size="18"></lp-i></span></div>
+      <div style="height:52px;flex:none;display:flex;align-items:center;gap:6px;padding:0 12px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="undo" size="20"></lp-i></span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="redo" size="20"></lp-i></span><span style="flex:1;text-align:center;font-family:'IBM Plex Mono';font-size:11px;color:#c47416">2 unsaved</span><span style="height:36px;padding:0 14px;border-radius:8px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;font-size:14px;font-weight:500">Save as new</span></div>
+      <div style="flex:1;min-height:0;position:relative;overflow:hidden;display:flex;justify-content:center;padding-top:14px">
+        <div style="position:relative;width:362px;height:512px;flex:none;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);padding:30px 26px;font-size:7.4px;line-height:1.5;color:#1b1b1b">
+          <div style="border-bottom:1px solid #1b1b1b;padding-bottom:6px"><div style="font-size:13px;font-weight:600">Discharge Summary</div></div>
+          <p style="margin:10px 0 9px">Carcinoma of the left breast, stage IIA (T2 N0 M0), ER/PR positive, HER2 negative. Post left modified radical mastectomy, cycle 3 of adjuvant chemotherapy.</p>
+          <p style="margin:0 0 9px">Admitted for cycle 3 of AC chemotherapy. <span style="background:rgba(196,116,22,.35)">Treatment was tolerated well with grade 1 nausea</span> managed with ondansetron.</p>
+          <div style="position:absolute;left:26px;top:150px;width:200px;padding:6px 8px;outline:1.5px dashed #8a3a1c;font-family:Helvetica,Arial;font-size:11px;color:#1f3b73">Reviewed and approved for discharge.</div>
+          <div style="position:absolute;left:220px;top:196px;font-family:'Instrument Serif';font-style:italic;font-size:22px;color:#1f3b73;transform:rotate(-4deg)">A. Shiva</div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;background:#fbf7ec;border-top:0.5px solid #c4b497;border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);padding:8px 18px 14px;display:flex;flex-direction:column;gap:12px">
+          <span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#c4b497"></span>
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Instrument Serif';font-size:20px">Text box</span><span style="font-size:13px;color:#a83a2a">Delete</span></div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);padding:3px;gap:2px;background:#e8dcc4;border-radius:9px;font-size:13px"><span style="height:38px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:#fbf7ec;color:#8a3a1c">Helvetica</span><span style="height:38px;display:flex;align-items:center;justify-content:center">Times</span><span style="height:38px;display:flex;align-items:center;justify-content:center">Courier</span></div>
+          <div style="display:flex;gap:10px;align-items:center"><span style="width:44px;height:44px;border:0.5px solid #c4b497;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:700">B</span><span style="width:44px;height:44px;border:0.5px solid #c4b497;border-radius:9px;display:flex;align-items:center;justify-content:center;font-style:italic;font-family:Georgia">I</span><span style="flex:1;height:44px;border:0.5px solid #c4b497;border-radius:9px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-family:'IBM Plex Mono'">−<span>13 pt</span>+</span><span style="width:30px;height:30px;border-radius:50%;background:#1f3b73;outline:2px solid #8a3a1c;outline-offset:2px"></span></div>
+        </div>
+      </div>
+      <div style="height:64px;flex:none;display:flex;align-items:center;gap:4px;padding:0 10px;background:#f2ead6;border-top:0.5px solid #d9cdb4;overflow:hidden">
+        <sc-for list="{{ tools }}" as="tl" hint-placeholder-count="8"><div style="width:52px;height:48px;flex:none;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:{{ tl.bg }};color:{{ tl.fg }};font-size:10px"><lp-i name="{{ tl.icon }}" size="19"></lp-i>{{ tl.label }}</div></sc-for>
+      </div>
+      <div style="height:84px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 26px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+        <sc-for list="{{ modesMark }}" as="m" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ m.fg }}"><lp-i name="{{ m.icon }}" size="20"></lp-i><span style="font-family:'Instrument Serif';font-style:italic;font-size:16px">{{ m.label }}</span></div></sc-for>
+      </div>
+    </div>
+
+    <!-- 4d Arrange -->
+    <div id="4d" style="width:390px;height:844px;border-radius:44px;overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+      <div style="height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:15px;font-weight:600;background:#f2ead6"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="16"></lp-i><lp-i name="battery" size="18"></lp-i></span></div>
+      <div style="height:52px;flex:none;display:flex;align-items:center;gap:6px;padding:0 12px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="shelf" size="20"></lp-i></span><span style="font-family:'Instrument Serif';font-size:19px;flex:1">3 desks · 20 pages</span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="undo" size="20"></lp-i></span><span style="height:36px;padding:0 14px;border-radius:8px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500"><lp-i name="doc-merge" size="16"></lp-i>Bind all</span></div>
+      <div style="flex:1;min-height:0;overflow:hidden;padding:14px 0;display:flex;flex-direction:column;gap:14px">
+        <sc-for list="{{ desks }}" as="dk" hint-placeholder-count="3">
+          <div style="margin:0 14px;background:#fbf7ec;border:0.5px solid {{ dk.bd }};border-top:3px solid {{ dk.dot }};border-radius:12px;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px;height:46px;padding:0 6px 0 14px"><span style="font-family:'Instrument Serif';font-size:17px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ dk.name }}</span><span style="font-family:'IBM Plex Mono';font-size:10.5px;color:#8a7c64">{{ dk.count }}</span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="more-horizontal" size="18"></lp-i></span></div>
+            <div style="display:flex;gap:10px;padding:4px 14px 14px;overflow:hidden">
+              <sc-for list="{{ dk.pages }}" as="pg"><div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:none"><div style="width:60px;height:84px;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.16);border-top:3px solid {{ pg.dot }};outline:{{ pg.o }};outline-offset:3px;opacity:{{ pg.op }}"></div><span style="font-family:'IBM Plex Mono';font-size:10px;color:#3a2f25">{{ pg.l }}</span></div></sc-for>
+            </div>
+          </div>
+        </sc-for>
+        <div style="margin:0 14px;height:56px;border:1px dashed #c4b497;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;color:#3a2f25"><lp-i name="plus" size="16"></lp-i>New desk</div>
+      </div>
+      <div style="position:absolute;left:150px;top:268px;transform:rotate(-6deg);display:flex;flex-direction:column;align-items:center;gap:4px;z-index:3"><div style="width:66px;height:92px;background:#fff;box-shadow:0 16px 30px rgba(0,0,0,.32);outline:2px solid #8a3a1c;outline-offset:3px;border-top:3px solid #8a3a1c"></div><span style="font-family:'IBM Plex Mono';font-size:10px;background:#1a1310;color:#fbf7ec;padding:2px 6px;border-radius:4px">long-press · drag</span></div>
+      <div style="height:84px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 26px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+        <sc-for list="{{ modesArr }}" as="m" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ m.fg }}"><lp-i name="{{ m.icon }}" size="20"></lp-i><span style="font-family:'Instrument Serif';font-style:italic;font-size:16px">{{ m.label }}</span></div></sc-for>
+      </div>
+    </div>
+
+    <!-- 4e Protect -->
+    <div id="4e" style="width:390px;height:844px;border-radius:44px;overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+      <div style="height:47px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font-size:15px;font-weight:600;background:#f2ead6"><span>18:40</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="16"></lp-i><lp-i name="battery" size="18"></lp-i></span></div>
+      <div style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;background:#f2ead6;border-bottom:0.5px solid #d9cdb4"><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="chevron-left" size="22"></lp-i></span><span style="flex:1;font-family:'Instrument Serif';font-size:18px">Redact</span><span style="height:36px;padding:0 14px;border-radius:8px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;font-size:14px;font-weight:500">Save copy</span></div>
+      <div style="flex:1;min-height:0;position:relative;overflow:hidden;display:flex;justify-content:center;padding-top:14px">
+        <div style="width:362px;height:512px;flex:none;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);padding:30px 26px;font-size:7.4px;line-height:1.5;color:#1b1b1b">
+          <div style="border-bottom:1px solid #1b1b1b;padding-bottom:6px;display:flex;justify-content:space-between;align-items:flex-end"><div style="font-size:13px;font-weight:600">Discharge Summary</div><span style="font-size:6.5px">Department of Medical <span style="background:rgba(196,116,22,.35);outline:1px solid #c47416">Oncology</span></span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px 10px;margin:10px 0 12px"><div><div style="color:#777;font-size:6px">Patient</div><span style="background:#111;color:#111">Meena Rajendran</span></div><div><div style="color:#777;font-size:6px">MRN</div><span style="background:#111;color:#111">00418-22-7731</span></div><div><div style="color:#777;font-size:6px">Age / Sex</div>54 / F</div></div>
+          <p style="margin:0 0 9px">Reviewed by the <span style="background:rgba(196,116,22,.35);outline:1px solid #c47416">Oncology</span> nurse specialist on day 4 regarding line care and diet.</p>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;height:300px;background:#fbf7ec;border-top:0.5px solid #c4b497;border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.12);padding:8px 18px;display:flex;flex-direction:column;gap:10px">
+          <span style="align-self:center;width:36px;height:4px;border-radius:2px;background:#c4b497"></span>
+          <div style="display:flex;gap:18px;font-size:14.5px"><span style="padding-bottom:8px;border-bottom:2px solid #1a1310;font-weight:500">Redact</span><span style="color:#8a7c64">Stamp</span><span style="color:#8a7c64">Flatten</span><span style="color:#8a7c64">Password</span></div>
+          <div style="display:flex;align-items:center;gap:8px;height:44px;padding:0 12px;border:0.5px solid #8a3a1c;border-radius:10px;background:#fff;font-size:15px"><lp-i name="search" size="16"></lp-i><span style="flex:1">Oncology</span><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">16</span></div>
+          <sc-for list="{{ matches }}" as="mt" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;min-height:44px;border-bottom:0.5px solid #e8dcc4;font-size:13px"><span style="font-family:'IBM Plex Mono';font-size:11px;color:#8a7c64">p{{ mt.p }}</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#3a2f25">{{ mt.s }}</span><span style="width:32px;height:32px;border-radius:8px;background:#1a1310;color:#fbf7ec;display:flex;align-items:center;justify-content:center"><lp-i name="check" size="14"></lp-i></span></div></sc-for>
+        </div>
+      </div>
+      <div style="height:84px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 26px;background:#fbf7ec;border-top:0.5px solid #c4b497">
+        <sc-for list="{{ modesProt }}" as="m" hint-placeholder-count="4"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:{{ m.fg }}"><lp-i name="{{ m.icon }}" size="20"></lp-i><span style="font-family:'Instrument Serif';font-style:italic;font-size:16px">{{ m.label }}</span></div></sc-for>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Instrument Serif';font-size:36px">Tablet</span><span style="font-size:14px;color:#3a2f25">4f Mark with a pencil · 4g Arrange with two hands. Landscape, 1180 × 820.</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:40px">
+      <sc-for list="{{ tablets }}" as="tb" hint-placeholder-count="2">
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">{{ tb.id }}</span><span style="font-size:14px">{{ tb.label }}</span></div>
+          <div style="width:1180px;height:820px;border-radius:28px;overflow:hidden;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 12px #1a1310;background:#f2ead6;position:relative">
+            <div style="position:absolute;inset:0;transform:scale(.8194);transform-origin:0 0;width:1440px;height:1000px">
+              <dc-import name="Chuvadi App" start-mode="{{ tb.mode }}" desks-per-row="{{ tb.per }}" hint-size="1440px,900px"></dc-import>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px;margin-top:20px">
+      <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'Instrument Serif';font-size:36px">iOS and Android</span><span style="font-size:14px;color:#3a2f25">4h · 4i — same screen, each platform's own controls</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:40px;align-items:flex-start">
+        <sc-for list="{{ plats }}" as="pl" hint-placeholder-count="2">
+          <div style="display:flex;gap:24px;align-items:flex-start">
+            <div style="width:390px;height:844px;border-radius:{{ pl.radius }};overflow:hidden;background:#e8dcc4;box-shadow:0 30px 70px rgba(26,19,16,.28),0 0 0 8px #1a1310;display:flex;flex-direction:column;position:relative">
+              <div style="height:{{ pl.sbH }};flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-size:{{ pl.sbF }};font-weight:600;background:#f2ead6"><span>{{ pl.time }}</span><span style="display:flex;gap:6px"><lp-i name="wifi" size="15"></lp-i><lp-i name="battery" size="17"></lp-i></span></div>
+              <div style="flex:none;display:flex;flex-direction:column;gap:2px;padding:{{ pl.barPad }};background:#f2ead6;border-bottom:0.5px solid #d9cdb4">
+                <div style="display:flex;align-items:center;gap:6px;height:44px"><span style="display:flex;align-items:center;gap:2px;color:#8a3a1c;font-size:15px"><lp-i name="{{ pl.back }}" size="22"></lp-i>{{ pl.backLabel }}</span><span style="flex:1;font-size:{{ pl.titleF }};text-align:{{ pl.titleAlign }};font-weight:{{ pl.titleW }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pl.inlineTitle }}</span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="search" size="20"></lp-i></span><span style="display:flex;width:40px;height:40px;align-items:center;justify-content:center"><lp-i name="{{ pl.more }}" size="20"></lp-i></span></div>
+                <sc-if value="{{ pl.large }}" hint-placeholder-val="{{ false }}"><span style="font-family:'Instrument Serif';font-size:30px;line-height:1.1;padding:0 4px 8px">Discharge summary</span></sc-if>
+              </div>
+              <div style="flex:1;min-height:0;display:flex;justify-content:center;padding-top:14px;position:relative">
+                <div style="width:350px;height:495px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);padding:28px 24px;display:flex;flex-direction:column;gap:6px"><span style="height:9px;width:50%;background:#d4d0c8"></span><span style="height:5px;background:#ebe8e2"></span><span style="height:5px;background:#ebe8e2"></span><span style="height:5px;width:80%;background:#ebe8e2"></span><span style="height:70px;background:#f4f2ed;margin:8px 0"></span><span style="height:5px;background:#ebe8e2"></span><span style="height:5px;width:70%;background:#ebe8e2"></span></div>
+                <sc-if value="{{ pl.fab }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;right:18px;bottom:18px;width:56px;height:56px;border-radius:16px;background:#8a3a1c;color:#fbf7ec;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(0,0,0,.25)"><lp-i name="edit" size="22"></lp-i></span></sc-if>
+                <sc-if value="{{ pl.large }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;left:50%;bottom:16px;transform:translateX(-50%);height:36px;padding:0 14px;border-radius:18px;background:rgba(251,247,236,.9);border:0.5px solid #c4b497;display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono';font-size:12px">1 / 12 · Fit width</span></sc-if>
+              </div>
+              <div style="height:{{ pl.navH }};flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:{{ pl.navPad }};background:#fbf7ec;border-top:0.5px solid #c4b497">
+                <sc-for list="{{ pl.nav }}" as="n"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:{{ n.fg }}"><span style="display:flex;align-items:center;justify-content:center;width:{{ n.pw }};height:32px;border-radius:16px;background:{{ n.pill }}"><lp-i name="{{ n.icon }}" size="20"></lp-i></span><span style="font-family:{{ n.ff }};font-style:{{ n.fs }};font-size:{{ n.fz }}">{{ n.label }}</span></div></sc-for>
+              </div>
+            </div>
+            <div style="width:300px;display:flex;flex-direction:column;gap:10px;padding-top:10px">
+              <div style="display:flex;align-items:center;gap:8px"><span style="font-family:'IBM Plex Mono';font-size:12px;padding:3px 8px;border-radius:4px;background:#8a3a1c;color:#fbf7ec">{{ pl.id }}</span><span style="font-family:'Instrument Serif';font-size:26px">{{ pl.name }}</span></div>
+              <sc-for list="{{ pl.notes }}" as="nt"><div style="display:flex;gap:8px;font-size:13px;line-height:1.5;color:#3a2f25"><span style="color:#8a3a1c">•</span><span>{{ nt }}</span></div></sc-for>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <p style="margin:0;max-width:900px;font-size:13.5px;line-height:1.55;color:#3a2f25">The tablet runs the desktop layout scaled to fit. The real build would also enlarge the leaf bar, tool column and desk headers to 44 px targets, and add pencil-only drawing (finger pans, pencil marks).</p>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const R = '#8a3a1c', M = '#c47416', O = '#6b7a3e';
+    const phones = [{ id: '4a', label: 'Home' }, { id: '4b', label: 'Read · swipe up for pages' }, { id: '4c', label: 'Mark · tools above the mode bar, properties in a sheet' }, { id: '4d', label: 'Arrange · desks stack, pages scroll sideways' }, { id: '4e', label: 'Protect · redact from a sheet' }];
+    const modeBar = (on) => [['read', 'reading-mode', 'Read'], ['mark', 'edit', 'Mark'], ['arrange', 'grid-view', 'Arrange'], ['protect', 'redact', 'Protect']]
+      .map(([id, icon, label]) => ({ icon, label, fg: id === on ? R : '#3a2f25' }));
+    const tools = [['text-box', 'Text', 1], ['highlight', 'Mark'], ['sticky-note', 'Note'], ['file-image', 'Image'], ['shape-rect', 'Box'], ['edit', 'Draw'], ['signature', 'Sign'], ['form-field', 'Fill']]
+      .map(([icon, label, on]) => ({ icon, label, bg: on ? 'rgba(138,58,28,.12)' : 'transparent', fg: on ? R : '#3a2f25' }));
+    const pg = (l, dot, o = {}) => ({ l, dot, o: o.sel ? '2px solid ' + R : 'none', op: o.drag ? 0.35 : 1 });
+    const desks = [
+      { name: 'Desk 1 · discharge-summary', count: '12 pg', dot: R, bd: R, pages: [pg('p 1', R), pg('p 2', R), pg('p 3', R, { sel: 1, drag: 1 }), pg('p 4', R, { sel: 1 }), pg('p 5', R)] },
+      { name: 'Desk 2 · referral pack', count: '5 pg', dot: M, bd: '#c4b497', pages: [pg('p 1', M), pg('p 2', M), pg('p 9', R), pg('p 3', M), pg('img', O)] },
+      { name: 'Desk 3 · annexure', count: '3 pg', dot: O, bd: '#c4b497', pages: [pg('p 10', R), pg('p 11', R), pg('p 12', R)] },
+    ];
+    return {
+      phones, tools, desks,
+      modesRead: modeBar('read'), modesMark: modeBar('mark'), modesArr: modeBar('arrange'), modesProt: modeBar('protect'),
+      resume: [{ name: 'discharge-summary.pdf', where: 'Page 3 of 12', mode: 'Marking', dot: R }, { name: 'referral-pack.pdf', where: '3 desks', mode: 'Arranging', dot: M }],
+      recents: [{ icon: 'file-pdf', c: R, name: 'lab-report-meena-r.pdf', when: '2 h' }, { icon: 'file-excel', c: O, name: 'insurance-claims.xlsx', when: '1 d' }, { icon: 'file-pdf', c: R, name: 'consent-form-signed.pdf', when: '1 d' }, { icon: 'file-word', c: '#1f3b73', name: 'ot-checklist-v3.docx', when: '3 d' }],
+      homeNav: [['home', 'Home', 1], ['library', 'Library'], ['files', 'Tabs · 4'], ['settings', 'Settings']].map(([icon, label, on]) => ({ icon: icon === 'files' ? 'copy' : icon, label, fg: on ? R : '#3a2f25' })),
+      strip: [1, 2, 3, 4, 5, 6, 7, 8].map(i => ({ o: i === 1 ? '2px solid ' + R : 'none' })),
+      matches: [{ p: '1', s: 'Department of Medical Oncology' }, { p: '1', s: '…reviewed by the Oncology nurse…' }, { p: '1', s: 'Review in Oncology OPD on 30 Oct' }],
+      plats: [
+        { id: '4h', name: 'iOS', radius: '50px', sbH: '50px', sbF: '16px', time: '18:40', barPad: '0 10px', back: 'chevron-left', backLabel: 'Home', more: 'more-horizontal', inlineTitle: '', titleF: '17px', titleAlign: 'center', titleW: 600, large: true, fab: false, navH: '84px', navPad: '6px 8px 28px',
+          nav: modeBar('read').map((m, i) => ({ ...m, pill: 'transparent', pw: '32px', ff: "'Instrument Serif'", fs: 'italic', fz: '15px' })),
+          notes: ['Large serif title that collapses into the bar as you scroll.', '“‹ Home” back button and swipe from the left edge to go back.', 'Mode bar = tab bar, with labels always shown and a home indicator below.', 'Sheets use the iOS detents (medium / large) and drag to dismiss.', 'Share sheet for “Save to Files”; Face ID unlocks protected files.'] },
+        { id: '4i', name: 'Android', radius: '36px', sbH: '36px', sbF: '13px', time: '18:40', barPad: '0 6px', back: 'arrow-left', backLabel: '', more: 'more-vertical', inlineTitle: 'Discharge summary — Meena R.', titleF: '18px', titleAlign: 'left', titleW: 500, large: false, fab: true, navH: '80px', navPad: '8px 8px 14px',
+          nav: modeBar('read').map((m, i) => ({ ...m, pill: i === 0 ? 'rgba(138,58,28,.16)' : 'transparent', pw: '60px', ff: "'LiPi Sans'", fs: 'normal', fz: '12px' })),
+          notes: ['Top app bar with ← and the title on the left; ⋮ overflow menu.', 'Navigation bar with a pill around the active mode (Material 3).', 'Floating button jumps straight to Mark.', 'System back gesture steps out: sheet → mode → Home.', 'Opens from any app’s “Open with”; storage via the system file picker.'] },
+      ],
+      tablets: [{ id: '4f', label: 'Mark — tool column + margin, pencil draws, finger pans', mode: 'mark', per: 1 }, { id: '4g', label: 'Arrange — two desks per row, drag with one hand while scrolling with the other', mode: 'arrange', per: 2 }],
+    };
+  }
+}
+</script>
+</body>
+</html>

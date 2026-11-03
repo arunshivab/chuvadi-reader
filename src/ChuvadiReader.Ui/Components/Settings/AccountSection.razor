@@ -1,0 +1,44 @@
+@namespace ChuvadiReader.Ui.Components.Settings
+
+@* Sangam sign-in, roles and the audit trail are not built yet: every row is visible and greyed out. *@
+<SettingsSection Title="@SectionTitle" Sub="Who is using Chuvadi, and what they may do.">
+    <SettingsCard Title="Signed in" IsNew="true">
+        <SettingRow Label="User" Hint="Reading, marking, arranging and protecting stay free and local" Soon="true" SoonText="Coming soon — Sangam sign-in">
+            <ValueChip Text="Not signed in" />
+        </SettingRow>
+        <SettingRow Soon="true" SoonText="Coming soon — Sangam sign-in">
+            <RowButton IconName="log-in" Primary="true">Sign in with Sangam</RowButton>
+        </SettingRow>
+        <SettingRow Label="Role" Soon="true">
+            <ValueChip Text="—" />
+        </SettingRow>
+        <SettingRow Label="Sign-in method" Soon="true">
+            <Segmented Options="MethodOptions" Value="Hospital ID" />
+        </SettingRow>
+        <SettingRow Label="Lock after idle" Soon="true">
+            <Segmented Options="IdleOptions" Value="15 min" />
+        </SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Roles" IsNew="true">
+        <SettingRow Label="Viewer" Hint="Read & print" Soon="true"><RowButton>Edit</RowButton></SettingRow>
+        <SettingRow Label="Clerk" Hint="+ Mark, sign, arrange" Soon="true"><RowButton>Edit</RowButton></SettingRow>
+        <SettingRow Label="Records officer" Hint="+ Redact, passwords, audit" Soon="true"><RowButton>Edit</RowButton></SettingRow>
+        <SettingRow Label="Admin" Hint="+ Kiosk & settings" Soon="true"><RowButton>Edit</RowButton></SettingRow>
+    </SettingsCard>
+
+    <SettingsCard Title="Audit trail" IsNew="true" Full="true">
+        <SettingRow Label="Record redact, sign, bind, print, protect" Soon="true"><Toggle Value="false" /></SettingRow>
+        <SettingRow Label="Keep for" Soon="true"><Segmented Options="KeepOptions" Value="7 years" /></SettingRow>
+        <SettingRow Label="View the trail" Soon="true"><RowButton>Open</RowButton></SettingRow>
+        <SettingRow Label="Export" Hint="CSV for the records department" Soon="true"><RowButton>Export…</RowButton></SettingRow>
+    </SettingsCard>
+</SettingsSection>
+
+@code {
+    private const string SectionTitle = "Account & roles";
+
+    private static readonly IReadOnlyList<SegOption> MethodOptions = SegOption.Of("Hospital ID", "PIN", "Smart card");
+    private static readonly IReadOnlyList<SegOption> IdleOptions = SegOption.Of("5 min", "15 min", "Never");
+    private static readonly IReadOnlyList<SegOption> KeepOptions = SegOption.Of("90 days", "1 year", "7 years");
+}
