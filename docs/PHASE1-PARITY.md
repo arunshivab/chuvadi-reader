@@ -110,6 +110,16 @@ Tests: 161 (was 149) — link allow-list, no-op hosts, the refusal text.
 
 ---
 
+## chuvadi-pdf 3.31.1 (2026-11-06)
+
+Moved from 3.30.2 to **3.31.1** (34 packages) plus a new dependency, **Chuvadi.Fonts 1.0.0** (LiPi Sans faces as embedded resources, pulled in by Authoring, Forms and Rendering.Raster). No app code changes were needed: build 0 warnings, 161 tests pass, and PDF pages render pixel-identical to 3.30.2 in the preview (cover and contents pages checked); Find highlights still line up.
+
+What 3.31 adds (not used by the app yet): annotation appearances generated for comments and form fields that have none (`AnnotationMode` on rendering, SVG export and text extraction), the Trim / Bleed / Art page boxes, and a font-embedding report.
+
+Re-checked library asks — **none fixed in 3.31.1**: `PdfSigner.Sign` still fails (“Could not locate /Contents value in the signed PDF output”), `EncryptionOptions.Permissions` is still init-only, and there is still no which-password-opened-the-file flag, outline position within a page, or `OptionalContentGroup` lock state / id. Those features stay greyed.
+
+---
+
 ## Roadmap (revised)
 - **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
   window controls), fixed left bar (modes + Open/Find/Library/Home + Settings), Tools rail and
