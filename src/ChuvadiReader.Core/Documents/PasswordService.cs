@@ -55,6 +55,11 @@ public sealed class PasswordService
     /// <summary>Shown on the greyed-out permission controls.</summary>
     public const string PermissionsWaitingReason = "Waiting on the PDF library — permissions can't be set on a protected copy in chuvadi-pdf 3.30.1";
 
+    /// <summary>Shown when removal is refused because the file forbids changes.</summary>
+    public const string RemoveRefusedMessage =
+        "This file's permissions don't allow changes, so its password can't be removed here. "
+        + "If you're the owner, you'll be able to remove it once the PDF library can tell which password opened the file.";
+
     /// <summary>False until the library lets callers set permissions.</summary>
     public static bool PermissionsAvailable => false;
 
@@ -117,7 +122,9 @@ public sealed class PasswordService
     /// Refused when the file forbids changes (see remarks): removing protection is a change.</summary>
     /// <remarks>chuvadi-pdf 3.30 opens with either password but doesn't say which one matched,
     /// so the app can't tell the owner (who may lift restrictions) from a user who only holds
-    /// the open password. Until it can, a file whose permissions forbid modification is refused.</remarks>
+    /// the open password. Until it can, a file whose permissions forbid modification is refused
+    /// (decision 2026-11-06, option C — kept as is; the "which password opened it" flag is on the
+    /// library ask list, and the refusal tells the person so).</remarks>
     public Task RemovePasswordAsync(string sourcePath, string password, string outputPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(password);
@@ -130,7 +137,7 @@ public sealed class PasswordService
             if (!e.AllowModify)
             {
                 throw new InvalidOperationException(
-                    "This file's permissions don't allow changes, so its password can't be removed here.");
+                    RemoveRefusedMessage);
             }
 
             WriteAtomically(outputPath, s => doc.Save(s, null), ct);

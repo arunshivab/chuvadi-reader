@@ -88,6 +88,8 @@ public partial class App : Application
             services.AddSingleton<BenchDropService>();
             services.AddSingleton<RedactRequestService>();
             services.AddSingleton<ShellService>();
+            services.AddSingleton<ChuvadiReader.Core.Window.IUiScale, ChuvadiReader.Windows.Platform.WpfUiScale>();
+            services.AddSingleton<ChuvadiReader.Core.Window.IExternalLinks, ChuvadiReader.Windows.Platform.WpfExternalLinks>();
             services.AddSingleton<ChuvadiReader.Core.Storage.PreferencesService>();
             services.AddSingleton<ChuvadiReader.Core.Documents.TextViewService>();
             services.AddSingleton<MeasureService>();

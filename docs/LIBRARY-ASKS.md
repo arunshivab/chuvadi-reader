@@ -76,6 +76,12 @@ Captured during the deep architecture review on 2026-10-14.
 - **XFA geometry completeness (PDF-10, minor).** `XfaDataField.Geometry` was populated for
   15 of 19 fields on the test certificate; 4 null. Low priority.
 
+- **WHICH PASSWORD OPENED THE FILE (PDF-13).** `PdfDocument.Open(path, password)` accepts
+  the owner or the open (user) password but doesn't say which matched. Until it does, Protect ›
+  Password refuses to remove protection from a file whose permissions forbid changes, even for
+  the owner (decision 2026-11-06, option C; the refusal message says so). Ask: an
+  `EncryptionInfo.OpenedWithOwnerPassword` (or similar) flag.
+
 ### Chuvadi.Sheets
 - **SHEETS-FMT** (above) — formatted cell display string.
 - **COLUMN WIDTH in a real unit (SHEETS-01).** The UI converts width with a hand `w*7`

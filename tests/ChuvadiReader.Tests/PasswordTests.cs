@@ -101,7 +101,9 @@ public class PasswordTests
         var svc = new PasswordService();
         TestSigning.ProtectRestricted(src, locked, "pw", PasswordService.BuildPermissionMask(new PasswordProtectOptions { OpenPassword = "pw", AllowModify = false }));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemovePasswordAsync(locked, "pw", TestPdf.TempOutput()));
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemovePasswordAsync(locked, "pw", TestPdf.TempOutput()));
+        Assert.Equal(PasswordService.RemoveRefusedMessage, refused.Message);
+        Assert.Contains("owner", refused.Message);
         await Assert.ThrowsAsync<PdfPasswordRequiredException>(() => svc.RemovePasswordAsync(locked, "bad", TestPdf.TempOutput()));
         await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemovePasswordAsync(src, "pw", TestPdf.TempOutput()));
     }

@@ -8,13 +8,20 @@ window.chuvadiTheme = {
 
     // Interface size in percent (100 / 125 / 150). Zooms the whole UI; prefs.css divides
     // viewport-height layouts by --chvd-ui-scale so the zoomed shell still fits the window.
-    setScale: function (pct) {
+    // Interface size. hostZoom = true when the host zooms the whole window (the Windows app sets
+    // the WebView zoom), so the page itself must not zoom again; the attribute stays for the
+    // larger hit targets. Otherwise (web/preview hosts) CSS zoom on <html> is the fallback and
+    // data-ui-zoom="css" turns on the viewport-unit corrections in prefs.css.
+    setScale: function (pct, hostZoom) {
         var n = parseInt(pct, 10);
         if (n !== 125 && n !== 150) n = 100;
         var root = document.documentElement;
         root.setAttribute('data-ui-scale', String(n));
-        root.style.setProperty('--chvd-ui-scale', String(n / 100));
-        root.style.zoom = n === 100 ? '' : String(n / 100);
+        var css = !hostZoom && n !== 100;
+        root.style.setProperty('--chvd-ui-scale', css ? String(n / 100) : '1');
+        root.style.zoom = css ? String(n / 100) : '';
+        if (css) root.setAttribute('data-ui-zoom', 'css');
+        else root.removeAttribute('data-ui-zoom');
     },
 
     // Reduce motion: no transitions or animations anywhere (prefs.css).

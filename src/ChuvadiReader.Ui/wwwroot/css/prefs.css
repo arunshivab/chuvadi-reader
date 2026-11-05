@@ -1,7 +1,9 @@
 /*
  * Chuvadi Reader — user preference switches (Settings › Accessibility / Appearance).
  * Set on <html> by theme.js:
- *   data-ui-scale="100|125|150" + --chvd-ui-scale (1 / 1.25 / 1.5) + style.zoom
+ *   data-ui-scale="100|125|150"  (always; drives the larger hit targets)
+ *   data-ui-zoom="css" + --chvd-ui-scale + style.zoom  (only when the host can't zoom the
+ *   whole window — the Windows app zooms the WebView instead, decision 2026-11-06)
  *   data-reduce-motion          (present = on)
  * Link after tokens.css and app.css.
  */
@@ -9,7 +11,7 @@
 :root { --chvd-ui-scale: 1; }
 
 /* ── Interface size ─────────────────────────────────────────────────────
-   <html> is zoomed, so anything sized in viewport units would grow past the
+   CSS-zoom fallback only: <html> is zoomed, so anything sized in viewport units would grow past the
    window. Divide those back down. The shell should size from height:100%
    (html/body/#app are 100% in app.css); these rules cover the current
    100vh users. */
@@ -18,8 +20,7 @@ html[data-ui-scale="150"] {
     --chvd-hit: 44px;                       /* larger touch targets (tokens.css note) */
 }
 
-html[data-ui-scale="125"] .shell,
-html[data-ui-scale="150"] .shell {
+html[data-ui-zoom="css"] .shell {
     height: calc(100vh / var(--chvd-ui-scale));
 }
 

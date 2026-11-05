@@ -2,15 +2,21 @@
 @implements IDisposable
 @inject PreferencesService Prefs
 @inject IJSRuntime JS
+@inject IServiceProvider Services
 
 @*
     Renderless. Drop <PreferencesHost /> once into the shell (MainLayout). On first render it
-    hydrates PreferencesService and applies UI scale + reduce motion to <html>; afterwards it
+    hydrates PreferencesService and applies UI scale (host window zoom when the host has it,
+    else CSS zoom on <html>) + reduce motion; afterwards it
     re-applies whenever a preference changes (Settings saves immediately). The theme is applied
     by the shell itself from ThemeService (use Theme.Current.Key()).
 *@
 
 @code {
+    // Optional: hosts without whole-window zoom (or tests) simply don't register one.
+    private ChuvadiReader.Core.Window.IUiScale? HostScale =>
+        Services.GetService(typeof(ChuvadiReader.Core.Window.IUiScale)) as ChuvadiReader.Core.Window.IUiScale;
+
     protected override void OnInitialized() => Prefs.Changed += OnPrefsChanged;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -22,7 +28,7 @@
 
         if (Prefs.IsHydrated)
         {
-            await PreferencesInterop.ApplyAsync(JS, Prefs);
+            await PreferencesInterop.ApplyAsync(JS, Prefs, HostScale);
         }
         else
         {
@@ -30,7 +36,7 @@
         }
     }
 
-    private void OnPrefsChanged() => _ = InvokeAsync(() => PreferencesInterop.ApplyAsync(JS, Prefs));
+    private void OnPrefsChanged() => _ = InvokeAsync(() => PreferencesInterop.ApplyAsync(JS, Prefs, HostScale));
 
     public void Dispose() => Prefs.Changed -= OnPrefsChanged;
 }

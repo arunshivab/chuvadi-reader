@@ -2,18 +2,20 @@
     HTML — D-09 frame 11l, defense in depth:
       1. Core's HtmlSanitizer (allow-list; scripts, handlers, forms, frames, unsafe URLs, remote
          images and url()/expression/@import CSS removed);
-      2. rendered in <iframe sandbox=""> — no allow-scripts, allow-forms, allow-same-origin or
-         allow-popups, so the frame is a unique opaque origin that can run nothing and open nothing;
+      2. rendered in <iframe sandbox="allow-same-origin"> — never allow-scripts, allow-forms,
+         allow-popups or allow-top-navigation, so nothing in the page can run, submit or open anything;
       3. a CSP meta first in the srcdoc: default-src 'none'; style-src 'unsafe-inline'; img-src data:
          (https: is added to img-src only after the user clicks "Load images").
-    Because the frame is cross-origin to the app by design, the app cannot script into it: Find is
-    applied by the sanitizer (marks in the srcdoc), and section go-to/scroll tracking are not
-    available in the rendered view (they work in Source view).
+    allow-same-origin (decision 2026-11-06, option B) lets the app — not the page — reach into the
+    frame from viewers.js: outline go-to, the § counter while scrolling, Find scrolling to the first
+    match, and link handling. Every link click is stopped: "#" links scroll inside the page; web and
+    mail links ask first, then open in the person's browser; anything else does nothing. The frame
+    itself can never navigate. Find marks are still applied by the sanitizer (in the srcdoc).
 *@
 @inherits ViewerBase
 @inject IServiceProvider Services
 
-<div class="htv">
+<div class="htv" @ref="_root">
     @if (_error is not null)
     {
         <ViewerMessage IconName="warning" Error="true" Text="@_error" />
@@ -49,7 +51,7 @@
                         <button type="button" class="htv-load" @onclick="LoadImagesAsync">Load images</button>
                     }
                 </div>
-                <iframe class="htv-frame" sandbox="@SandboxNone" referrerpolicy="no-referrer" loading="eager"
+                <iframe class="htv-frame" sandbox="@Sandbox" referrerpolicy="no-referrer" loading="eager"
                         title="@(_result.Title ?? "HTML document") (sandboxed)" srcdoc="@_srcdoc"></iframe>
             </div>
         </div>
@@ -57,9 +59,15 @@
 </div>
 
 @code {
-    // sandbox="" — an empty token list: no allow-scripts, allow-forms, allow-same-origin, allow-popups,
-    // allow-top-navigation … Passed as an explicit empty string so it renders as sandbox="".
-    private const string SandboxNone = "";
+    // Only allow-same-origin: never allow-scripts (with both, a page could lift its own sandbox),
+    // allow-forms, allow-popups or allow-top-navigation.
+    internal const string Sandbox = "allow-same-origin";
+
+    private ElementReference _root;  // always rendered; viewers.js finds the frame inside it
+    private bool _frameHooked;     // frameAttach done
+    private bool _frameDirty;      // srcdoc/anchors changed since the last frameUpdate
+    private bool _frameFindHit;    // the change was a Find query: go to the first match
+    private DotNetObjectReference<HtmlView>? _selfRef;
 
     private TextDocument? _doc;
     private HtmlSanitizeResult? _result;
@@ -92,10 +100,10 @@
         }
         if (_doc is null) return;
 
-        bool rebuild = false;
-        if (Q(FindQuery) != _query) { _query = Q(FindQuery); rebuild = true; }
+        bool rebuild = false, findChanged = false;
+        if (Q(FindQuery) != _query) { _query = Q(FindQuery); rebuild = true; findChanged = _query is not null; }
         if (Math.Abs(Scale - _scale) > 0.0001) { _scale = Scale; rebuild = true; }
-        if (rebuild) await SanitizeAsync();
+        if (rebuild) await SanitizeAsync(findChanged);
 
         if (ShowSource != _wasSource)
         {
@@ -126,7 +134,7 @@
             var doc = await Task.Run(() => svc.Load(path));
             if (v != _version || Disposed) return;
             _doc = doc;
-            await SanitizeAsync();
+            await SanitizeAsync(findChanged: _query is not null);
             if (v != _version || _result is null) return;
             await ReportOutlineAsync(_result.Outline);
             if (!ShowSource) await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
@@ -141,7 +149,7 @@
         }
     }
 
-    private async Task SanitizeAsync()
+    private async Task SanitizeAsync(bool findChanged = false)
     {
         if (_doc is null) return;
         var text = _doc.Text;
@@ -155,6 +163,8 @@
         });
         _result = result;
         _srcdoc = srcdoc;
+        _frameDirty = true;
+        _frameFindHit |= findChanged;
         if (!ShowSource) await ReportFindCountAsync(result.HighlightCount);
     }
 
@@ -169,9 +179,9 @@
     {
         if (_doc is null || _result is null) return "HTML";
         if (ShowSource) return $"HTML · source · {_doc.Lines.Count:N0} line{(_doc.Lines.Count == 1 ? "" : "s")}";
-        if (_allowRemote) return "HTML · sandboxed · remote images on";
+        if (_allowRemote) return "HTML · scripts off · remote images on";
         var n = _result.Blocked.RemoteImages;
-        return n > 0 ? $"HTML · sandboxed · offline · {n} image{(n == 1 ? "" : "s")} blocked" : "HTML · sandboxed · offline";
+        return n > 0 ? $"HTML · scripts off · offline · {n} image{(n == 1 ? "" : "s")} blocked" : "HTML · scripts off · offline";
     }
 
     private string BlockedSummary
@@ -210,16 +220,97 @@
         $".{HtmlSanitizer.ImagePlaceholderClass}{{display:inline-block;padding:1px 8px;border:1px dashed #c4b497;border-radius:4px;" +
         "color:#8a7c64;background:#faf7f0;font:12px system-ui,sans-serif}";
 
-    // The rendered frame is opaque to the app (sandbox without allow-same-origin), so section
-    // navigation only works in Source view.
+    private bool FrameShown => !ShowSource && _error is null && _doc is not null && _result is not null;
+
+    private string[] Anchors => _result?.Outline.Select(o => o.Anchor).ToArray() ?? Array.Empty<string>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_frameHooked)
+        {
+            _frameHooked = true;
+            _selfRef ??= DotNetObjectReference.Create(this);
+            await JsVoidAsync("frameAttach", _root, _selfRef, Anchors);
+        }
+        if (_frameDirty && FrameShown)
+        {
+            _frameDirty = false;
+            bool hit = _frameFindHit;
+            _frameFindHit = false;
+            await JsVoidAsync("frameUpdate", _root, Anchors, hit);
+        }
+    }
+
+    // Rendered view: the § counter follows the heading at the top of the frame.
+    protected override Task HandleScrollAsync(int index) =>
+        FrameShown ? ReportCounterAsync(index, Sections, ViewerCounter.Section) : Task.CompletedTask;
+
     public override async Task GoToAsync(int index)
     {
-        if (ShowSource && _src is not null) await _src.GoToAsync(index);
+        if (ShowSource)
+        {
+            if (_src is not null) await _src.GoToAsync(index);
+            return;
+        }
+        if (!FrameShown) return;
+        var outline = _result!.Outline;
+        if (outline.Count == 0)
+        {
+            await JsVoidAsync("frameScrollTop", _root);
+        }
+        else
+        {
+            var i = Math.Clamp(index, 1, outline.Count);
+            await JsVoidAsync("frameScrollToAnchor", _root, outline[i - 1].Anchor);
+        }
+        await ReportCounterAsync(index, Sections, ViewerCounter.Section);
     }
 
     public override async Task ScrollToAnchorAsync(string anchor)
     {
-        if (ShowSource && _src is not null) await _src.ScrollToAnchorAsync(anchor);
+        if (ShowSource)
+        {
+            if (_src is not null) await _src.ScrollToAnchorAsync(anchor);
+            return;
+        }
+        if (FrameShown) await JsVoidAsync("frameScrollToAnchor", _root, anchor);
+    }
+
+    /// <summary>A web or mail link was clicked in the rendered page. Nothing opens until the
+    /// person confirms; then the system browser / mail app opens it (outside Chuvadi).</summary>
+    [JSInvokable]
+    public Task OnExternalLink(string url)
+    {
+        if (!IExternalLinks.IsAllowed(url)) return Task.CompletedTask;
+        var shell = Services.GetService(typeof(ShellService)) as ShellService;
+        var links = Services.GetService(typeof(IExternalLinks)) as IExternalLinks;
+        if (shell is null) return Task.CompletedTask;
+        var shown = DisplayUrl(url);
+        if (links is null || !links.IsAvailable)
+        {
+            shell.Notify($"This link goes outside Chuvadi: {shown}");
+            return Task.CompletedTask;
+        }
+        shell.Notify($"Open {shown} in your browser?", false, "Open", async () =>
+        {
+            if (!await links.OpenAsync(url)) shell.Notify($"Couldn't open {shown}.", isError: true);
+        });
+        return Task.CompletedTask;
+    }
+
+    private static string DisplayUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return url;
+        if (u.Scheme == Uri.UriSchemeMailto) return u.UserInfo.Length > 0 ? $"{u.UserInfo}@{u.Host}" : url;
+        var s = u.Host + (u.AbsolutePath == "/" ? "" : u.AbsolutePath);
+        return s.Length > 60 ? s[..57] + "…" : s;
+    }
+
+    protected override async ValueTask DisposeCoreAsync()
+    {
+        if (_frameHooked) await JsVoidAsync("frameDetach", _root);
+        _selfRef?.Dispose();
+        _selfRef = null;
     }
 
     /// <summary>Rendered view: the page's visible text. Source view: the file exactly as stored.</summary>

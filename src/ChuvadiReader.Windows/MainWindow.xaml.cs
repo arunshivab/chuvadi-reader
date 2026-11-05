@@ -14,9 +14,12 @@ namespace ChuvadiReader.Windows;
 
 public partial class MainWindow : Window
 {
+    private readonly IServiceProvider _services;
+
     public MainWindow(IServiceProvider services)
     {
         InitializeComponent();
+        _services = services;
 
         Web.Services = services;
         Web.RootComponents.Add(new RootComponent
@@ -145,6 +148,12 @@ public partial class MainWindow : Window
         }
 
         TryReleaseWebViewDrop();
+
+        // Interface size (Settings) zooms the whole WebView; attach now that it exists.
+        if (_services.GetService(typeof(ChuvadiReader.Core.Window.IUiScale)) is ChuvadiReader.Windows.Platform.WpfUiScale scale)
+        {
+            scale.Attach(e.WebView, e.WebView.Dispatcher);
+        }
     }
 
     private void OnStateChanged(object? sender, EventArgs e)

@@ -1,5 +1,6 @@
 using ChuvadiReader.Core.Storage;
 using ChuvadiReader.Core.Theme;
+using ChuvadiReader.Core.Window;
 using Microsoft.JSInterop;
 
 namespace ChuvadiReader.Ui.Components.Settings;
@@ -12,11 +13,27 @@ namespace ChuvadiReader.Ui.Components.Settings;
 public static class PreferencesInterop
 {
     /// <summary>Apply UI scale and reduce motion (not the theme — the shell owns that).</summary>
-    public static async Task ApplyAsync(IJSRuntime js, PreferencesService prefs)
+    /// <param name="hostScale">When the host can zoom the whole window (the Windows app zooms
+    /// the WebView), the scale goes there and the page itself isn't zoomed; otherwise
+    /// theme.js falls back to CSS zoom on &lt;html&gt;.</param>
+    public static async Task ApplyAsync(IJSRuntime js, PreferencesService prefs, IUiScale? hostScale = null)
     {
+        bool hostZoom = hostScale?.IsSupported == true;
+        if (hostZoom)
+        {
+            try
+            {
+                hostScale!.SetScale(prefs.UiScale);
+            }
+            catch (Exception)
+            {
+                hostZoom = false; // fall back to CSS zoom rather than lose the setting
+            }
+        }
+
         try
         {
-            await js.InvokeVoidAsync("chuvadiTheme.setScale", prefs.UiScale);
+            await js.InvokeVoidAsync("chuvadiTheme.setScale", prefs.UiScale, hostZoom);
             await js.InvokeVoidAsync("chuvadiTheme.setReducedMotion", prefs.ReduceMotion);
         }
         catch (JSException)

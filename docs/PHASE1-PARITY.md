@@ -96,6 +96,20 @@ Built in one pass on chuvadi-pdf 3.30.0, then moved to **3.30.1** and **3.30.2**
 
 ---
 
+## Three decisions (2026-11-06)
+
+Each option was set out with pros and cons and Arun chose:
+
+| # | Question | Chosen | What changed |
+|---|---|---|---|
+| 1 | How Settings › Interface size (100 / 125 / 150 %) is applied | **B — whole-window zoom by the host** | New `IUiScale` (Core, `Window/IUiScale.cs`). The Windows app registers `WpfUiScale`, which sets the WebView2 `ZoomFactor`, so layout, breakpoints, viewport units and pointer positions all scale together. Hosts without it (tests, the preview, a future web portal) register `NoopUiScale` and keep the CSS `zoom` on `<html>` as the fallback (`data-ui-zoom="css"` turns on the `100vh` correction in `prefs.css`). The 44 px hit targets still follow `data-ui-scale`. Ctrl + wheel / pinch zoom stay off. |
+| 2 | HTML viewer: what the app may do inside the sandboxed frame | **B — `sandbox="allow-same-origin"`, never `allow-scripts`** | Nothing in the page can run, submit, open windows or navigate (sanitizer + CSP unchanged). The app now reaches into the frame (`viewers.js` `frame*`): outline go-to, the § counter while scrolling, Find scrolls to the first match, keyboard shortcuts work with focus inside the page (Ctrl K, Ctrl F, Esc, 1–4). Every link click is stopped: `#` links scroll within the page; web and mail links show “Open … in your browser?” and open only on **Open** (new `IExternalLinks`; Windows: `WpfExternalLinks`, http / https / mailto only); anything else does nothing. Status reads “HTML · scripts off · …”. |
+| 3 | Removing a password from a file whose permissions forbid changes | **C — keep refusing; say why** | Same rule (the library can't say whether the owner or the open password was used). The refusal now adds: “If you're the owner, you'll be able to remove it once the PDF library can tell which password opened the file.” The flag stays on the library ask list. |
+
+Tests: 161 (was 149) — link allow-list, no-op hosts, the refusal text.
+
+---
+
 ## Roadmap (revised)
 - **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
   window controls), fixed left bar (modes + Open/Find/Library/Home + Settings), Tools rail and
