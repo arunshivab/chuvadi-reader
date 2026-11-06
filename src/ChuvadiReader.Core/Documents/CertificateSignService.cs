@@ -114,7 +114,8 @@ public sealed class CertificateSignService
 
     private static (X509Certificate2 Leaf, List<X509Certificate2> Others) LoadPfx(string pfxPath, string pfxPassword)
     {
-        var flags = OperatingSystem.IsMacOS() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet;
+        // Mac Catalyst (the MAUI Mac host) reports IsMacOS() == false but has the same keychain limits.
+        var flags = OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet;
         var all = X509CertificateLoader.LoadPkcs12CollectionFromFile(pfxPath, pfxPassword, flags);
         var leaf = all.FirstOrDefault(c => c.HasPrivateKey);
         if (leaf is null)

@@ -1,0 +1,63 @@
+DRAFT, to be reviewed by counsel. Do not publish until this line is removed.
+
+CHUVADI - PRIVACY NOTICE
+
+Copyright © 2026 Sthraas Intelligence Pvt Ltd. All rights reserved.
+
+This notice explains what personal data Chuvadi processes, why, for how long, and your rights under India's Digital Personal Data Protection Act, 2023 (the "DPDP Act") and the Digital Personal Data Protection Rules, 2025. Sthraas Intelligence Pvt Ltd, India ("Sthraas", "we") is the Data Fiduciary for the Chuvadi web portal.
+
+PART A - THE CHUVADI READER APPS (Windows, macOS, Linux, Android)
+
+A1. The apps do not send us any personal data. Your documents are opened, edited and saved on your own device. The apps have no accounts, no analytics, no advertising and no crash reporting, and they do not contact Sthraas.
+A2. On your device, the apps keep your settings, recent files, open tabs and recovery drafts in the app's own folder. You can delete them by clearing the app's data or uninstalling it.
+A3. Links you choose to open (for example to a website) open in your browser, under that site's own privacy terms. On Windows the app's display uses Microsoft Edge WebView2, a part of Windows covered by Microsoft's privacy statement and your Windows diagnostic settings.
+A4. If a future version adds online features (for example signing in), this notice will be updated before those features are used.
+
+PART B - THE CHUVADI WEB PORTAL
+
+B1. What we process, and why
+   - Identity from Sangam, when you sign in: your Sangam identifier, name, e-mail address and whether it is verified, the organisation you choose, and sign-in details (when and how you signed in, and a session identifier). Purpose: to sign you in, show who is signed in, keep your session separate from everyone else's, and sign you out everywhere when you sign out of Sangam.
+   - Your documents: the files you upload and the files you create or save while signed in. Purpose: to provide the reading, marking, arranging, protecting and saving you ask for. We do not read, analyse or use your documents for any other purpose.
+   - Your settings for the session (for example the theme), held in memory on the server. Purpose: to show the portal the way you set it.
+   - Technical records: server logs of requests and errors, which may include a file name. Purpose: to keep the portal secure and working, and to investigate problems.
+
+B2. How long we keep it
+   - Documents and your session's files: only for your session. They are deleted when you sign out, when the session ends or expires (at most 8 hours after sign-in), when Sangam tells us you signed out, or if the session stops unexpectedly. Nothing you upload is kept after your session.
+   - Identity and settings: only for your session (in an encrypted cookie and in memory); not stored in a database.
+   - Technical records: [retention period - to be confirmed by counsel; note the DPDP Rules 2025 may require certain logs to be kept for at least one year].
+
+B3. Consent and withdrawal. We process your personal data with your consent, which you give when you sign in. You can withdraw it at any time by signing out; withdrawing is as easy as giving it. Signing out ends processing and deletes your session's files. [Legal basis and consent wording - to be confirmed by counsel.]
+
+B4. Who we share it with. We do not sell your personal data or use it for advertising. We share it only with:
+   - Sangam, the identity service you sign in with (it holds your Sangam account under its own privacy notice);
+   - our hosting provider, which runs the servers for us under contract: [provider - to be confirmed], in India;
+   - authorities, where the law requires it.
+
+B5. Where it is processed. On servers in India.
+
+B6. Security. Connections are encrypted (HTTPS). Each signed-in person's session runs in its own isolated process, and its working files are kept in an encrypted area that only that session can use. If a personal data breach happens, we will inform you and the Data Protection Board of India as the DPDP Act and Rules require.
+
+B7. Children. The portal is not meant for anyone under 18 unless a parent or lawful guardian has given verifiable consent. [Process for verifiable parental consent - to be confirmed by counsel.]
+
+B8. Cookies and browser storage. See the Chuvadi Cookie and Browser Storage Notice.
+
+PART C - YOUR RIGHTS (DPDP Act, sections 11 to 14)
+
+You can:
+   - ask for a summary of the personal data we process about you and how we process it, and who we have shared it with;
+   - ask us to correct, complete, update or erase it;
+   - withdraw your consent (see B3);
+   - nominate another person to exercise your rights if you die or cannot do so;
+   - raise a grievance with us (below). We will respond within the time the law requires (the Rules set a maximum of 90 days);
+   - complain to the Data Protection Board of India, after first raising your grievance with us.
+Because the portal keeps nothing after your session, most requests are answered by signing out. We will verify your identity before acting on a request.
+
+PART D - CONTACT AND GRIEVANCES
+
+Grievance officer and person who answers questions about personal data: [name - to be confirmed], Sthraas Intelligence Pvt Ltd, [registered address - to be confirmed], [e-mail - to be confirmed].
+
+Changes: we will update this notice when what we process changes, and show the date below. Languages: this notice is available in English. [Other languages listed in the Eighth Schedule to the Constitution, on request - to be confirmed by counsel.]
+
+This notice is governed by the laws of India; the courts at Ahmedabad, Gujarat, India have exclusive jurisdiction.
+
+Last updated: [date - to be set on publication]

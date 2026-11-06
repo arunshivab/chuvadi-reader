@@ -3,6 +3,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+
+    <!-- Licence (Arun, 7 Nov 2026): proprietary, free to use, all rights reserved. LICENSE and
+         everything in legal/ are drafts, to be reviewed by counsel.
+         Every host's package metadata uses these values. -->
+    <Company>Sthraas Intelligence Pvt Ltd</Company>
+    <Authors>Sthraas Intelligence Pvt Ltd</Authors>
+    <Product>Chuvadi Reader</Product>
+    <Copyright>Copyright © 2026 Sthraas Intelligence Pvt Ltd. All rights reserved.</Copyright>
     <!--
       HARD RULE (inherited from Chuvadi): no third-party NuGet in the app.
       The only allowed PackageReferences are the Blazor / BlazorWebView

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The platform contract: what every host (Windows, macOS, Linux, Android, Web) provides to
+    Core and Ui. Contracts only — no implementations, no package references, no host code.
+    STATUS: DRAFT pending Arun's decisions (see docs/foundation/PLATFORM-INTERFACE.md).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ChuvadiReader.Platform</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+</Project>

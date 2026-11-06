@@ -1,0 +1,189 @@
+@implements IDisposable
+@inject ShellService Shell
+@inject TabsService Tabs
+
+@*
+    Phone app bar (12g-12j), 56 px: back · document title over a mono sub-line · counter · ⋮.
+    Arrange (12i): "N desks · M pages" / "long-press a page to drag", and Bind all where the
+    counter is. Home shows the wordmark; Library and Settings show their name.
+*@
+<header class="ph-bar">
+    @if (ShowBack)
+    {
+        <button class="ph-ib" @onclick="OnBack" aria-label="Back"><Icon Name="arrow-left" Size="21" /></button>
+    }
+    else
+    {
+        <span class="ph-brand cv-brand">C<span class="cv-brand-ta">ச</span>huvadi</span>
+    }
+
+    <span class="ph-title">
+        <span class="ph-t">@Title</span>
+        @if (!string.IsNullOrEmpty(Sub))
+        {
+            <span class="ph-sub">@Sub</span>
+        }
+    </span>
+
+    @if (OnDocView && Shell.Mode == DocMode.Arrange)
+    {
+        if (BindCommand is { } bind)
+        {
+            <button class="ph-pager ph-pager-act" disabled="@(!bind.IsEnabled)" title="@(bind.DisabledReason ?? bind.Label)" @onclick="bind.Run">Bind all</button>
+        }
+    }
+    else if (OnDocView && Shell.HasCounter)
+    {
+        @if (_editing)
+        {
+            <input class="ph-pager ph-pager-in" type="number" inputmode="numeric" min="1" max="@Shell.CounterTotal" value="@Shell.CounterCurrent"
+                   aria-label="@Shell.CounterUnit number" @onchange="Jump" @onblur="() => _editing = false" @ref="_input" />
+        }
+        else
+        {
+            <button class="ph-pager" @onclick="StartEdit" title="@($"{Shell.CounterUnit} {Shell.CounterCurrent} of {Shell.CounterTotal} — tap to go to a {Shell.CounterUnit}")">@Prefix@Shell.CounterCurrent / @Shell.CounterTotal</button>
+        }
+    }
+
+    <button class="ph-ib" @onclick="OnMenu" aria-label="More"><Icon Name="more-vertical" Size="20" /></button>
+</header>
+
+@code {
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback OnMenu { get; set; }
+    [Parameter] public bool OnDocView { get; set; }
+
+    /// <summary>Title for pages that aren't a document (Library, Settings…); null on Home.</summary>
+    [Parameter] public string? PageTitle { get; set; }
+
+    private bool _editing;
+    private bool _focus;
+    private ElementReference _input;
+
+    protected override void OnInitialized()
+    {
+        Shell.Changed += OnChanged;
+        Tabs.Changed += OnChanged;
+    }
+
+    private bool ShowBack => OnDocView || PageTitle is not null;
+
+    private ShellCommand? BindCommand => Shell.Commands.FirstOrDefault(c => c.Id == Phone.PhoneCommands.ArrangeBind);
+
+    private string Prefix => Shell.CounterUnit switch
+    {
+        "section" => "§ ",
+        "line" => "ln ",
+        "sheet" => "sheet ",
+        _ => "",
+    };
+
+    private string Title
+    {
+        get
+        {
+            if (!OnDocView)
+            {
+                return PageTitle ?? string.Empty;
+            }
+
+            if (Shell.Mode == DocMode.Arrange)
+            {
+                return AfterMode(Shell.Activity, "Arrange") ?? "Arrange";
+            }
+
+            return Tabs.Active?.FileName ?? string.Empty;
+        }
+    }
+
+    private string? Sub
+    {
+        get
+        {
+            if (!OnDocView)
+            {
+                return null;
+            }
+
+            switch (Shell.Mode)
+            {
+                case DocMode.Arrange:
+                    return "long-press a page to drag";
+                case DocMode.Mark:
+                    return AfterMode(Shell.Activity, "Mark");
+                case DocMode.Protect:
+                    return AfterMode(Shell.Activity, "Protect");
+                default:
+                    var n = Tabs.Tabs.Count;
+                    if (n == 0)
+                    {
+                        return null;
+                    }
+
+                    var i = 1;
+                    for (var k = 0; k < n; k++)
+                    {
+                        if (Tabs.Tabs[k].Id == Tabs.Active?.Id)
+                        {
+                            i = k + 1;
+                            break;
+                        }
+                    }
+
+                    return $"{i} of {n} tab{(n == 1 ? "" : "s")}";
+            }
+        }
+    }
+
+    /// <summary>"Mark · 2 marks · unsaved" → "2 marks · unsaved" (the status-bar activity line, which
+    /// the phone has no room for, minus the mode the bottom bar already shows).</summary>
+    private static string? AfterMode(string? activity, string mode)
+    {
+        if (string.IsNullOrEmpty(activity))
+        {
+            return null;
+        }
+
+        var prefix = mode + " · ";
+        var rest = activity.StartsWith(prefix, StringComparison.Ordinal) ? activity[prefix.Length..] : activity;
+        return rest.Length == 0 ? null : char.ToLowerInvariant(rest[0]) + rest[1..];
+    }
+
+    private void StartEdit()
+    {
+        _editing = true;
+        _focus = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focus && _editing)
+        {
+            _focus = false;
+            try
+            {
+                await _input.FocusAsync();
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        }
+    }
+
+    private async Task Jump(ChangeEventArgs e)
+    {
+        _editing = false;
+        if (int.TryParse(e.Value?.ToString(), out var n))
+        {
+            await Shell.GoToAsync(n);
+        }
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Shell.Changed -= OnChanged;
+        Tabs.Changed -= OnChanged;
+    }
+}

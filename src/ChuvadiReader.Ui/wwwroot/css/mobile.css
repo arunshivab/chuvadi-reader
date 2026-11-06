@@ -1,0 +1,339 @@
+/*
+ * Chuvadi Reader — Android tablet and phone look (Portal & Android 12d-12j).
+ * Every rule is keyed on <html data-shell="tablet"> or <html data-shell="phone">, which PlatformRoot
+ * sets from the host's platform signal, so nothing here can reach the desktop or portal layouts.
+ * Link after shell.css. Colours and type come only from tokens.css, so all five themes work.
+ *
+ *   tablet  top bar 52 · left bar 72 · Tools rail 72 · View rail 60 · 48 px targets · no status bar
+ *           portrait (< 1000 px): View rail folds into Tools (shell.css's own narrow rule)
+ *   phone   app bar 56 · tool strip 62 (Mark, Protect) · bottom bar 80 · sheets · FAB 56
+ */
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Shared by tablet and phone
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* Edge-to-edge window: the Ui keeps clear of the status bar, the gesture bar and a display cut-out.
+   100dvh follows the on-screen keyboard and the browser chrome; 100vh is the fallback. */
+html[data-shell="tablet"] .shell,
+html[data-shell="phone"] .shell {
+    height: 100vh;
+    height: 100dvh;
+    box-sizing: border-box;
+}
+html[data-shell="tablet"] .shell {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* No hover on touch: the hover strip under the page shows on a tap instead (mobile.js). */
+html[data-shell="tablet"] .mview-canvas:hover .pstrip,
+html[data-shell="phone"] .mview-canvas:hover .pstrip { opacity: 0; pointer-events: none; transform: translate(-50%, 8px); }
+html[data-shell="tablet"] .mview-canvas.chvd-strip-on .pstrip,
+html[data-shell="phone"] .mview-canvas.chvd-strip-on .pstrip,
+html[data-shell="tablet"] .pstrip.pinned,
+html[data-shell="phone"] .pstrip.pinned { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+html[data-shell="tablet"] .pstrip button,
+html[data-shell="phone"] .pstrip button { height: 44px; padding: 0 12px; }
+
+/* The "To desk" chip on a page is hover-only on desktop. On touch the same action is in the
+   per-page strip a tap brings up, so the chip stays hidden instead of covering the page. */
+html[data-shell="tablet"] .rpage-send,
+html[data-shell="phone"] .rpage-send { display: none; }
+
+/* Popovers and menus: 44 px rows. */
+html[data-shell="tablet"] .pop-item,
+html[data-shell="phone"] .pop-item { height: 44px; font-size: 14px; }
+
+/* Arrange: one finger scrolls the desks; a page drags after a long-press (mobile.js). */
+html[data-shell="tablet"] .bpage,
+html[data-shell="tablet"] .shelf-pg,
+html[data-shell="phone"] .bpage,
+html[data-shell="phone"] .shelf-pg { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Tablet — 12d (Read), 12e (Mark with a pen), 12f (Arrange, portrait)
+   ════════════════════════════════════════════════════════════════════════════ */
+html[data-shell="tablet"] {
+    --sh-top: 52px;
+    --sh-left: 72px;
+    --sh-left-open: 72px;      /* no hover-expand on touch: the verbs sit under the mode icons */
+    --sh-tools: 72px;
+    --sh-view: 60px;
+    --sh-status: 0px;
+}
+@media (max-width: 999px) {
+    html[data-shell="tablet"] { --sh-left: 72px; --sh-tools: 72px; --sh-view: 0px; }
+}
+
+/* Top bar (12d): wordmark · active tab · +N · ‹ n / N › · Document ▾ · search. The theme toggle
+   stays in Settings › Appearance; there is no status bar. */
+html[data-shell="tablet"] .topbar { padding: 0 12px; gap: 10px; }
+html[data-shell="tablet"] .tb-brandbox,
+html[data-shell="tablet"] .topbar.lb-open .tb-brandbox { width: auto; min-width: max-content; border-right: none; margin-right: 4px; }
+html[data-shell="tablet"] .topbar .cv-brand { font-size: 21px !important; }
+html[data-shell="tablet"] .topbar .rtab:not(.active) { display: none; }
+html[data-shell="tablet"] .topbar .rtab {
+    height: 34px; max-width: 220px; padding: 0 10px; border-radius: 9px; gap: 6px;
+}
+html[data-shell="tablet"] .topbar .rtab-name { font-size: 11.5px; }
+html[data-shell="tablet"] .topbar .rtab-x { display: none; }
+html[data-shell="tablet"] .rtab-more {
+    display: inline-flex; align-items: center; height: 34px; padding: 0 10px; border-radius: 9px;
+    background: var(--chvd-surface-lo); color: var(--chvd-ink-soft);
+}
+/* 12d shows only the active tab and the +N count: Open is in the left bar, Close in Document ▾. */
+html[data-shell="tablet"] .topbar .rtab-add,
+html[data-shell="tablet"] .topbar .rtabs-actions { display: none; }
+html[data-shell="tablet"] .tb-pager { height: 40px; padding: 0 4px; gap: 4px; border-radius: 10px; font-size: 13px; }
+html[data-shell="tablet"] .tb-pg-btn { width: 36px; height: 36px; }
+html[data-shell="tablet"] .tb-pg-btn svg { width: 18px; height: 18px; }
+html[data-shell="tablet"] .tb-pg-box { width: 34px; height: 28px; border-radius: 6px; font-size: 13px; }
+html[data-shell="tablet"] .tb-doc { height: 40px; padding: 0 12px; font-size: 14px; }
+html[data-shell="tablet"] .tb-cmd { width: 40px; height: 40px; padding: 0; justify-content: center; border: none; background: transparent; color: var(--chvd-ink); }
+html[data-shell="tablet"] .tb-cmd svg { width: 19px; height: 19px; }
+html[data-shell="tablet"] .tb-cmd-t,
+html[data-shell="tablet"] .tb-cmd .kbd,
+html[data-shell="tablet"] .topbar .tb-icon,
+html[data-shell="tablet"] .statusbar { display: none; }
+
+/* Left bar (12d): modes as icon over italic verb (60 px), then Open · Find · Library (48 px),
+   Settings at the foot. Home is the wordmark; the expand toggle means nothing on touch. */
+html[data-shell="tablet"] .leftbar { padding: 10px; gap: 4px; }
+html[data-shell="tablet"] .lb-btn { height: 48px; padding: 0; justify-content: center; border-radius: 12px; color: var(--chvd-ink-soft); }
+html[data-shell="tablet"] .lb-btn svg { width: 21px; height: 21px; }
+html[data-shell="tablet"] .lb-btn .lb-l,
+html[data-shell="tablet"] .lb-btn .lb-k { display: none; }
+html[data-shell="tablet"] .lb-mode { height: 60px; flex-direction: column; gap: 2px; }
+html[data-shell="tablet"] .lb-mode svg { width: 22px; height: 22px; }
+html[data-shell="tablet"] .lb-mode .lb-verb { display: block; flex: none; opacity: 1; font-size: 14px; line-height: 1; }
+html[data-shell="tablet"] .lb-mark { display: none; }
+html[data-shell="tablet"] .lb-sep { margin: 6px 4px; }
+html[data-shell="tablet"] .lb-toggle,
+html[data-shell="tablet"] .leftbar .lb-btn[title="Home"] { display: none; }
+
+/* Right rails (12d-12f): 72 px Tools with 52 × 48 buttons, 60 px View with 48 × 46; icon only,
+   never expanding over the page on a tap. */
+html[data-shell="tablet"] .srail { padding: 10px; gap: 4px; align-items: center; }
+html[data-shell="tablet"] .srail-view { padding: 10px 6px; }
+html[data-shell="tablet"] .srail-h { font-size: 9px; padding: 2px 0 4px; }
+html[data-shell="tablet"] .rb { width: 52px; height: 48px; padding: 0; justify-content: center; border-radius: 12px; }
+html[data-shell="tablet"] .rb svg { width: 21px; height: 21px; }
+html[data-shell="tablet"] .srail-view .rb { width: 48px; height: 46px; padding: 0; border-radius: 10px; }
+html[data-shell="tablet"] .srail-view .rb svg { width: 20px; height: 20px; }
+html[data-shell="tablet"] .rb-l,
+html[data-shell="tablet"] .rb-k { display: none; }
+html[data-shell="tablet"] .srail:hover { width: var(--sh-tools); box-shadow: none; z-index: 20; }
+html[data-shell="tablet"] .srail-view:hover { width: var(--sh-view); }
+html[data-shell="tablet"] .srail:hover .srail-h { text-align: center; padding-left: 0; }
+html[data-shell="tablet"] .srail:hover .rtext { justify-content: center; padding-left: 0; }
+
+/* Messages sit above the gesture bar, not above a status bar that isn't there. */
+html[data-shell="tablet"] .msgs { bottom: calc(14px + env(safe-area-inset-bottom)); }
+
+/* Arrange, portrait (12f): desks two across; 76 × 106 page cards; 48 px desk header. */
+@media (max-width: 999px) {
+    html[data-shell="tablet"] .bench-desks { --desk-cols: 2 !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Phone — 12g (Read), 12h (Mark), 12i (Arrange), 12j (Protect + View sheet)
+   The phone shell (PhoneShell.razor) replaces the top bar, left bar and status bar; the mode
+   views still render, and their rails fold away here.
+   ════════════════════════════════════════════════════════════════════════════ */
+html[data-shell="phone"] {
+    --sh-top: 0px; --sh-left: 0px; --sh-left-open: 0px; --sh-tools: 0px; --sh-view: 0px; --sh-status: 0px;
+    --ph-bar: 56px; --ph-strip: 62px; --ph-nav: 80px;
+}
+
+.ph-shell {
+    flex: 1; min-height: 0; display: flex; flex-direction: column;
+    background: var(--chvd-surface-lo);
+    padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
+}
+
+/* App bar: back · title / sub-line · counter · ⋮ */
+.ph-bar {
+    flex: none; height: calc(var(--ph-bar) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0;
+    display: flex; align-items: center; gap: 4px; box-sizing: border-box;
+    background: var(--chvd-surface-hi); border-bottom: var(--chvd-stroke) solid var(--chvd-border);
+    position: relative; z-index: 30;
+}
+.ph-ib {
+    flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 22px; background: transparent; color: var(--chvd-ink); cursor: pointer;
+}
+.ph-ib:active { background: var(--chvd-surface-mid); }
+.ph-brand { padding: 0 8px 0 10px; font-size: 21px; }
+.ph-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-t { font-size: 15.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--chvd-ink); }
+.ph-sub { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-pager {
+    flex: none; display: flex; align-items: center; height: 36px; min-width: 44px; padding: 0 6px; box-sizing: border-box;
+    background: var(--chvd-surface-mid); border: var(--chvd-stroke) solid var(--chvd-border-soft); border-radius: 9px;
+    font-family: var(--chvd-mono); font-size: 12px; color: var(--chvd-ink); cursor: pointer; white-space: nowrap;
+}
+.ph-pager-act:disabled { opacity: .45; cursor: default; }
+.ph-pager-in { width: 64px; text-align: center; user-select: text; -webkit-user-select: text; }
+.ph-pager-in:focus { outline: 1.5px solid var(--chvd-binding); outline-offset: 0; }
+
+/* Content: the mode views render here, edge to edge. */
+.ph-content { flex: 1; min-height: 0; position: relative; overflow: auto; margin: 0; }
+
+/* Floating primary action (12h Save as new, 12i Add desk). */
+.ph-fab {
+    position: absolute; right: 16px; bottom: 16px; z-index: 24;
+    width: 56px; height: 56px; border: none; border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--chvd-binding); color: var(--chvd-on-accent); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); cursor: pointer;
+}
+.ph-fab:disabled { opacity: .45; cursor: default; }
+/* Arrange: stay clear of the Shelf peek. */
+.ph-shell[data-mode="arrange"] .ph-fab { bottom: 68px; z-index: 45; }
+
+/* Tool strip (Mark / Protect): 62 px, 52 × 50 items, sideways scroll when it overflows. */
+.ph-strip {
+    flex: none; height: var(--ph-strip); display: flex; align-items: center; gap: 2px; padding: 0 6px;
+    background: var(--chvd-surface-mid); border-top: var(--chvd-stroke) solid var(--chvd-border-soft);
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+.ph-strip::-webkit-scrollbar { height: 0; }
+.ph-tool {
+    flex: none; width: 52px; height: 50px; border: none; border-radius: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    background: transparent; color: var(--chvd-ink-soft); font-family: var(--chvd-sans-display); font-size: 10px; cursor: pointer;
+}
+.ph-tool.on { background: var(--chvd-binding-soft); color: var(--chvd-binding); }
+.ph-tool:disabled { opacity: .38; cursor: default; }
+
+/* Bottom bar: Read · Mark · Arrange · Protect — icon in a 60 × 32 pill over the italic verb. */
+.ph-nav {
+    flex: none; height: calc(var(--ph-nav) + env(safe-area-inset-bottom)); box-sizing: border-box;
+    display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 8px calc(14px + env(safe-area-inset-bottom));
+    background: var(--chvd-surface-hi); border-top: var(--chvd-stroke) solid var(--chvd-border);
+    position: relative; z-index: 30;
+}
+.ph-nav-b {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    border: none; background: transparent; color: var(--chvd-ink-soft); cursor: pointer; min-height: 48px; padding: 0;
+}
+.ph-pill { display: flex; align-items: center; justify-content: center; width: 60px; height: 32px; border-radius: 16px; }
+.ph-verb { font-family: var(--chvd-serif-display); font-style: italic; font-size: 15px; line-height: 1; }
+.ph-nav-b.on { color: var(--chvd-binding); }
+.ph-nav-b.on .ph-pill { background: var(--chvd-binding-soft); background: color-mix(in srgb, var(--chvd-binding) 16%, transparent); }
+.ph-nav-b:disabled { opacity: .38; cursor: default; }
+
+/* Bottom sheets: the ⋮ menu and the View sheet (12j). */
+.ph-scrim { position: fixed; inset: 0; z-index: 90; background: var(--chvd-scrim); animation: ph-fade var(--chvd-base); }
+.ph-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 91;
+    max-height: 80dvh; display: flex; flex-direction: column; gap: 10px;
+    padding: 8px calc(16px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+    background: var(--chvd-surface-hi); border-top: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .14);
+    animation: ph-rise var(--chvd-base) var(--chvd-ease);
+}
+.ph-handle { align-self: center; display: flex; align-items: center; justify-content: center; width: 64px; height: 20px; margin: -4px 0 -6px; border: none; background: transparent; cursor: pointer; }
+.ph-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--chvd-border); }
+.ph-sheet-hd { display: flex; justify-content: space-between; align-items: baseline; }
+.ph-sheet-t { font-family: var(--chvd-serif-display); font-size: 21px; color: var(--chvd-ink); }
+.ph-sheet-a { border: none; background: transparent; color: var(--chvd-binding); font-size: 13px; min-height: 44px; padding: 0 2px 0 12px; cursor: pointer; font-family: var(--chvd-sans-display); }
+.ph-sheet-body { overflow-y: auto; display: flex; flex-direction: column; }
+.ph-sheet-h { font-family: var(--chvd-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--chvd-ink-muted); padding: 14px 0 6px; }
+.ph-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0;
+    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); background: transparent;
+    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 13.5px; text-align: left; cursor: pointer;
+}
+.ph-row > .cv-icon:first-child { color: var(--chvd-ink-soft); }
+.ph-row-l { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-row-v { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); white-space: nowrap; }
+.ph-row:disabled { color: var(--chvd-ink-muted); cursor: default; }
+@keyframes ph-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ph-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Mode views on a phone: the rails fold into the strip / sheet; the page uses the full width. */
+html[data-shell="phone"] .mview-rails { display: none; }
+html[data-shell="phone"] .rdesk { padding: 12px 0 24px; }
+
+/* Pages & outline drawer and Arrange's Shelf: a sheet that rises from the bottom bar. */
+html[data-shell="phone"] .mdrawer,
+html[data-shell="phone"] .bench-shelf:not(.hidden) {
+    position: fixed; left: 0; right: 0; bottom: calc(var(--ph-nav) + env(safe-area-inset-bottom)); z-index: 40;
+    width: auto; height: 60dvh; max-height: calc(100% - 120px);
+    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border); border-radius: 22px 22px 0 0;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, .14);
+    animation: ph-rise var(--chvd-base) var(--chvd-ease);
+}
+/* The Shelf rests as a 52 px peek above the bottom bar; a tap on it (or a swipe up) opens it. */
+html[data-shell="phone"] .bench-shelf:not(.hidden):not(.chvd-open) { height: 52px; overflow: hidden; padding-top: 22px; cursor: pointer; }
+html[data-shell="phone"] .bench-shelf:not(.hidden) { padding-top: 22px; }
+html[data-shell="phone"] .bench-shelf:not(.hidden)::before {
+    content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px;
+    border-radius: 2px; background: var(--chvd-border);
+}
+html[data-shell="phone"] .bench-shelf:not(.hidden):not(.chvd-open) > :not(.shelf-head) { visibility: hidden; }
+html[data-shell="phone"] .bench-desks { padding-bottom: 76px; }
+html[data-shell="phone"] .mdrawer-tabs { height: 48px; }
+html[data-shell="phone"] .mdrawer-x { min-width: 44px; min-height: 44px; justify-content: center; align-items: center; }
+html[data-shell="phone"] .mdrawer-body { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 18px; align-content: flex-start; }
+
+/* Settings cards (Text, Find & redact, Layers, Measure, Print…): bottom sheets above the strip. */
+html[data-shell="phone"] .fcards {
+    position: fixed; top: auto; left: 0; right: 0; bottom: calc(var(--ph-nav) + env(safe-area-inset-bottom)); z-index: 40;
+    max-height: 60dvh; gap: 0; overflow-y: auto;
+}
+html[data-shell="phone"] .ph-shell[data-mode="mark"] .fcards,
+html[data-shell="phone"] .ph-shell[data-mode="protect"] .fcards { bottom: var(--ph-strip); }
+html[data-shell="phone"] .fcard {
+    width: auto !important; border-radius: 22px 22px 0 0; border-left: none; border-right: none; border-bottom: none;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, .14); padding: 14px 16px;
+}
+html[data-shell="phone"] .fc-btn,
+html[data-shell="phone"] .fc-num,
+html[data-shell="phone"] .fc-in,
+html[data-shell="phone"] .fc-sel,
+html[data-shell="phone"] .fc-seg > button { min-height: 44px; }
+html[data-shell="phone"] .fcard-x { min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
+
+/* Messages: above the bottom bar (and strip). */
+html[data-shell="phone"] .msgs { left: 12px; right: 12px; bottom: calc(var(--ph-nav) + 12px + env(safe-area-inset-bottom)); align-items: stretch; }
+html[data-shell="phone"] .msg { max-width: none; }
+
+/* Command bar (still reachable from Find): full width under the app bar. */
+html[data-shell="phone"] .cmd { top: calc(var(--ph-bar) + env(safe-area-inset-top) + 8px); width: calc(100vw - 16px); }
+
+/* Arrange (12i): desks stack; each desk's pages scroll sideways; 58 × 82 cards; the header keeps
+   name · page count · ⋯ (everything else is in the ⋯ menu). */
+html[data-shell="phone"] .bench-main { flex-direction: column; }
+html[data-shell="phone"] .bench-desks { padding: 12px; gap: 12px; flex-direction: column; flex-wrap: nowrap; padding-bottom: 88px; }
+html[data-shell="phone"] .desk { flex: none; width: 100%; min-height: 0; border-radius: 12px; overflow: hidden; }
+html[data-shell="phone"] .desk-h { height: 46px; padding: 0 4px 0 14px; gap: 8px; }
+html[data-shell="phone"] .desk-swatch,
+html[data-shell="phone"] .desk-wm,
+html[data-shell="phone"] .desk-sel,
+html[data-shell="phone"] .desk-ord,
+html[data-shell="phone"] .desk-dup,
+html[data-shell="phone"] .desk-clear,
+html[data-shell="phone"] .desk-del,
+html[data-shell="phone"] .desk-foot { display: none; }
+html[data-shell="phone"] .desk-name { font-size: 17px; }
+html[data-shell="phone"] .desk-count { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); }
+html[data-shell="phone"] .desk-more { width: 44px; height: 44px; }
+html[data-shell="phone"] .desk-drop {
+    display: flex; flex-wrap: nowrap; gap: 10px; padding: 2px 14px 14px; min-height: 0;
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
+}
+html[data-shell="phone"] .bpage { flex: none; width: 58px; }
+html[data-shell="phone"] .bthumb { width: 58px; }
+html[data-shell="phone"] .desk-add { min-height: 88px; }
+
+/* Immersive keeps only the page, as on desktop. */
+body.chvd-immersive .ph-bar,
+body.chvd-immersive .ph-strip,
+body.chvd-immersive .ph-nav,
+body.chvd-immersive .ph-fab { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .ph-sheet, .ph-scrim, html[data-shell="phone"] .mdrawer, html[data-shell="phone"] .bench-shelf { animation: none; }
+}
+/* Settings › Accessibility › Reduce motion is handled for everything by prefs.css. */

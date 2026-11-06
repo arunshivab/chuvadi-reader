@@ -1,0 +1,11 @@
+/* macOS / left-hand buttons: 15 px dots, gap 9 (design handout, Shell layout). */
+.traffic-left {
+    margin-left: 0;
+    margin-right: 10px;
+    gap: 9px;
+}
+
+.traffic-left .tl {
+    width: 15px;
+    height: 15px;
+}

@@ -13,6 +13,7 @@
 @inject CategoryService Categories
 @inject SaveFolderService SaveFolders
 @inject PreferencesService Prefs
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <PageTitle>Chuvadi · Home</PageTitle>
 
@@ -28,27 +29,68 @@
                     <span class="ta" lang="ta">வணக்கம்.</span>
                 }
             </h1>
+            @if (Platform.Capabilities.ServerSide)
+            {
+                <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · @ChuvadiReader.Ui.Components.Platform.PlatformText.HomeServerLine</p>
+            }
+            else
+            {
             <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · nothing leaves this device.</p>
+            }
         </section>
 
         @if (IsFirstRun)
         {
             <div class="drop first">
                 <span class="drop-ic"><Icon Name="upload" Size="34" /></span>
+                @if (CanDrop)
+                {
                 <span class="drop-title">Drop your first document here</span>
+                }
+                else
+                {
+                    <span class="drop-title">@(IsPortal ? "Upload your first document" : "Open your first document")</span>
+                }
                 <span class="drop-sub">PDF, Word or Excel — even password-protected ones.</span>
+                @if (IsPortal)
+                {
+                    <span class="first-actions">
+                        <button type="button" class="btn primary" @onclick="OpenFile">Upload a file…</button>
+                    </span>
+                }
+                else
+                {
                 <span class="first-actions">
                     <button type="button" class="btn primary" @onclick="OpenFile">Open a file…</button>
                     <button type="button" class="btn" @onclick="ChooseLibraryFolder">Choose a library folder</button>
                 </span>
+                }
             </div>
-            <p class="tip">Tip: Ctrl K finds any file or action. Try typing “merge”.</p>
+            @if (ChuvadiReader.Platform.ShellLayouts.Shell(Platform) == ChuvadiReader.Platform.ShellLayout.Phone)
+            {
+                <p class="tip">@ChuvadiReader.Ui.Components.Platform.PlatformText.PhoneFindTip</p>
+            }
+            else
+            {
+            <p class="tip">Tip: @Platform.Keys.Format("Ctrl K") finds any file or action. Try typing “merge”.</p>
+            }
         }
         else
         {
-            <button type="button" class="drop" @onclick="OpenFile" title="Drop a file anywhere on the window, or click to choose one">
+            <button type="button" class="drop" @onclick="OpenFile" title="@(CanDrop ? "Drop a file anywhere on the window, or click to choose one" : IsPortal ? "Choose a document to upload" : "Choose a document to open")">
                 <span class="drop-ic"><Icon Name="upload" Size="28" /></span>
+                @if (IsPortal)
+                {
+                    <span class="drop-title">@(CanDrop ? "Drop a document, or click to upload" : "Click to upload a document")</span>
+                }
+                else if (CanDrop)
+                {
                 <span class="drop-title">Drop a document, or click to open</span>
+                }
+                else
+                {
+                    <span class="drop-title">Open a document</span>
+                }
                 <span class="chips">
                     <span class="chip on">pdf</span>
                     <span class="chip">docx</span>
@@ -109,7 +151,10 @@
         <section class="block smap">
             <h2 class="eye smap-head">
                 <span>Storage map</span>
-                <span class="smap-folder" title="@Categories.BaseFolder">@Categories.BaseFolder</span>
+                @if (Platform.Capabilities.RevealInFolder)
+                {
+                    <span class="smap-folder" title="@Categories.BaseFolder">@Categories.BaseFolder</span>
+                }
                 <span class="smap-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
             </h2>
             <div class="smap-grid">
@@ -157,7 +202,14 @@
         <button type="button" class="shelf" @onclick='() => Nav.NavigateTo("/library")'>
             <span class="eye shelf-head">
                 <Icon Name="library" Size="12" /> Library
+                @if (Platform.Capabilities.RevealInFolder)
+                {
                 <span class="shelf-meta" title="@Lib.FolderPath">@ShortFolder(Lib.FolderPath) · @(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+                }
+                else
+                {
+                    <span class="shelf-meta">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+                }
             </span>
             <span class="shelf-wrap" aria-hidden="true">
                 <span class="books">
@@ -181,6 +233,8 @@
             <span class="shelf-go">@(Books.Count == 0 ? "Your shelves are empty — open the Library" : "Open the shelves") <Icon Name="chevron-right" Size="13" /></span>
         </button>
 
+        @if (Platform.Capabilities.WatchFolders)
+        {
         <section class="watch">
             <h2 class="eye"><Icon Name="folder" Size="12" /> Watched folder</h2>
             <span class="w-path" title="@Watched.FolderPath">@Watched.FolderPath</span>
@@ -190,6 +244,7 @@
                 <button type="button" class="mini" disabled title="Coming soon — one watched folder for now"><Icon Name="plus" Size="11" /> add folder</button>
             </span>
         </section>
+        }
     </aside>
 
 </div>
@@ -240,15 +295,20 @@
 
     // ── Greeting ─────────────────────────────────────────────────────────
 
+    // The Web portal (H3 "Upload", U-11): uploads, not local files.
+    private bool IsPortal => Platform.Kind == ChuvadiReader.Platform.PlatformKind.Web;
+
+    // D-89 B: no "Drop" wording where the platform can't take a drop (Android; the portal until its
+    // drop catcher is on). Desktop: always true, original text.
+    private bool CanDrop => Platform.Capabilities.DropFiles;
+
     private static string DayLine => DateTime.Now.ToString("dddd d MMM yyyy · HH:mm");
 
     private string Greeting
     {
         get
         {
-            var h = DateTime.Now.Hour;
-            var part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
-            return string.IsNullOrWhiteSpace(Profile.Name) ? $"Good {part}." : $"Good {part}, {Profile.Name}.";
+            return GreetingText.For(DateTime.Now.Hour, Profile.Name);
         }
     }
 

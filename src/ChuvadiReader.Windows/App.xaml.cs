@@ -10,6 +10,9 @@ using ChuvadiReader.Core.Storage;
 using ChuvadiReader.Core.Theme;
 using ChuvadiReader.Core.Window;
 using ChuvadiReader.Windows.Platform;
+using ChuvadiReader.Hosting;
+using ChuvadiReader.Hosting.Desktop;
+using ChuvadiReader.Platform;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ChuvadiReader.Windows;
@@ -20,6 +23,7 @@ public partial class App : Application
     private MainWindow? _main;
     private WpfWindowControls? _windowControls;
     private DispatcherTimer? _fallback;
+    private DesktopSingleInstance? _instance;
 
     private static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -30,6 +34,15 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        // Single instance (W-A, F-1): a launch while Chuvadi runs hands its files to the running copy
+        // and exits here, before building anything. The first launch pays only for one named mutex.
+        _instance = DesktopSingleInstance.Claim(e.Args, beforeHandOff: WpfForeground.AllowAnyProcess);
+        if (_instance.Role == InstanceRole.HandedOver)
+        {
+            Shutdown();
+            return;
+        }
 
         // Nothing fails silently any more.
         DispatcherUnhandledException += (_, args) =>
@@ -58,49 +71,26 @@ public partial class App : Application
                 "Chuvadi");
 
             var storage = new FileAppStorage(appDataDir);
+
+            // Every Core service, registered once for all hosts (ChuvadiReader.Hosting).
+            services.AddChuvadiReader(AppStateLifetime.Process);
+
+            // Windows implementations of the platform seams.
             services.AddSingleton<IAppStorage>(storage);
-            services.AddSingleton<SaveFolderService>();
-            services.AddSingleton<CategoryService>();
-            services.AddSingleton<ThemeService>();
-            services.AddSingleton<UserProfileService>();
-            services.AddSingleton<RecentFilesService>();
-            services.AddSingleton<PinnedService>();
-            services.AddSingleton<WatchedFolderService>();
-            services.AddSingleton<LibraryService>();
-            services.AddSingleton<TagService>();
-            services.AddSingleton<FolderSearchService>();
-            services.AddSingleton<DocumentPropertiesService>();
-            services.AddSingleton<ExportService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.RedactService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.StampService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.DocxViewService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.XlsxViewService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.FlattenService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.RecoveryService>();
-            services.AddSingleton<PressService>();
-            services.AddSingleton<IPdfReader, ChuvadiPdfReader>();
-            services.AddSingleton<TabsService>();
-            services.AddSingleton<PdfToolsService>();
-            services.AddSingleton<BenchComposer>();
-            services.AddSingleton<BenchService>();
-            services.AddSingleton<SessionService>();
-            services.AddSingleton<OpenDocumentService>();
-            services.AddSingleton<BenchDropService>();
-            services.AddSingleton<RedactRequestService>();
-            services.AddSingleton<ShellService>();
             services.AddSingleton<ChuvadiReader.Core.Window.IUiScale, ChuvadiReader.Windows.Platform.WpfUiScale>();
             services.AddSingleton<ChuvadiReader.Core.Window.IExternalLinks, ChuvadiReader.Windows.Platform.WpfExternalLinks>();
-            services.AddSingleton<ChuvadiReader.Core.Storage.PreferencesService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.TextViewService>();
-            services.AddSingleton<MeasureService>();
-            services.AddSingleton<SignatureCheckService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.PasswordService>();
-            services.AddSingleton<ChuvadiReader.Core.Documents.CertificateSignService>();
             services.AddSingleton<IPrintService, ChuvadiReader.Windows.Platform.WpfPrintService>();
-            services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
             services.AddSingleton<IFilePicker, WpfFilePicker>();
             services.AddSingleton<IImageClipboard, WpfImageClipboard>();
-            services.AddSingleton<IAppReadySignal, AppReadySignal>();
+            services.AddSingleton<IClipboard, WpfClipboard>();
+            services.AddSingleton<IFileManager, WpfFileManager>();
+            services.AddSingleton<IAppInstance>(_instance);
+            services.AddSingleton<IPlatformInfo>(new FixedPlatformInfo(
+                PlatformKind.Windows,
+                InputKinds.Mouse | InputKinds.Keyboard | InputKinds.Touch,
+                new ShellChrome(ChuvadiReader.Platform.WindowButtons.Right, NativeMenuBar: false, AccountMenu: false, TitleBarDrag: true, CornerRadiusPx: 0),
+                FixedPlatformInfo.DesktopCapabilities,
+                new CtrlKeyLabels()));
 
             _windowControls = new WpfWindowControls();
             services.AddSingleton<IWindowControls>(_windowControls);
@@ -110,6 +100,14 @@ public partial class App : Application
             _main = new MainWindow(Services);
             _windowControls.Attach(_main);
             MainWindow = _main;
+
+            // Files this copy was started with (Open with, double-click) and files handed over later
+            // all go through one router; each opens in its own tab once the Ui has rendered.
+            var incoming = Services.GetRequiredService<IncomingFiles>();
+            incoming.Delivered += BringToFront;
+            incoming.Receive(e.Args);
+            var instance = _instance;
+            Services.GetRequiredService<IAppReadySignal>().Ready += () => instance.StartListening(RunOnUi);
 
             // Match the window background to the saved theme so the pale default
             // doesn't flash before the (dark) WebView content paints on startup.
@@ -173,6 +171,49 @@ public partial class App : Application
                 _main.Focus();
             }
         });
+    }
+
+    /// <summary>Runs <paramref name="action"/> on the UI thread within <paramref name="wait"/>; when the
+    /// UI is busy past that, the action is withdrawn and never runs (the new launch opens its own window).</summary>
+    private bool RunOnUi(Action action, TimeSpan wait)
+    {
+        var op = Dispatcher.InvokeAsync(action);
+        if (op.Wait(wait) == DispatcherOperationStatus.Completed)
+        {
+            return true;
+        }
+
+        if (op.Abort())
+        {
+            return false;
+        }
+
+        op.Wait(); // it had just started: let it finish (a few microseconds)
+        return op.Status == DispatcherOperationStatus.Completed;
+    }
+
+    private void BringToFront()
+    {
+        if (_main is null || !_main.IsVisible)
+        {
+            return; // at startup the window shows itself
+        }
+
+        if (_main.WindowState == WindowState.Minimized)
+        {
+            _main.WindowState = WindowState.Normal;
+        }
+
+        _main.Activate();
+        _main.Topmost = true;
+        _main.Topmost = false;
+        _main.Focus();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _instance?.Dispose();
+        base.OnExit(e);
     }
 
     private static void Report(Exception ex)

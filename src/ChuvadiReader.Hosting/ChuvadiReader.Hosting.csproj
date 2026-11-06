@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Shared host kit: the one place that registers Core's services, plus the platform defaults
+    every host can reuse. Each host (Windows, Mac, Linux, Android, Web) references this project,
+    calls AddChuvadiReader(...), then registers its own platform implementations.
+    STATUS: DRAFT pending Arun's decisions (see docs/foundation/PLATFORM-INTERFACE.md).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ChuvadiReader.Hosting</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ChuvadiReader.Platform\ChuvadiReader.Platform.csproj" />
+    <ProjectReference Include="..\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
+    <!-- Ui brings the Blazor framework package (and with it Microsoft.Extensions.DependencyInjection). -->
+    <ProjectReference Include="..\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChuvadiReader.Hosting.Tests" />
+  </ItemGroup>
+
+</Project>

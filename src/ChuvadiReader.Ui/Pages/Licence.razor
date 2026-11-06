@@ -1,0 +1,35 @@
+@page "/licence"
+@page "/terms"
+@page "/privacy"
+@inject NavigationManager Nav
+
+@*
+    The legal documents on their own addresses, for links from outside the app shell: the portal's
+    sign-in "Terms of use" (/terms) and the privacy policy link the stores require (/privacy).
+    /licence?part=notices opens a given document. The Web host serves /terms and /privacy before sign-in.
+*@
+<PageTitle>Chuvadi · @Heading</PageTitle>
+<div class="licence-page">
+    <ChuvadiReader.Ui.Components.Legal.LicencesSection Part="@Part" Title="@Heading" />
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "part")]
+    public string? PartQuery { get; set; }
+
+    private string Route => "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+
+    private string? Part => Route switch
+    {
+        "/terms" => "terms",
+        "/privacy" => "privacy",
+        _ => PartQuery,
+    };
+
+    private string Heading => Route switch
+    {
+        "/terms" => "Terms of use",
+        "/privacy" => "Privacy",
+        _ => "Licences",
+    };
+}

@@ -1,0 +1,96 @@
+@using ChuvadiReader.Ui.Components.Platform
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ShellService Shell
+@inject TabsService Tabs
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
+
+@*
+    Touch behaviour for the tablet and phone shells (hook H-2): renders nothing; loads mobile.js,
+    which turns touch into what the desktop already understands —
+      * pinch → the Reader's own cursor-anchored zoom (Ctrl + wheel on the page desk)
+      * double-tap → Fit width ⇄ Fit page;  swipe (when the page fits) → next / previous page
+      * tap on the canvas → shows the per-page strip (the desktop shows it on hover)
+      * Arrange: long-press a page to drag it; a quick swipe scrolls the desks instead
+    MainLayout renders this only for the tablet and phone layouts, so desktop and portal pay nothing.
+*@
+
+@code {
+    private IJSObjectReference? _js;
+    private DotNetObjectReference<TouchSupport>? _self;
+    private bool _on;
+
+    private bool Wanted => ChuvadiReader.Platform.ShellLayouts.Shell(Platform) is ChuvadiReader.Platform.ShellLayout.Tablet or ChuvadiReader.Platform.ShellLayout.Phone;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Wanted == _on)
+        {
+            return;
+        }
+
+        try
+        {
+            _js ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/mobile.js");
+            if (Wanted)
+            {
+                _self ??= DotNetObjectReference.Create(this);
+                await _js.InvokeVoidAsync("initTouch", _self);
+            }
+            else
+            {
+                await _js.InvokeVoidAsync("disposeTouch");
+            }
+
+            _on = Wanted;
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+
+    /// <summary>Double-tap on the page (Read): Fit width ⇄ Fit page.</summary>
+    [JSInvokable]
+    public Task OnDoubleTap()
+    {
+        if (Shell.Mode != DocMode.Read)
+        {
+            return Task.CompletedTask;
+        }
+
+        var id = Tabs.Active?.FitMode == ReaderFitMode.Width ? "v.fitp" : "v.fitw";
+        var cmd = Shell.Commands.FirstOrDefault(c => c.Id == id);
+        return cmd is { IsEnabled: true } ? InvokeAsync(cmd.Run) : Task.CompletedTask;
+    }
+
+    /// <summary>Horizontal swipe on a page that fits (Read): next (+1) or previous (−1) page or spread.</summary>
+    [JSInvokable]
+    public Task OnSwipe(int direction)
+    {
+        if (Shell.Mode != DocMode.Read || !Shell.HasCounter)
+        {
+            return Task.CompletedTask;
+        }
+
+        var target = Shell.CounterCurrent + Math.Sign(direction) * Shell.CounterStep;
+        return InvokeAsync(() => Shell.GoToAsync(target));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _self?.Dispose();
+        if (_js is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _js.InvokeVoidAsync("disposeTouch");
+            await _js.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+    }
+}

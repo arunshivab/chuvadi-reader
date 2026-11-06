@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Dev-only startup probe (never shipped). Measures Core/Ui startup work in a fresh process:
+    runtime start → Main, service-provider build, and the first render of the real App component
+    (MainLayout + Home, every OnInitialized) through Blazor's HtmlRenderer. WebView2 and window
+    creation are Windows-only and measured by scripts/measure-startup.ps1 instead.
+    Build with -p:Before=true against chuvadi-reader main (no Hosting kit) for the baseline.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DefineConstants Condition="'$(Before)' == 'true'">$(DefineConstants);BEFORE</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
+    <ProjectReference Include="..\..\src\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Before)' != 'true'">
+    <ProjectReference Include="..\..\src\ChuvadiReader.Hosting\ChuvadiReader.Hosting.csproj" />
+  </ItemGroup>
+</Project>

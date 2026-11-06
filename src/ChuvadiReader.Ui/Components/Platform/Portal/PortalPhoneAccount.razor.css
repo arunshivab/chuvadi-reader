@@ -1,0 +1,16 @@
+/* Portal account block at the foot of the phone ⋮ sheet (D-32). */
+.ppa { display: flex; flex-direction: column; gap: 8px; padding: 14px 0 10px; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); margin-top: 6px; }
+.ppa-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ppa-av {
+    width: 36px; height: 36px; flex: none; border-radius: 50%; background: var(--chvd-binding); color: var(--chvd-on-accent);
+    display: flex; align-items: center; justify-content: center; font-family: var(--chvd-mono); font-size: 12px;
+}
+.ppa-t { display: flex; flex-direction: column; min-width: 0; }
+.ppa-t b { font-family: var(--chvd-sans-display); font-weight: 600; font-size: 15px; color: var(--chvd-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppa-id { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppa-server { display: flex; align-items: center; gap: 8px; font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); line-height: 1.4; }
+/* Same blue as the status bar's .status-dot.server in shell.css (D-37). */
+.ppa-server .status-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: #2c3e8c; }
+html[data-theme="dark"] .ppa-server .status-dot { background: #8fa3e6; }
+a.ph-row { text-decoration: none; color: var(--chvd-ink); }
+.ppa-out, .ppa-out:hover { color: var(--chvd-danger); }

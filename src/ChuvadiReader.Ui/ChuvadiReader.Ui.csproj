@@ -12,4 +12,10 @@
     <!-- Your icon system, consumed as a packaged distribution (manifest embedded in its dll). -->
     <PackageReference Include="LiPicons.Blazor" Version="1.1.0" />
   </ItemGroup>
+  <!-- Legal texts for the Licences, /terms and /privacy pages (one source: LICENSE and legal/*.txt). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\LICENSE" LogicalName="Chuvadi.Legal.LICENSE.txt" />
+    <EmbeddedResource Include="..\..\legal\*.txt" LogicalName="Chuvadi.Legal.%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

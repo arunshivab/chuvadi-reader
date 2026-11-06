@@ -1,5 +1,7 @@
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Operations;
+using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -48,7 +50,13 @@ public sealed class PressService
 {
     private readonly SaveFolderService _saveFolders;
 
-    public PressService(SaveFolderService saveFolders) => _saveFolders = saveFolders;
+    private readonly IAppPaths? _paths;
+
+    public PressService(SaveFolderService saveFolders, IAppPaths? paths = null)
+    {
+        _saveFolders = saveFolders;
+        _paths = paths;
+    }
 
     public string DefaultFolder => _saveFolders.SubFolder("Compressed");
 
@@ -82,7 +90,7 @@ public sealed class PressService
             foreach (var quality in new[] { 85, 70, 55, 45, 35, 25 })
             {
                 ct.ThrowIfCancellationRequested();
-                var tmp = Path.Combine(Path.GetTempPath(), $"press-{Guid.NewGuid():N}.pdf");
+                var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"press-{Guid.NewGuid():N}.pdf");
                 var result = RunCompress(pdfPath, tmp, new PressOptions(true, quality, 128, 2_000), ct);
                 var size = new FileInfo(tmp).Length;
 

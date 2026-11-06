@@ -1,0 +1,32 @@
+@using ChuvadiReader.Platform
+@implements IDisposable
+@inject IPlatformInfo Platform
+@inject IWindowControls Win
+
+@*
+    Left-hand window buttons: macOS order (close · minimise · zoom), and Linux desktops whose button
+    layout is on the left. MainLayout instantiates this only when Chrome.Buttons is Left; right-hand
+    buttons (Windows, Linux default) stay inline in MainLayout so the Windows markup and startup are
+    exactly as before. Android and Web: none (Web shows the account menu instead).
+*@
+
+@if (Platform.Chrome.Buttons == Side)
+{
+    <div class="traffic traffic-left" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+        <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
+        <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
+        <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Exit full screen" : "Zoom")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
+    </div>
+}
+
+@code {
+    /// <summary>Which end of the top bar this instance sits at.</summary>
+    [Parameter, EditorRequired]
+    public ChuvadiReader.Platform.WindowButtons Side { get; set; }
+
+    protected override void OnInitialized() => Win.StateChanged += OnWindowStateChanged;
+
+    private void OnWindowStateChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Win.StateChanged -= OnWindowStateChanged;
+}

@@ -1,0 +1,18 @@
+@namespace ChuvadiReader.Ui.Components.Platform.Portal
+@using ChuvadiReader.Platform
+@implements IDisposable
+@inject IAccount Account
+
+@*
+    Status-bar user item on the web portal (design 12b): "Arun S. · Sangam". Replaces the desktop's
+    avatar + computer name, inside the same status-bar item, when IPlatformInfo.Capabilities.ServerSide is true.
+*@
+@Account.DisplayName · Sangam
+
+@code {
+    protected override void OnInitialized() => Account.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Account.Changed -= OnChanged;
+}

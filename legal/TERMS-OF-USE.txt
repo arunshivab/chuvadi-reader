@@ -1,0 +1,40 @@
+DRAFT, to be reviewed by counsel. Do not publish on the portal until this line is removed.
+
+CHUVADI WEB PORTAL - TERMS OF USE
+
+Copyright © 2026 Sthraas Intelligence Pvt Ltd. All rights reserved.
+
+These terms govern your use of the Chuvadi web portal (the "Portal"), operated by Sthraas Intelligence Pvt Ltd, India ("Sthraas", "we"). By signing in or using the Portal you agree to them. If you use the Portal for an organisation, you confirm you may accept these terms for it. The Chuvadi Reader apps for Windows, macOS, Linux and Android are covered by the Chuvadi End User Licence Agreement instead.
+
+1. The service. The Portal lets you open, read, mark, arrange, protect and save documents in your browser. Chuvadi is free. We may change, suspend or end the Portal, or any feature of it, at any time.
+
+2. Your account. You sign in with your Sangam ID. Sangam is a separate identity service with its own terms; you are responsible for keeping your Sangam credentials safe and for what is done with your signed-in session. Tell us at once if you believe your account has been misused.
+
+3. Your documents.
+   - You keep all rights in the documents you upload. You give Sthraas only the permission needed to process them for you while you use the Portal.
+   - Your documents are processed on Chuvadi's servers in an encrypted working area that only your session can use. They are deleted when you sign out, when your session ends or expires, or if the session stops unexpectedly. Nothing you upload is kept after your session.
+   - The Portal is not a storage service. Save or download anything you want to keep before you sign out.
+   - How we handle personal data is described in the Chuvadi Privacy Notice.
+
+4. Acceptable use. You must not use the Portal to:
+   - upload or process anything you have no right to use, or anything unlawful;
+   - try to reach another person's documents or session, probe, scan or test the Portal's security, or get around its limits;
+   - overload, disrupt or reverse engineer the Portal, or access it by automated means except as the Portal itself provides;
+   - resell, sublicense or offer the Portal to others as a service.
+   We may suspend or end your access if you breach these terms or if needed to protect the Portal or other users.
+
+5. Ownership. The Portal and Chuvadi Reader are owned by Sthraas and are proprietary software, not open source. Nothing in these terms transfers any right in them to you, except the right to use the Portal under these terms. Third-party components are listed in the Third-party notices (Settings › About › Licences).
+
+6. No warranty. The Portal is provided "as is" and "as available", without warranty of any kind, express or implied, including merchantability, fitness for a particular purpose, non-infringement and uninterrupted or error-free operation. It is not a medical device and is not intended for diagnosis or treatment decisions.
+
+7. Limitation of liability. To the fullest extent permitted by law, Sthraas is not liable for any indirect, incidental, special or consequential damages, or for loss of data, documents, profits or revenue, arising from the Portal. Where liability cannot be excluded, it is limited to the amount you paid for the Portal (which is zero).
+
+8. Indemnity. You will compensate Sthraas for losses arising from documents you upload or from your breach of these terms, to the extent permitted by law.
+
+9. Changes to these terms. We may update these terms. The date below shows the latest version. If a change is significant we will tell you on the Portal before it applies; continuing to use the Portal after that means you accept the new terms.
+
+10. Grievances. Questions or complaints about the Portal or these terms: [grievance officer name - to be confirmed], Sthraas Intelligence Pvt Ltd, [registered address - to be confirmed], [grievance e-mail - to be confirmed]. We will acknowledge within [48 hours - to be confirmed] and resolve within the time the law requires.
+
+11. Governing law. These terms are governed by the laws of India. The courts at Ahmedabad, Gujarat, India have exclusive jurisdiction.
+
+Last updated: [date - to be set on publication]

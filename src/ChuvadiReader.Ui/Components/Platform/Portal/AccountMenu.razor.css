@@ -1,0 +1,54 @@
+/* Portal account menu — Portal & Android 12b. Theme tokens only, so all five themes follow. */
+.acct-wrap { position: relative; display: flex; margin-left: 4px; }
+
+.acct-chip {
+    display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 4px;
+    border: var(--chvd-stroke) solid var(--chvd-border); border-radius: 15px; background: transparent;
+    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 12.5px; cursor: pointer; white-space: nowrap;
+}
+.acct-chip:hover, .acct-chip.on { background: var(--chvd-surface-mid); border-color: var(--chvd-binding); }
+.acct-chip:focus-visible, .acct-item:focus-visible { outline: 1.5px solid var(--chvd-binding); outline-offset: 1px; }
+
+.acct-av {
+    width: 22px; height: 22px; flex: none; border-radius: 50%;
+    background: var(--chvd-binding); color: var(--chvd-on-accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--chvd-mono); font-size: 9px; letter-spacing: 0;
+}
+.acct-av-lg { width: 34px; height: 34px; font-size: 11px; }
+
+.acct-pop {
+    /* 12b: the card opens just below the top bar, beside the Tools rail (right = Tools + View + 12 px). */
+    position: fixed; top: calc(var(--sh-top, 40px) + 14px); right: calc(var(--sh-tools, 64px) + var(--sh-view, 54px) + 12px);
+    z-index: 81; width: 300px;
+    display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
+    background: var(--chvd-surface-hi); border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: var(--chvd-radius-xl); box-shadow: var(--chvd-shadow-popover);
+    font-size: 12.5px; color: var(--chvd-ink);
+}
+
+.acct-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.acct-who-t { display: flex; flex-direction: column; min-width: 0; }
+.acct-who-t b { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-id { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.acct-item {
+    display: flex; align-items: center; gap: 10px; height: 32px; width: 100%; padding: 0;
+    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); background: transparent;
+    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 12.5px;
+    text-align: left; text-decoration: none; cursor: pointer;
+}
+.acct-item:hover { color: var(--chvd-binding); }
+.acct-out, .acct-out:hover { color: var(--chvd-danger); }
+.acct-item:disabled { opacity: .5; cursor: default; }
+
+/* Tablet-sized touch browsers (D-32): 40 px chip like the other top-bar controls (mobile.css), 48 px rows. */
+html[data-shell="tablet"] .acct-chip { height: 40px; border-radius: 20px; padding: 0 10px 0 5px; font-size: 13.5px; }
+html[data-shell="tablet"] .acct-av { width: 28px; height: 28px; font-size: 10.5px; }
+html[data-shell="tablet"] .acct-item { height: 48px; font-size: 14px; }
+
+/* Narrow browsers: the chip keeps only the avatar. */
+@media (max-width: 720px) {
+    .acct-first { display: none; }
+    .acct-pop { right: 12px; width: min(300px, calc(100vw - 24px)); }
+}

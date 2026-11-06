@@ -194,6 +194,9 @@
 }
 .sb-item { display: flex; align-items: center; gap: 6px; }
 .statusbar .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--chvd-olive); }
+/* Web portal (design 12b, D-37): processed on the server → blue dot; lighter on the dark papers. */
+.statusbar .status-dot.server { background: #2c3e8c; }
+html[data-theme="dark"] .statusbar .status-dot.server { background: #8fa3e6; }
 .sb-div { width: 0.5px; height: 12px; background: var(--chvd-border); flex: none; }
 .sb-avatar {
     width: 16px; height: 16px; border-radius: 50%; background: var(--chvd-binding); color: var(--chvd-on-accent);
@@ -424,3 +427,14 @@ body.chvd-immersive .shell-body > .content { margin-left: 0; }
 /* Immersive keeps its dark screen behind the page */
 body.chvd-immersive .mview,
 body.chvd-immersive .mview-canvas { background: #070a0c; }
+
+/* D-39 · WebKit (WKWebView, WebKitGTK, Safari) at 1×–1.25× drops 0.5px-wide boxes at fractional
+   positions, so these hairlines vanish; a 0.5px border always paints. Applied on non-Windows hosts
+   only — <html data-platform> is never set on Windows — so WebView2 output is unchanged (Chromium
+   paints the border variant differently at 125 % and 175 %, which is why it isn't global). */
+html[data-platform] .sb-div { width: 0; background: none; border-left: 0.5px solid var(--chvd-border); }
+html[data-platform] .pop-sep,
+html[data-platform] .lb-sep,
+html[data-platform] .rsepx,
+html[data-platform] .rtabs-msep,
+html[data-platform] .psi-or span { height: 0; background: none; border-top: 0.5px solid var(--chvd-border-soft); }

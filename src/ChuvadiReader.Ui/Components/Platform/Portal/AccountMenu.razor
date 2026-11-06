@@ -1,0 +1,83 @@
+@namespace ChuvadiReader.Ui.Components.Platform.Portal
+@using ChuvadiReader.Platform
+@implements IDisposable
+@inject IAccount Account
+@inject PortalLinks Links
+
+@*
+    Web portal account menu (design: Portal & Android 12b). Sits at the end of the top bar where the
+    desktop draws its window buttons; shown only when IPlatformInfo.Chrome.AccountMenu is true.
+    Scope (Arun, 6 Nov): no per-user storage and no sharing this release, so the handout's storage
+    meter, "My files" and "Shared with me" are left out. Items: Get the desktop app · Account
+    settings · Sign out.
+*@
+<span class="acct-wrap" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
+    <button class="acct-chip @(_open ? "on" : null)" @onclick="Toggle" aria-haspopup="menu" aria-expanded="@(_open ? "true" : "false")"
+            title="@Account.DisplayName" aria-label="Account: @Account.DisplayName">
+        <span class="acct-av">@AccountText.Initials(Account.DisplayName)</span>
+        <span class="acct-first">@AccountText.FirstName(Account.DisplayName)</span>
+        <Icon Name="chevron-down" Size="11" />
+    </button>
+    @if (_open)
+    {
+        <div class="pop-scrim" @onclick="Close"></div>
+        <div class="acct-pop" role="menu" @onkeydown="OnKey">
+            <div class="acct-who">
+                <span class="acct-av acct-av-lg">@AccountText.Initials(Account.DisplayName)</span>
+                <div class="acct-who-t">
+                    <b>@Account.DisplayName</b>
+                    @if (!string.IsNullOrEmpty(Account.Email))
+                    {
+                        <span class="acct-id">@Account.Email@(string.IsNullOrEmpty(Account.Unit) ? null : " · " + Account.Unit)</span>
+                    }
+                </div>
+            </div>
+            <a class="acct-item" role="menuitem" href="@Links.DesktopAppUrl" target="_blank" rel="noopener" @onclick="Close">
+                <Icon Name="download" Size="15" />Get the desktop app
+            </a>
+            @if (Links.AccountSettingsUrl is { } settings)
+            {
+                <a class="acct-item" role="menuitem" href="@settings" target="_blank" rel="noopener" @onclick="Close">
+                    <Icon Name="settings" Size="15" />Account settings
+                </a>
+            }
+            <button class="acct-item acct-out" role="menuitem" @onclick="SignOut" disabled="@_signingOut">
+                <Icon Name="log-out" Size="15" />Sign out
+            </button>
+        </div>
+    }
+</span>
+
+@code {
+    private bool _open;
+    private bool _signingOut;
+
+    protected override void OnInitialized() => Account.Changed += OnAccountChanged;
+
+    private void OnAccountChanged() => InvokeAsync(StateHasChanged);
+
+    private void Toggle() => _open = !_open;
+
+    private void Close() => _open = false;
+
+    private void OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") _open = false;
+    }
+
+    private async Task SignOut()
+    {
+        _signingOut = true;
+        try
+        {
+            await Account.SignOutAsync();
+        }
+        finally
+        {
+            _signingOut = false;
+            _open = false;
+        }
+    }
+
+    public void Dispose() => Account.Changed -= OnAccountChanged;
+}

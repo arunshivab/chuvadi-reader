@@ -2,6 +2,7 @@
 @inject ThemeService Theme
 @inject PreferencesService Prefs
 @inject IJSRuntime JS
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <SettingsSection Title="Appearance" Sub="Pages stay white; only the paper around them changes.">
     <Lead>
@@ -12,8 +13,8 @@
             }
         </div>
         <div class="quick">
-            <SettingRow Label="Follow the computer's light / dark setting" Soon="true">
-                <Toggle Value="false" AriaLabel="Follow the computer's light / dark setting" />
+            <SettingRow Label="@PlatformText.FollowSystemTheme(Platform)" Soon="true">
+                <Toggle Value="false" AriaLabel="@PlatformText.FollowSystemTheme(Platform)" />
             </SettingRow>
             <SettingRow Label="Reduce motion" Hint="No sliding or fading panels">
                 <Toggle Value="Prefs.ReduceMotion" ValueChanged="v => Prefs.SetReduceMotionAsync(v)" AriaLabel="Reduce motion" />

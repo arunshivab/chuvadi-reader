@@ -1,4 +1,6 @@
 @namespace ChuvadiReader.Ui.Components.Settings
+@inject ChuvadiReader.Platform.IAppPaths Paths
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <SettingsSection Title="About" Sub="Versions, licences and privacy.">
     <SettingsCard Title="Chuvadi Reader">
@@ -8,18 +10,29 @@
             <SettingRow Label="@lib.Role"><ValueChip Text="@($"{lib.Name} {lib.Version}")" /></SettingRow>
         }
         <SettingRow Label="Typeface"><ValueChip Text="LiPi Sans (OFL)" /></SettingRow>
+        <SettingRow Label="Licence" Hint="@AppInfo.Copyright"><ValueChip Text="Free · proprietary" /></SettingRow>
     </SettingsCard>
 
     <SettingsCard Title="Privacy">
-        <SettingRow Label="Network" Hint="offline · nothing leaves this device"><ValueChip Text="Offline" /></SettingRow>
-        <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@AppInfo.DataFolder" Wrap="true" /></SettingRow>
+        @if (Platform.Capabilities.ServerSide)
+        {
+            <SettingRow Label="Network" Hint="@ChuvadiReader.Ui.Components.Platform.PlatformText.ServerPrivacy"><ValueChip Text="Server" /></SettingRow>
+        }
+        else
+        {
+            <SettingRow Label="Network" Hint="offline · nothing leaves this device"><ValueChip Text="Offline" /></SettingRow>
+        }
+        @if (!Platform.Capabilities.ServerSide)
+        {
+            <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@Paths.AppDataFolder" Wrap="true" /></SettingRow>
+        }
         <SettingRow Label="Clear recent files & cache" Soon="true"><RowButton>Clear…</RowButton></SettingRow>
     </SettingsCard>
 
     <SettingsCard Title="Help" Full="true">
         <SettingRow Label="Keyboard shortcuts"><RowButton OnClick="OpenShortcuts">Open</RowButton></SettingRow>
         <SettingRow Label="What’s new" Soon="true"><RowButton>Open</RowButton></SettingRow>
-        <SettingRow Label="Licences" Hint="Open-source notices" Soon="true"><RowButton>Open</RowButton></SettingRow>
+        <SettingRow Label="Licences" Hint="Licence agreement and third-party notices"><RowButton OnClick="OpenLicences">Open</RowButton></SettingRow>
         <SettingRow Label="Send diagnostics file" Hint="Saved to Desktop — you choose who gets it" Soon="true"><RowButton>Create…</RowButton></SettingRow>
     </SettingsCard>
 </SettingsSection>
@@ -29,4 +42,9 @@
     [Parameter] public EventCallback OnShowShortcuts { get; set; }
 
     private Task OpenShortcuts() => OnShowShortcuts.InvokeAsync();
+
+    /// <summary>Raised when "Licences › Open" is clicked; the page switches to the Licences view.</summary>
+    [Parameter] public EventCallback OnShowLicences { get; set; }
+
+    private Task OpenLicences() => OnShowLicences.InvokeAsync();
 }

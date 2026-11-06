@@ -1,4 +1,5 @@
 @inject IJSRuntime JS
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 @*
     Ctrl K command bar: find and run any feature. Commands come from the shell (global)
@@ -48,7 +49,7 @@
                     }
                     @if (cc.Keys is not null)
                     {
-                        <span class="kbd">@cc.Keys</span>
+                        <span class="kbd">@Platform.Keys.Format(cc.Keys)</span>
                     }
                 </button>
             }

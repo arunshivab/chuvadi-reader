@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Test-only tooling, same versions as tests/ChuvadiReader.Tests. Never shipped. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The mode views' command registrations, read as text by the contract test. -->
+    <None Include="..\..\src\ChuvadiReader.Ui\Pages\*.Shell.cs" LinkBase="ShellSources" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\ChuvadiReader.Ui\wwwroot\css\mobile.css" Link="mobile.css.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

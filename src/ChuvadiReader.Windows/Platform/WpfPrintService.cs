@@ -54,6 +54,11 @@ public sealed class WpfPrintService : IPrintService
                 () => string.IsNullOrEmpty(request.Password) ? PdfDocument.Open(pdfPath) : PdfDocument.Open(pdfPath, request.Password),
                 ct).ConfigureAwait(false);
 
+            if (!PrintPermission.Allows(doc))
+            {
+                return new PrintResult(PrintOutcome.Failed, 0, PrintPermission.Refused);
+            }
+
             if (!PageRangeParser.TryParse(request.PageRange, doc.PageCount, request.CurrentPage, out var pages, out var rangeError))
             {
                 return new PrintResult(PrintOutcome.Failed, 0, rangeError);

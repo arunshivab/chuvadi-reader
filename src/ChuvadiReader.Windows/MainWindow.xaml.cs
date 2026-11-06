@@ -38,10 +38,9 @@ public partial class MainWindow : Window
         Drop += OnFileDrop;
     }
 
-    private static readonly string[] DropExtensions = { ".pdf", ".docx", ".doc", ".xlsx", ".xls" };
-
+    // Same list as the Open dialog (Core: DocumentFormatExtensions.OpenableExtensions).
     private static bool IsSupportedFile(string path)
-        => DropExtensions.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant());
+        => ChuvadiReader.Core.Documents.DocumentFormatExtensions.IsOpenable(path);
 
     private static bool HasSupportedFile(DragEventArgs e)
         => e.Data.GetDataPresent(DataFormats.FileDrop)
@@ -67,21 +66,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        // If the Bench is open, dropped files join the shelf as sources (the bench workflow)
-        // rather than yanking the user into the Reader.
-        if (Web.Services?.GetService(typeof(BenchDropService)) is BenchDropService bench && bench.IsBenchActive)
+        // The web layer never sees a real file path (WebView2 security), so the open starts here.
+        // The shared router (ChuvadiReader.Hosting.IncomingFiles) sends the files to the Bench shelf
+        // when the Bench is open, otherwise each to its own Reader tab (approved 7 Nov: every
+        // dropped file opens, not just the first).
+        if (_services.GetService(typeof(ChuvadiReader.Hosting.IncomingFiles)) is ChuvadiReader.Hosting.IncomingFiles incoming)
         {
-            bench.Drop(supported);
-            Activate();
-            return;
-        }
-
-        // The web layer never sees a real file path (WebView2 security), so the
-        // open is initiated here and the shell navigates to the reader via the
-        // OpenDocumentService.Requested event.
-        if (Web.Services?.GetService(typeof(OpenDocumentService)) is OpenDocumentService open)
-        {
-            open.Request(supported[0]);
+            incoming.Receive(supported);
             Activate();
         }
     }

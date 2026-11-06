@@ -1,0 +1,4 @@
+/* Invisible full-window drop target, active only while documents are dragged over the window. */
+.pdrop { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+.pdrop.on { pointer-events: auto; cursor: copy; }
+.pdrop ::deep .pdrop-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: copy; }

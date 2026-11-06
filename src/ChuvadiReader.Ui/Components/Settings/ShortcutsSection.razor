@@ -1,4 +1,5 @@
 @namespace ChuvadiReader.Ui.Components.Settings
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 @*
     Read-only list of keyboard shortcuts. "Works" rows mirror the real key handlers
@@ -28,7 +29,7 @@
                                     {
                                         <span class="or">·</span>
                                     }
-                                    <kbd>@k.Chords[i]</kbd>
+                                    <kbd>@Platform.Keys.Format(k.Chords[i])</kbd>
                                 }
                             </td>
                         </tr>

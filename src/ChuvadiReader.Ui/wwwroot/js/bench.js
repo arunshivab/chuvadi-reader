@@ -132,6 +132,12 @@ function showShelfPeek(sp) {
 }
 
 // Scroll the shelf to a page thumbnail and flash it (#25 search jump).
+// Tablet desk counter (D-46): bring desk n (0-based) into view.
+export function scrollDeskTo(index) {
+    const desk = document.querySelectorAll('.bench-desks > .desk')[index];
+    if (desk) desk.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+}
+
 export function scrollShelfTo(srcIndex, pageIndex) {
     if (!root) return;
     const el = root.querySelector(`[data-shelf="${srcIndex}:${pageIndex}"]`);

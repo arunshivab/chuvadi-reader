@@ -1,0 +1,21 @@
+@implements IDisposable
+
+@*
+    Status-bar clock. Owns its one-second timer so only this span re-renders each second,
+    not the whole shell (decision D-52). Markup identical to the inline clock it replaces.
+*@
+<span class="sb-clock">@_text</span>
+
+@code {
+    private string _text = DateTime.Now.ToString("HH:mm:ss");
+    private System.Threading.Timer? _timer;
+
+    protected override void OnInitialized() =>
+        _timer = new System.Threading.Timer(_ =>
+        {
+            _text = DateTime.Now.ToString("HH:mm:ss");
+            _ = InvokeAsync(StateHasChanged);
+        }, null, 1000, 1000);
+
+    public void Dispose() => _timer?.Dispose();
+}

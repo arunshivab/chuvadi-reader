@@ -1,0 +1,674 @@
+diff --git a/src/ChuvadiReader.Core/Documents/GreetingText.cs b/src/ChuvadiReader.Core/Documents/GreetingText.cs
+new file mode 100644
+index 0000000..5aa3905
+--- /dev/null
++++ b/src/ChuvadiReader.Core/Documents/GreetingText.cs
+@@ -0,0 +1,20 @@
++namespace ChuvadiReader.Core.Documents;
++
++/// <summary>The Home greeting line ("Good morning, Arun.").</summary>
++public static class GreetingText
++{
++    /// <summary>
++    /// "Good {part}, {name}." — the name is shown exactly as the person typed it. When it already
++    /// ends with a full stop ("Arun S."), the greeting doesn't add a second one.
++    /// </summary>
++    public static string For(int hour, string? name)
++    {
++        var part = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
++        if (string.IsNullOrWhiteSpace(name))
++        {
++            return $"Good {part}.";
++        }
++
++        return name.TrimEnd().EndsWith('.') ? $"Good {part}, {name}" : $"Good {part}, {name}.";
++    }
++}
+diff --git a/src/ChuvadiReader.Core/Reader/ChuvadiPdfReader.cs b/src/ChuvadiReader.Core/Reader/ChuvadiPdfReader.cs
+index f446d1b..cecaf25 100644
+--- a/src/ChuvadiReader.Core/Reader/ChuvadiPdfReader.cs
++++ b/src/ChuvadiReader.Core/Reader/ChuvadiPdfReader.cs
+@@ -34,6 +34,7 @@ public sealed class ChuvadiPdfReader : IPdfReader
+             FileName = fileName,
+             PageCount = document.PageCount,
+             IsEncrypted = !string.IsNullOrEmpty(password),
++            AllowsPrinting = PrintPermission.Allows(document),
+             IsXfaForm = IsXfaForm(document),
+         };
+ 
+diff --git a/src/ChuvadiReader.Core/Reader/IPdfReader.cs b/src/ChuvadiReader.Core/Reader/IPdfReader.cs
+index 7e18a59..4a50f27 100644
+--- a/src/ChuvadiReader.Core/Reader/IPdfReader.cs
++++ b/src/ChuvadiReader.Core/Reader/IPdfReader.cs
+@@ -9,6 +9,9 @@ public sealed class PdfDocumentVm
+ 
+     public bool IsEncrypted { get; init; }
+ 
++    /// <summary>False when the file's own permissions forbid printing (<see cref="PrintPermission"/>).</summary>
++    public bool AllowsPrinting { get; init; } = true;
++
+     /// <summary>True when the document is an XFA-based form. The SVG renderer can't
+     /// display XFA content (it lives in a separate stream), so the UI shows a notice
+     /// instead of a blank page.</summary>
+diff --git a/src/ChuvadiReader.Core/Reader/OpenDocumentService.cs b/src/ChuvadiReader.Core/Reader/OpenDocumentService.cs
+index 972506e..dd7b9a0 100644
+--- a/src/ChuvadiReader.Core/Reader/OpenDocumentService.cs
++++ b/src/ChuvadiReader.Core/Reader/OpenDocumentService.cs
+@@ -1,19 +1,28 @@
+ namespace ChuvadiReader.Core.Reader;
+ 
++/// <summary>One "open this document" request: the file, the tab name and an optional 1-based page.</summary>
++public sealed record PendingOpen(string Path, string Name, int? Page);
++
+ /// <summary>
+-/// Carries the "open this document" request from the dashboard to the Reader
+-/// page across navigation. The Reader consumes it on load and clears it.
++/// Carries "open this document" requests from the dashboard (or a drop, an upload, Open with)
++/// to the Reader page across navigation. Requests queue in order, so several made before the
++/// Reader runs each open in their own tab; the Reader takes them one at a time.
+ /// </summary>
+ public sealed class OpenDocumentService
+ {
+-    public string? PendingPath { get; private set; }
++    private readonly object _gate = new();
++    private readonly Queue<PendingOpen> _queue = new();
++
++    /// <summary>The next request's path, or null when nothing is waiting.</summary>
++    public string? PendingPath => Peek()?.Path;
+ 
+-    public string? PendingName { get; private set; }
++    /// <summary>The next request's tab name, or null when nothing is waiting.</summary>
++    public string? PendingName => Peek()?.Name;
+ 
+-    /// <summary>Optional 1-based page to jump to once the document opens.</summary>
+-    public int? PendingPage { get; private set; }
++    /// <summary>Optional 1-based page to jump to once the next document opens.</summary>
++    public int? PendingPage => Peek()?.Page;
+ 
+-    /// <summary>Raised when a new open is requested (e.g. a file dropped on the window),
++    /// <summary>Raised after each request (e.g. a file dropped on the window),
+     /// so the shell can navigate to the Reader.</summary>
+     public event Action? Requested;
+ 
+@@ -25,16 +34,37 @@ public sealed class OpenDocumentService
+ 
+     public void Request(string path, string name, int? page)
+     {
+-        PendingPath = path;
+-        PendingName = name;
+-        PendingPage = page;
++        lock (_gate)
++        {
++            _queue.Enqueue(new PendingOpen(path, name, page));
++        }
++
+         Requested?.Invoke();
+     }
+ 
++    /// <summary>Takes the oldest waiting request. Each request is taken exactly once.</summary>
++    public bool TryTake(out PendingOpen open)
++    {
++        lock (_gate)
++        {
++            return _queue.TryDequeue(out open!);
++        }
++    }
++
++    /// <summary>Drops every waiting request.</summary>
+     public void Clear()
+     {
+-        PendingPath = null;
+-        PendingName = null;
+-        PendingPage = null;
++        lock (_gate)
++        {
++            _queue.Clear();
++        }
++    }
++
++    private PendingOpen? Peek()
++    {
++        lock (_gate)
++        {
++            return _queue.TryPeek(out var next) ? next : null;
++        }
+     }
+ }
+diff --git a/src/ChuvadiReader.Core/Reader/PrintPermission.cs b/src/ChuvadiReader.Core/Reader/PrintPermission.cs
+new file mode 100644
+index 0000000..e8a0a1f
+--- /dev/null
++++ b/src/ChuvadiReader.Core/Reader/PrintPermission.cs
+@@ -0,0 +1,20 @@
++using Chuvadi.Pdf.Documents;
++
++namespace ChuvadiReader.Core.Reader;
++
++/// <summary>
++/// A PDF's own "no printing" permission (PDF 32000-1 §7.6.3.2, /P bit 3). Every platform respects
++/// it: the Print card is locked with <see cref="Refused"/> as the reason, and host print services
++/// refuse the job as well.
++/// </summary>
++public static class PrintPermission
++{
++    public const string Refused = "This file's permissions don't allow printing.";
++
++    /// <summary>False when the file is encrypted and its permissions forbid printing.</summary>
++    public static bool Allows(PdfDocument document)
++    {
++        ArgumentNullException.ThrowIfNull(document);
++        return document.Encryption?.AllowPrint ?? true;
++    }
++}
+diff --git a/src/ChuvadiReader.Hosting/Desktop/DesktopAppPaths.cs b/src/ChuvadiReader.Hosting/Desktop/DesktopAppPaths.cs
+index 1181747..d9bcd9a 100644
+--- a/src/ChuvadiReader.Hosting/Desktop/DesktopAppPaths.cs
++++ b/src/ChuvadiReader.Hosting/Desktop/DesktopAppPaths.cs
+@@ -6,6 +6,9 @@ namespace ChuvadiReader.Hosting.Desktop;
+ /// Standard per-user folders on Windows, macOS and Linux. The Windows values equal what Core uses
+ /// today (%AppData%\Chuvadi, Documents); macOS uses ~/Library/Application Support/Chuvadi and Linux
+ /// follows XDG ($XDG_CONFIG_HOME or ~/.config).
++/// The default save folder is the person's Documents folder even before it exists (it is created
++/// on first save): .NET returns "" for a missing Documents folder, and Core would then save under
++/// the temp folder, which Linux wipes at reboot (Linux chat, BUILD-LOG §17).
+ /// </summary>
+ public sealed class DesktopAppPaths : IAppPaths
+ {
+@@ -14,8 +17,32 @@ public sealed class DesktopAppPaths : IAppPaths
+         AppDataFolder = ResolveAppData();
+         // Same folder Core uses today (Path.GetTempPath()), so moving Core to IAppPaths changes nothing on desktop.
+         WorkingFolder = Path.GetTempPath();
+-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+-        DefaultSaveFolder = string.IsNullOrEmpty(docs) ? null : docs;
++        DefaultSaveFolder = ResolveSaveFolder(
++            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
++            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments, Environment.SpecialFolderOption.DoNotVerify),
++            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
++    }
++
++    /// <summary>
++    /// The existing Documents folder when there is one (Windows: always, so nothing changes there);
++    /// else where it would be (XDG_DOCUMENTS_DIR as .NET reads it), unless that is the home folder
++    /// itself; else ~/Documents; null only when there is no home folder.
++    /// </summary>
++    public static string? ResolveSaveFolder(string? existing, string? unverified, string? home)
++    {
++        if (!string.IsNullOrEmpty(existing))
++        {
++            return existing;
++        }
++
++        static string Trim(string p) => p.TrimEnd('/', '\\');
++        if (!string.IsNullOrEmpty(unverified) && Path.IsPathRooted(unverified)
++            && (string.IsNullOrEmpty(home) || !string.Equals(Trim(unverified), Trim(home), StringComparison.Ordinal)))
++        {
++            return unverified;
++        }
++
++        return string.IsNullOrEmpty(home) ? null : Path.Combine(home, "Documents");
+     }
+ 
+     public string AppDataFolder { get; }
+diff --git a/src/ChuvadiReader.Ui/Components/Cards/PrintCard.razor b/src/ChuvadiReader.Ui/Components/Cards/PrintCard.razor
+index d64e8f8..a26c98f 100644
+--- a/src/ChuvadiReader.Ui/Components/Cards/PrintCard.razor
++++ b/src/ChuvadiReader.Ui/Components/Cards/PrintCard.razor
+@@ -66,7 +66,7 @@
+ </section>
+ 
+ @code {
+-    private const string UnavailableText = "Printing isn't available on this platform";
++    private const string NoPrintingText = "Printing isn't available on this platform";
+ 
+     public enum RangeMode { All, Current, Custom }
+ 
+@@ -99,7 +99,12 @@
+     private IPrintService PrintService =>
+         _print ??= Services.GetService(typeof(IPrintService)) as IPrintService ?? new NoopPrintService();
+ 
+-    private bool Available => PrintService.IsAvailable && !string.IsNullOrEmpty(Path);
++    private bool Available => PrintService.IsAvailable && !string.IsNullOrEmpty(Path) && Allowed;
++
++    /// <summary>False when the file's own permissions forbid printing (every platform).</summary>
++    private bool Allowed => Session?.Document.AllowsPrinting != false;
++
++    private string UnavailableText => Allowed ? NoPrintingText : PrintPermission.Refused;
+ 
+     private int? PageCount => Session?.Document.PageCount;
+ 
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/PlatformText.cs b/src/ChuvadiReader.Ui/Components/Platform/PlatformText.cs
+index c792376..685a202 100644
+--- a/src/ChuvadiReader.Ui/Components/Platform/PlatformText.cs
++++ b/src/ChuvadiReader.Ui/Components/Platform/PlatformText.cs
+@@ -1,10 +1,32 @@
++using ChuvadiReader.Platform;
++
+ namespace ChuvadiReader.Ui.Components.Platform;
+ 
+-/// <summary>Wording that differs on the Web portal (coordinator decision, 6 Nov 2026).</summary>
++/// <summary>Wording that differs by platform: the Web portal (D-20, U-11) and Android (6 Nov 2026).
++/// Desktop strings are the original text, character for character.</summary>
+ public static class PlatformText
+ {
+     /// <summary>Replaces the device-only privacy lines (About, Settings, Library) on the Web portal.
+     /// The status bar keeps the handout's own 12b text (see StatusLocation).</summary>
+     public const string ServerPrivacy =
+         "Processed on the Chuvadi server · encrypted · only you can see it. Your files are removed when you sign out.";
++
++    /// <summary>End of the Home summary line on the Web portal (U-11); desktop says "nothing leaves this device.".</summary>
++    public const string HomeServerLine = "processed on the Chuvadi server · removed when you sign out.";
++
++    /// <summary>"phone" on an Android phone, "device" on an Android tablet, "computer" everywhere else.</summary>
++    public static string DeviceNoun(IPlatformInfo platform) =>
++        platform.Kind != PlatformKind.Android ? "computer"
++        : platform.FormFactor == FormFactor.Phone ? "phone" : "device";
++
++    /// <summary>Appearance › the follow-the-system toggle.</summary>
++    public static string FollowSystemTheme(IPlatformInfo platform) =>
++        $"Follow the {DeviceNoun(platform)}'s light / dark setting";
++
++    /// <summary>Language › Greeting › Preferred name hint. Android shows no name until one is set
++    /// (D-59), so its hint says so instead of promising the device's name.</summary>
++    public static string PreferredNameHint(IPlatformInfo platform) =>
++        platform.Kind == PlatformKind.Android
++            ? $"Leave blank to show no name. Stored on this {DeviceNoun(platform)}, never sent anywhere."
++            : "Leave blank to use your computer's name. Stored locally, never sent anywhere.";
+ }
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/AppearanceSection.razor b/src/ChuvadiReader.Ui/Components/Settings/AppearanceSection.razor
+index 327ef55..f015a24 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/AppearanceSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/AppearanceSection.razor
+@@ -2,6 +2,7 @@
+ @inject ThemeService Theme
+ @inject PreferencesService Prefs
+ @inject IJSRuntime JS
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ <SettingsSection Title="Appearance" Sub="Pages stay white; only the paper around them changes.">
+     <Lead>
+@@ -12,8 +13,8 @@
+             }
+         </div>
+         <div class="quick">
+-            <SettingRow Label="Follow the computer's light / dark setting" Soon="true">
+-                <Toggle Value="false" AriaLabel="Follow the computer's light / dark setting" />
++            <SettingRow Label="@PlatformText.FollowSystemTheme(Platform)" Soon="true">
++                <Toggle Value="false" AriaLabel="@PlatformText.FollowSystemTheme(Platform)" />
+             </SettingRow>
+             <SettingRow Label="Reduce motion" Hint="No sliding or fading panels">
+                 <Toggle Value="Prefs.ReduceMotion" ValueChanged="v => Prefs.SetReduceMotionAsync(v)" AriaLabel="Reduce motion" />
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/LanguageSection.razor b/src/ChuvadiReader.Ui/Components/Settings/LanguageSection.razor
+index c9ad7b0..b6da59a 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/LanguageSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/LanguageSection.razor
+@@ -1,6 +1,7 @@
+ @namespace ChuvadiReader.Ui.Components.Settings
+ @inject UserProfileService Profile
+ @inject PreferencesService Prefs
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ <SettingsSection Title="Language" Sub="Interface language. Documents keep their own.">
+     <SettingsCard Title="Interface" IsNew="true" Full="true">
+@@ -13,7 +14,7 @@
+     </SettingsCard>
+ 
+     <SettingsCard Title="Greeting">
+-        <SettingRow Label="Preferred name" Hint="Leave blank to use your computer's name. Stored locally, never sent anywhere." Stack="true">
++        <SettingRow Label="Preferred name" Hint="@PlatformText.PreferredNameHint(Platform)" Stack="true">
+             <input class="name-in" value="@_name" @oninput="OnNameInput" placeholder="@Profile.Name" aria-label="Preferred name" spellcheck="false" />
+         </SettingRow>
+         <SettingRow Label="Show Tamil greeting" Hint="வணக்கம்.">
+diff --git a/src/ChuvadiReader.Ui/Pages/Dashboard.razor b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+index 10dd7d6..ea02e9b 100644
+--- a/src/ChuvadiReader.Ui/Pages/Dashboard.razor
++++ b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+@@ -31,7 +31,7 @@
+             </h1>
+             @if (Platform.Capabilities.ServerSide)
+             {
+-                <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · @ChuvadiReader.Ui.Components.Platform.PlatformText.ServerPrivacy</p>
++                <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · @ChuvadiReader.Ui.Components.Platform.PlatformText.HomeServerLine</p>
+             }
+             else
+             {
+@@ -45,10 +45,19 @@
+                 <span class="drop-ic"><Icon Name="upload" Size="34" /></span>
+                 <span class="drop-title">Drop your first document here</span>
+                 <span class="drop-sub">PDF, Word or Excel — even password-protected ones.</span>
++                @if (IsPortal)
++                {
++                    <span class="first-actions">
++                        <button type="button" class="btn primary" @onclick="OpenFile">Upload a file…</button>
++                    </span>
++                }
++                else
++                {
+                 <span class="first-actions">
+                     <button type="button" class="btn primary" @onclick="OpenFile">Open a file…</button>
+                     <button type="button" class="btn" @onclick="ChooseLibraryFolder">Choose a library folder</button>
+                 </span>
++                }
+             </div>
+             <p class="tip">Tip: @Platform.Keys.Format("Ctrl K") finds any file or action. Try typing “merge”.</p>
+         }
+@@ -56,7 +65,14 @@
+         {
+             <button type="button" class="drop" @onclick="OpenFile" title="Drop a file anywhere on the window, or click to choose one">
+                 <span class="drop-ic"><Icon Name="upload" Size="28" /></span>
++                @if (IsPortal)
++                {
++                    <span class="drop-title">Drop a document, or click to upload</span>
++                }
++                else
++                {
+                 <span class="drop-title">Drop a document, or click to open</span>
++                }
+                 <span class="chips">
+                     <span class="chip on">pdf</span>
+                     <span class="chip">docx</span>
+@@ -261,15 +277,16 @@
+ 
+     // ── Greeting ─────────────────────────────────────────────────────────
+ 
++    // The Web portal (H3 "Upload", U-11): uploads, not local files.
++    private bool IsPortal => Platform.Kind == ChuvadiReader.Platform.PlatformKind.Web;
++
+     private static string DayLine => DateTime.Now.ToString("dddd d MMM yyyy · HH:mm");
+ 
+     private string Greeting
+     {
+         get
+         {
+-            var h = DateTime.Now.Hour;
+-            var part = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+-            return string.IsNullOrWhiteSpace(Profile.Name) ? $"Good {part}." : $"Good {part}, {Profile.Name}.";
++            return GreetingText.For(DateTime.Now.Hour, Profile.Name);
+         }
+     }
+ 
+diff --git a/src/ChuvadiReader.Ui/Pages/Reader.razor b/src/ChuvadiReader.Ui/Pages/Reader.razor
+index 41cd124..25e234d 100644
+--- a/src/ChuvadiReader.Ui/Pages/Reader.razor
++++ b/src/ChuvadiReader.Ui/Pages/Reader.razor
+@@ -3207,21 +3207,20 @@
+     // open: navigation to /reader is a no-op, so consume the pending open directly.
+     private void OnOpenRequestedLive() => _ = InvokeAsync(OpenPendingAsync);
+ 
++    // Takes every waiting request in order; each is taken once, so two requests made
++    // before the Reader ran open two tabs, each with its own file and name.
+     private async Task OpenPendingAsync()
+     {
+-        if (string.IsNullOrEmpty(OpenDoc.PendingPath))
++        while (OpenDoc.TryTake(out var open))
+         {
+-            return;
++            var path = open.Path;
++            var name = string.IsNullOrEmpty(open.Name) ? System.IO.Path.GetFileName(path) : open.Name;
++            var format = DocumentFormatExtensions.FromPath(path);
++            _pendingJumpPage = open.Page;
++            await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
++            await Tabs.OpenAsync(path, name, format);
++            StateHasChanged();
+         }
+-
+-        var path = OpenDoc.PendingPath!;
+-        var name = OpenDoc.PendingName ?? System.IO.Path.GetFileName(path);
+-        var format = DocumentFormatExtensions.FromPath(path);
+-        _pendingJumpPage = OpenDoc.PendingPage;
+-        OpenDoc.Clear();
+-        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+-        await Tabs.OpenAsync(path, name, format);
+-        StateHasChanged();
+     }
+ 
+     private void OnTabsChanged()
+diff --git a/src/ChuvadiReader.Windows/Platform/WpfPrintService.cs b/src/ChuvadiReader.Windows/Platform/WpfPrintService.cs
+index 4c15ae0..6777660 100644
+--- a/src/ChuvadiReader.Windows/Platform/WpfPrintService.cs
++++ b/src/ChuvadiReader.Windows/Platform/WpfPrintService.cs
+@@ -54,6 +54,11 @@ public sealed class WpfPrintService : IPrintService
+                 () => string.IsNullOrEmpty(request.Password) ? PdfDocument.Open(pdfPath) : PdfDocument.Open(pdfPath, request.Password),
+                 ct).ConfigureAwait(false);
+ 
++            if (!PrintPermission.Allows(doc))
++            {
++                return new PrintResult(PrintOutcome.Failed, 0, PrintPermission.Refused);
++            }
++
+             if (!PageRangeParser.TryParse(request.PageRange, doc.PageCount, request.CurrentPage, out var pages, out var rangeError))
+             {
+                 return new PrintResult(PrintOutcome.Failed, 0, rangeError);
+diff --git a/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs b/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs
+index e054b13..4994ff1 100644
+--- a/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs
++++ b/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs
+@@ -124,6 +124,15 @@ public sealed class GroupBcTests : IDisposable
+             desktop.DefaultFolder);
+     }
+ 
++    [Theory]
++    [InlineData("/home/a/Documents", "/home/a/Documents", "/home/a", "/home/a/Documents")]       // exists: as before
++    [InlineData("", "/home/a/Docs", "/home/a", "/home/a/Docs")]                                 // XDG folder not created yet
++    [InlineData("", "/home/a", "/home/a", "/home/a/Documents")]                                 // XDG points at home itself
++    [InlineData("", "", "/home/a", "/home/a/Documents")]                                        // nothing configured
++    [InlineData("", "", "", null)]                                                              // no home folder
++    public void Save_folder_falls_back_when_Documents_is_missing(string existing, string unverified, string home, string? expected) =>
++        Assert.Equal(expected, DesktopAppPaths.ResolveSaveFolder(existing, unverified, home)?.Replace('\\', '/'));
++
+     private sealed class NullStorage : IAppStorage
+     {
+         public Task<string?> GetAsync(string key, CancellationToken ct = default) => Task.FromResult<string?>(null);
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs b/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs
+index 9957ac6..2c3d751 100644
+--- a/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs
++++ b/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs
+@@ -9,10 +9,12 @@ using Path = System.IO.Path;
+ 
+ namespace ChuvadiReader.MobileUi.Preview;
+ 
+-/// <summary>Platform facts for the preview: Android phone / tablet, or Windows desktop.</summary>
+-public sealed class PreviewPlatform(FormFactor formFactor) : IPlatformInfo
++/// <summary>Platform facts for the preview: Android phone / tablet, Windows desktop, or the Web portal
++/// (<paramref name="web"/>: server-side, no folders, account menu — for checking portal wording).</summary>
++public sealed class PreviewPlatform(FormFactor formFactor, bool web = false) : IPlatformInfo
+ {
+-    public PlatformKind Kind => formFactor == FormFactor.Desktop ? PlatformKind.Windows : PlatformKind.Android;
++    public PlatformKind Kind => web ? PlatformKind.Web
++        : formFactor == FormFactor.Desktop ? PlatformKind.Windows : PlatformKind.Android;
+ 
+     public FormFactor FormFactor => formFactor;
+ 
+@@ -22,11 +24,18 @@ public sealed class PreviewPlatform(FormFactor formFactor) : IPlatformInfo
+         ? InputKinds.Mouse | InputKinds.Keyboard
+         : InputKinds.Touch;
+ 
+-    public ShellChrome Chrome => formFactor == FormFactor.Desktop
++    public ShellChrome Chrome => web ? new ShellChrome(WindowButtons.None, false, true, false, 0)
++        : formFactor == FormFactor.Desktop
+         ? new ShellChrome(WindowButtons.Right, false, false, true, 0)
+         : new ShellChrome(WindowButtons.None, false, false, false, 0);
+ 
+-    public PlatformCapabilities Capabilities => FixedPlatformInfo.DesktopCapabilities;
++    public PlatformCapabilities Capabilities => web
++        ? FixedPlatformInfo.DesktopCapabilities with
++        {
++            PickFolders = false, SaveInPlace = false, WatchFolders = false, RevealInFolder = false,
++            SavesAsDownload = true, ServerSide = true,
++        }
++        : FixedPlatformInfo.DesktopCapabilities;
+ 
+     public IKeyLabels Keys { get; } = new CtrlKeyLabels();
+ }
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/Program.cs b/tests/ChuvadiReader.MobileUi.Preview/Program.cs
+index 27e4646..3cdd184 100644
+--- a/tests/ChuvadiReader.MobileUi.Preview/Program.cs
++++ b/tests/ChuvadiReader.MobileUi.Preview/Program.cs
+@@ -5,12 +5,12 @@ using ChuvadiReader.Hosting;
+ using ChuvadiReader.MobileUi.Preview;
+ using ChuvadiReader.Platform;
+ 
+-// TESTING ONLY. CHVD_FF = phone | tablet | desktop (default phone). Desktop reports Windows so the
++// TESTING ONLY. CHVD_FF = phone | tablet | desktop | web (default phone). Desktop reports Windows so the
+ // desktop chrome renders exactly as the WPF host shows it; phone and tablet report Android.
+ var ff = (Environment.GetEnvironmentVariable("CHVD_FF") ?? "phone").ToLowerInvariant() switch
+ {
+     "tablet" => FormFactor.Tablet,
+-    "desktop" => FormFactor.Desktop,
++    "desktop" or "web" => FormFactor.Desktop,
+     _ => FormFactor.Phone,
+ };
+ 
+@@ -21,7 +21,13 @@ builder.Services.AddSingleton<IAppStorage, MemoryStorage>();
+ builder.Services.AddSingleton<IFilePicker, FixturePicker>();
+ builder.Services.AddSingleton<IImageClipboard, NoClipboard>();
+ builder.Services.AddSingleton<IClipboard, NoClipboard>();
+-builder.Services.AddSingleton<IPlatformInfo>(new PreviewPlatform(ff));
++var web = Environment.GetEnvironmentVariable("CHVD_FF") == "web";
++builder.Services.AddSingleton<IPlatformInfo>(new PreviewPlatform(ff, web));
++if (web)
++{
++    // The Web host registers these from its configuration; the preview uses the placeholders.
++    builder.Services.AddSingleton(new ChuvadiReader.Ui.Components.Platform.Portal.PortalLinks("https://chuvadi.in/download", null, null));
++}
+ 
+ var app = builder.Build();
+ app.UseAntiforgery();
+diff --git a/tests/ChuvadiReader.MobileUi.Tests/PlatformTextTests.cs b/tests/ChuvadiReader.MobileUi.Tests/PlatformTextTests.cs
+new file mode 100644
+index 0000000..f562a61
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Tests/PlatformTextTests.cs
+@@ -0,0 +1,36 @@
++using ChuvadiReader.Platform;
++using ChuvadiReader.Ui.Components.Platform;
++using Xunit;
++
++namespace ChuvadiReader.MobileUi.Tests;
++
++/// <summary>Per-platform wording: desktop keeps the original text exactly; Android says phone/device.</summary>
++public class PlatformTextTests
++{
++    private sealed class Info(PlatformKind kind, FormFactor formFactor) : IPlatformInfo
++    {
++        public PlatformKind Kind => kind;
++        public FormFactor FormFactor => formFactor;
++        public event Action? FormFactorChanged { add { } remove { } }
++        public InputKinds Input => default;
++        public ShellChrome Chrome => null!;
++        public PlatformCapabilities Capabilities => null!;
++        public IKeyLabels Keys => null!;
++    }
++
++    [Theory]
++    [InlineData(PlatformKind.Windows, FormFactor.Desktop, "Follow the computer's light / dark setting")]
++    [InlineData(PlatformKind.MacOS, FormFactor.Desktop, "Follow the computer's light / dark setting")]
++    [InlineData(PlatformKind.Linux, FormFactor.Desktop, "Follow the computer's light / dark setting")]
++    [InlineData(PlatformKind.Android, FormFactor.Phone, "Follow the phone's light / dark setting")]
++    [InlineData(PlatformKind.Android, FormFactor.Tablet, "Follow the device's light / dark setting")]
++    public void Follow_system_theme(PlatformKind kind, FormFactor ff, string expected) =>
++        Assert.Equal(expected, PlatformText.FollowSystemTheme(new Info(kind, ff)));
++
++    [Theory]
++    [InlineData(PlatformKind.Windows, FormFactor.Desktop, "Leave blank to use your computer's name. Stored locally, never sent anywhere.")]
++    [InlineData(PlatformKind.Android, FormFactor.Phone, "Leave blank to show no name. Stored on this phone, never sent anywhere.")]
++    [InlineData(PlatformKind.Android, FormFactor.Tablet, "Leave blank to show no name. Stored on this device, never sent anywhere.")]
++    public void Preferred_name_hint(PlatformKind kind, FormFactor ff, string expected) =>
++        Assert.Equal(expected, PlatformText.PreferredNameHint(new Info(kind, ff)));
++}
+diff --git a/tests/ChuvadiReader.Tests/PlatformFixesTests.cs b/tests/ChuvadiReader.Tests/PlatformFixesTests.cs
+new file mode 100644
+index 0000000..3fc0d56
+--- /dev/null
++++ b/tests/ChuvadiReader.Tests/PlatformFixesTests.cs
+@@ -0,0 +1,91 @@
++using Chuvadi.Pdf.Documents;
++using ChuvadiReader.Core.Documents;
++using ChuvadiReader.Core.Reader;
++using Xunit;
++
++namespace ChuvadiReader.Tests;
++
++/// <summary>Bug fixes from the platform programme's second combined patch (L-8, F-2, F-3).</summary>
++public sealed class PlatformFixesTests
++{
++    // ── L-8: a file whose permissions forbid printing doesn't print, on any platform ──
++
++    [Fact]
++    public async Task A_no_printing_file_is_refused()
++    {
++        var src = TestPdf.TextPage("No printing");
++        var locked = TestPdf.TempOutput();
++        TestSigning.ProtectRestricted(src, locked, "pw", PrintPermissionMask(allowPrint: false));
++
++        using (var doc = PdfDocument.Open(locked, "pw"))
++        {
++            Assert.False(PrintPermission.Allows(doc));
++        }
++
++        using var session = await new ChuvadiPdfReader().OpenAsync(locked, "locked.pdf", "pw");
++        Assert.False(session.Document.AllowsPrinting);
++    }
++
++    [Fact]
++    public async Task Plain_and_print_allowed_files_still_print()
++    {
++        var plain = TestPdf.TextPage("Plain");
++        using (var doc = PdfDocument.Open(plain))
++        {
++            Assert.True(PrintPermission.Allows(doc));
++        }
++
++        var locked = TestPdf.TempOutput();
++        TestSigning.ProtectRestricted(plain, locked, "pw", PrintPermissionMask(allowPrint: true));
++        using var session = await new ChuvadiPdfReader().OpenAsync(locked, "locked.pdf", "pw");
++        Assert.True(session.Document.AllowsPrinting);
++    }
++
++    private static int PrintPermissionMask(bool allowPrint) =>
++        PasswordService.BuildPermissionMask(new PasswordProtectOptions { OpenPassword = "pw", AllowPrint = allowPrint });
++
++    // ── F-2: the greeting doesn't double a full stop; the name is shown as typed ──
++
++    [Theory]
++    [InlineData(9, null, "Good morning.")]
++    [InlineData(9, "  ", "Good morning.")]
++    [InlineData(13, "Arun", "Good afternoon, Arun.")]
++    [InlineData(20, "Arun S.", "Good evening, Arun S.")]
++    [InlineData(20, "Dr.  arun s. ", "Good evening, Dr.  arun s. ")]
++    [InlineData(11, "A.R.U.N", "Good morning, A.R.U.N.")]
++    public void Greeting(int hour, string? name, string expected) =>
++        Assert.Equal(expected, GreetingText.For(hour, name));
++
++    // ── F-3: requests made before the Reader runs each open, in order, once ──
++
++    [Fact]
++    public void Open_requests_queue_in_order_and_are_taken_once()
++    {
++        var open = new OpenDocumentService();
++        var raised = 0;
++        open.Requested += () => raised++;
++
++        open.Request("/a/one.pdf");
++        open.Request("/a/two.pdf", "Two", 3);
++
++        Assert.Equal(2, raised);
++        Assert.Equal(("/a/one.pdf", "one.pdf", (int?)null), (open.PendingPath, open.PendingName, open.PendingPage));
++
++        Assert.True(open.TryTake(out var first));
++        Assert.Equal(new PendingOpen("/a/one.pdf", "one.pdf", null), first);
++        Assert.True(open.TryTake(out var second));
++        Assert.Equal(new PendingOpen("/a/two.pdf", "Two", 3), second);
++        Assert.False(open.TryTake(out _));
++        Assert.Null(open.PendingPath);
++    }
++
++    [Fact]
++    public void Clear_drops_every_waiting_request()
++    {
++        var open = new OpenDocumentService();
++        open.Request("/a/one.pdf");
++        open.Request("/a/two.pdf");
++        open.Clear();
++        Assert.False(open.TryTake(out _));
++    }
++}

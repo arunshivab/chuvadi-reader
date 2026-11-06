@@ -1,4 +1,5 @@
 using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -15,10 +16,19 @@ public sealed class SaveFolderService
     private const string MonthKey = "save-month-folders";
 
     private readonly IAppStorage _storage;
+    private readonly IAppPaths? _paths;
 
-    public SaveFolderService(IAppStorage storage) => _storage = storage;
+    /// <param name="paths">Host folders. The default save folder is "Chuvadi Documents" under the host's
+    /// <see cref="IAppPaths.DefaultSaveFolder"/> (desktop: Documents, as before); a host without a visible
+    /// file system (Web) gets it under its working folder, delivered by write-back.</param>
+    public SaveFolderService(IAppStorage storage, IAppPaths? paths = null)
+    {
+        _storage = storage;
+        _paths = paths;
+        BaseFolder = DefaultFolder;
+    }
 
-    public string BaseFolder { get; private set; } = DefaultBaseFolder();
+    public string BaseFolder { get; private set; }
 
     public bool DateFolders { get; private set; }
 
@@ -26,15 +36,17 @@ public sealed class SaveFolderService
 
     public event Action? Changed;
 
-    public static string DefaultBaseFolder()
-        => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            "Chuvadi Documents");
+    /// <summary>The default save folder for this host.</summary>
+    public string DefaultFolder => Path.Combine(
+        _paths is null
+            ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+            : _paths.DefaultSaveFolder ?? ScratchFiles.Folder(_paths),
+        "Chuvadi Documents");
 
     public async Task HydrateAsync()
     {
         var custom = await _storage.GetAsync(FolderKey);
-        BaseFolder = string.IsNullOrWhiteSpace(custom) ? DefaultBaseFolder() : custom!;
+        BaseFolder = string.IsNullOrWhiteSpace(custom) ? DefaultFolder : custom!;
         DateFolders = string.Equals(await _storage.GetAsync(DateKey), "on", StringComparison.OrdinalIgnoreCase);
         MonthFolders = string.Equals(await _storage.GetAsync(MonthKey), "on", StringComparison.OrdinalIgnoreCase);
         Changed?.Invoke();
@@ -42,7 +54,7 @@ public sealed class SaveFolderService
 
     public async Task SetBaseFolderAsync(string? path)
     {
-        BaseFolder = string.IsNullOrWhiteSpace(path) ? DefaultBaseFolder() : path!;
+        BaseFolder = string.IsNullOrWhiteSpace(path) ? DefaultFolder : path!;
         await _storage.SetAsync(FolderKey, BaseFolder);
         Changed?.Invoke();
     }

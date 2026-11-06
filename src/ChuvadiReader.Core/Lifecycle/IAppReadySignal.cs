@@ -11,6 +11,9 @@ public interface IAppReadySignal
 {
     event Action? Ready;
 
+    /// <summary>True once <see cref="Ready"/> has fired (it fires once). Lets late subscribers act at once.</summary>
+    bool IsReady { get; }
+
     void SignalReady();
 }
 
@@ -19,6 +22,8 @@ public sealed class AppReadySignal : IAppReadySignal
     private bool _fired;
 
     public event Action? Ready;
+
+    public bool IsReady => _fired;
 
     public void SignalReady()
     {

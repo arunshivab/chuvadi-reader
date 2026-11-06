@@ -1,0 +1,105 @@
+@namespace ChuvadiReader.Ui.Components.Platform.Portal
+@inject PortalLinks Links
+
+@*
+    Web portal sign-in page (design: Portal & Android 12a). The whole page below the browser's own
+    chrome. It holds no sign-in logic: the Web host renders it for signed-out visitors and wires the
+    two actions to its Sangam client —
+      * OnContinueWithSangam: "Continue with Sangam" (redirect to Sangam's sign-in).
+      * OnSubmitId:           "Sign in" under the Sangam ID field — the same redirect, with the ID as
+                              OpenID Connect login_hint (D-34). No password is ever typed on this page.
+    Busy disables the buttons while a redirect is starting; Error shows the host's message.
+    ShowSangamId: U-9 (a) (coordinator, 6 Nov) — off by default, so the card shows only "Continue with
+    Sangam" and the desktop-app line, because Sangam rc.16 accepts login_hint but does not pre-fill it.
+    Asking Arun for that Sangam change is U-9 (c); if he agrees, the host sets ShowSangamId="true".
+*@
+<div class="psi">
+    <section class="psi-hero">
+        <span class="psi-water" aria-hidden="true">ச</span>
+        <span class="psi-mark"><BrandMark Size="30" /> <span class="psi-tag">portal</span></span>
+        <div class="psi-pitch">
+            <h1 class="psi-h1">Your documents, from any browser.</h1>
+            <p class="psi-body">@Pitch</p>
+        </div>
+        <ul class="psi-promises">
+            @foreach (var (icon, text) in Promises)
+            {
+                <li><span class="psi-pr-ic"><Icon Name="@icon" Size="16" /></span>@text</li>
+            }
+        </ul>
+    </section>
+
+    <section class="psi-side">
+        <form class="psi-card" @onsubmit="Submit" aria-labelledby="psi-title">
+            <span class="psi-title" id="psi-title">Sign in</span>
+            <button type="button" class="psi-sangam" @onclick="ContinueWithSangam" disabled="@Busy">
+                <span class="psi-s" aria-hidden="true">S</span>Continue with Sangam
+            </button>
+            @if (ShowSangamId)
+            {
+                <div class="psi-or"><span></span>or with your Sangam ID<span></span></div>
+                <label class="psi-field">
+                    <span class="psi-label">Sangam ID</span>
+                    <input class="psi-input" type="text" name="username" autocomplete="username" spellcheck="false"
+                           autocapitalize="off" @bind="_id" @bind:event="oninput" disabled="@Busy" required />
+                </label>
+            }
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <span class="psi-err" role="alert"><Icon Name="warning" Size="14" />@Error</span>
+            }
+            @if (ShowSangamId)
+            {
+                <button type="submit" class="psi-submit" disabled="@(Busy || !CanSubmit)">Sign in</button>
+            }
+            <span class="psi-foot">Prefer to keep files on your computer? <a href="@Links.DesktopAppUrl" target="_blank" rel="noopener">Download the desktop app</a> — no sign-in needed to read.</span>
+            @if (Links.TermsUrl is { } terms)
+            {
+                @* Licence terms (coordinator, 7 Nov): proprietary, free for everyone; the EULA is the Foundation's. *@
+                <span class="psi-foot psi-terms"><a href="@terms" target="_blank" rel="noopener">Terms of use</a></span>
+            }
+        </form>
+    </section>
+</div>
+
+@code {
+    /// <summary>"Continue with Sangam" was pressed.</summary>
+    [Parameter] public EventCallback OnContinueWithSangam { get; set; }
+
+    /// <summary>"Sign in" under the Sangam ID field: the ID exactly as typed, for login_hint.</summary>
+    [Parameter] public EventCallback<string> OnSubmitId { get; set; }
+
+    /// <summary>Show the "or with your Sangam ID" field (12a). Default false (U-9 a) until Sangam pre-fills login_hint.</summary>
+    [Parameter] public bool ShowSangamId { get; set; } = ShowSangamIdDefault;
+
+    /// <summary>U-9 (a): the ID field is off until Sangam honours login_hint.</summary>
+    public const bool ShowSangamIdDefault = false;
+
+    /// <summary>True while a sign-in is starting: the buttons and the field are disabled.</summary>
+    [Parameter] public bool Busy { get; set; }
+
+    /// <summary>Short, user-facing reason the last sign-in failed, or null.</summary>
+    [Parameter] public string? Error { get; set; }
+
+    // 12a text. Pitch as designed (true with D-28: tmpfs + LUKS). Promises 1 and 3 reworded by D-31
+    // because the portal keeps no per-user storage this release; promise 2 and the icons as designed.
+    private const string Pitch = "The same Read, Mark, Arrange and Protect as the desktop app. On the portal, files are processed on our server, encrypted at rest, and visible only to you.";
+
+    private static readonly (string Icon, string Text)[] Promises =
+    [
+        ("lock", "Files live only for your session, then are wiped"),
+        ("user", "Only your Sangam identity can open your files"),
+        ("trash", "Sign out and your files are gone from the server"),
+    ];
+
+    /// <summary>The three promise lines, for tests.</summary>
+    public static IReadOnlyList<string> PromiseTexts { get; } = Promises.Select(p => p.Text).ToArray();
+
+    private string _id = string.Empty;
+
+    private bool CanSubmit => !string.IsNullOrWhiteSpace(_id);
+
+    private Task ContinueWithSangam() => OnContinueWithSangam.InvokeAsync();
+
+    private Task Submit() => Busy || !CanSubmit ? Task.CompletedTask : OnSubmitId.InvokeAsync(_id);
+}

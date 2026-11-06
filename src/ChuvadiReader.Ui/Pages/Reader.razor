@@ -19,6 +19,12 @@
 @inject ChuvadiReader.Core.Documents.RecoveryService Recovery
 @inject RedactRequestService RedactHandoff
 @inject IEntitlements Entitlements
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
+@inject ChuvadiReader.Platform.IClipboard TextClip
+@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
+@inject ChuvadiReader.Platform.IAppPaths Paths
+@inject ChuvadiReader.Platform.IFileManager FileManager
+@inject ChuvadiReader.Platform.IAppLifecycle Lifecycle
 @using ChuvadiReader.Core.Documents
 
 <PageTitle>Chuvadi · Reader</PageTitle>
@@ -85,7 +91,7 @@
             else
             {
                 <div class="bm-acts">
-                    <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page (Ctrl B)"><Icon Name="plus" Size="13" /> Add</button>
+                    <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page (@Platform.Keys.Format("Ctrl B"))"><Icon Name="plus" Size="13" /> Add</button>
                     <button class="bm-act" @onclick="() => BmMove(-1)" disabled="@(_bmSel is null)" title="Move up"><Icon Name="chevron-up" Size="13" /></button>
                     <button class="bm-act" @onclick="() => BmMove(1)" disabled="@(_bmSel is null)" title="Move down"><Icon Name="chevron-down" Size="13" /></button>
                     <button class="bm-act" @onclick="BmIndent" disabled="@(_bmSel is null)" title="Indent (nest under the entry above)"><Icon Name="chevron-right" Size="13" /></button>
@@ -189,7 +195,10 @@
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
                     <Icon Name="folder" Size="13" />
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_expFolder">@_expFolder</span>
-                    <button @onclick="ChangeExportFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                    @if (Platform.Capabilities.PickFolders)
+                    {
+                        <button @onclick="ChangeExportFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                    }
                 </div>
 
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -253,7 +262,10 @@
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
                     <Icon Name="folder" Size="13" />
                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_pressFolder">@_pressFolder</span>
-                    <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                    @if (Platform.Capabilities.PickFolders)
+                    {
+                        <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
+                    }
                 </div>
 
                 @if (_pressResult is not null)
@@ -1029,7 +1041,7 @@
             <button @onclick="() => RotateCurrent(90)" title="Rotate this page (view only)"><Icon Name="rotate-cw" Size="14" /> Rotate page</button>
             <button @onclick="() => ToggleSendMenu(CurPage - 1)" title="Send this page to a desk in Arrange"><Icon Name="grid-view" Size="14" /> To desk</button>
             <button @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region (S)"><Icon Name="snapshot" Size="14" /> Snapshot</button>
-            <button @onclick="AddBookmarkHere" title="Bookmark this page (Ctrl B)"><Icon Name="bookmark" Size="14" /> Bookmark</button>
+            <button @onclick="AddBookmarkHere" title="Bookmark this page (@Platform.Keys.Format("Ctrl B"))"><Icon Name="bookmark" Size="14" /> Bookmark</button>
             <button disabled title="Peek — coming soon"><Icon Name="eye" Size="14" /> Peek</button>
         </div>
     }
@@ -1188,7 +1200,7 @@
             try
             {
                 var temp = System.IO.Path.Combine(
-                    System.IO.Path.GetTempPath(),
+                    ScratchFiles.Folder(Paths),
                     System.IO.Path.GetFileNameWithoutExtension(active.Path) + "-toredact-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".pdf");
                 await Redact.FlattenToFileAsync(
                     active.Path, temp,
@@ -1269,6 +1281,7 @@
         try
         {
             var n = await Export.ExportAsync(active.Path, _expFolder, _expFormat, _expAll, CurPage - 1, _expDpi);
+            if (n > 0) await WriteBack.DeliverOrThrowAsync(_expFolder);
             _expStatus = $"Exported {n} file{(n == 1 ? "" : "s")} → {_expFolder}";
         }
         catch (Exception ex)
@@ -1332,6 +1345,7 @@
                 _pressResult = await Press.PressAsync(active.Path, _pressFolder, opts);
             }
 
+            await WriteBack.DeliverOrThrowAsync(_pressResult?.OutputPath);
             _pressStatus = null;
         }
         catch (Exception ex)
@@ -1819,6 +1833,7 @@
             {
                 _stampStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
             }
+            await WriteBack.DeliverOrThrowAsync(inPlace ? finalPath : output);
             _stampError = false;
         }
         catch (Exception ex)
@@ -1883,6 +1898,7 @@
         try
         {
             await System.IO.File.WriteAllBytesAsync(path!, bytes);
+            await WriteBack.DeliverOrThrowAsync(path);
             ShowToast("Saved snapshot");
             CloseSnapMenu();
         }
@@ -1931,7 +1947,7 @@
         if (bytes is null) return null;
         try
         {
-            var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chuvadi-snaps");
+            var dir = System.IO.Path.Combine(ScratchFiles.Folder(Paths), "chuvadi-snaps");
             System.IO.Directory.CreateDirectory(dir);
             var path = System.IO.Path.Combine(dir, $"snap-{Guid.NewGuid():N}.png");
             await System.IO.File.WriteAllBytesAsync(path, bytes);
@@ -2188,7 +2204,7 @@
         _bmBusy = true; _bmStatus = null; StateHasChanged();
         try
         {
-            var output = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"chuvadi-toc-{Guid.NewGuid():N}.pdf");
+            var output = System.IO.Path.Combine(ScratchFiles.Folder(Paths), $"chuvadi-toc-{Guid.NewGuid():N}.pdf");
             await _outline.WriteToFileAsync(path, output, _bmTree);
             await Tabs.ReloadActiveAsync(async () =>
             {
@@ -2204,6 +2220,7 @@
                 }
                 await Task.CompletedTask;
             });
+            await WriteBack.DeliverOrThrowAsync(path);
             _bmStatus = $"Saved {BmFlat().Count()} bookmark(s)";
         }
         catch (Exception ex) { _bmStatus = ex.Message; }
@@ -2996,6 +3013,8 @@
                 await Task.CompletedTask;
             });
 
+            await WriteBack.DeliverOrThrowAsync(src);
+
             // Flattened into the file now — clear the editable overlays.
             _texts.Clear();
             _shapes.Clear();
@@ -3035,6 +3054,7 @@
             var shps = BuildShapesDict();
 
             await Redact.FlattenToFileAsync(active.Path, output!, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
+            await WriteBack.DeliverOrThrowAsync(output);
             _mkSavedPath = output;
             _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
             _mkError = false;
@@ -3141,6 +3161,7 @@
             if (string.IsNullOrEmpty(output)) return;
 
             await Flatten.FlattenToFileAsync(source!, output);
+            await WriteBack.DeliverOrThrowAsync(output);
 
             var name = System.IO.Path.GetFileName(output);
             var format = DocumentFormatExtensions.FromPath(output);
@@ -3171,6 +3192,7 @@
     {
         Tabs.Changed += OnTabsChanged;
         OpenDoc.Requested += OnOpenRequestedLive;
+        Lifecycle.BackRequested += OnBackRequested;
 
         ShellInit();
 
@@ -3187,21 +3209,20 @@
     // open: navigation to /reader is a no-op, so consume the pending open directly.
     private void OnOpenRequestedLive() => _ = InvokeAsync(OpenPendingAsync);
 
+    // Takes every waiting request in order; each is taken once, so two requests made
+    // before the Reader ran open two tabs, each with its own file and name.
     private async Task OpenPendingAsync()
     {
-        if (string.IsNullOrEmpty(OpenDoc.PendingPath))
+        while (OpenDoc.TryTake(out var open))
         {
-            return;
+            var path = open.Path;
+            var name = string.IsNullOrEmpty(open.Name) ? System.IO.Path.GetFileName(path) : open.Name;
+            var format = DocumentFormatExtensions.FromPath(path);
+            _pendingJumpPage = open.Page;
+            await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
+            await Tabs.OpenAsync(path, name, format);
+            StateHasChanged();
         }
-
-        var path = OpenDoc.PendingPath!;
-        var name = OpenDoc.PendingName ?? System.IO.Path.GetFileName(path);
-        var format = DocumentFormatExtensions.FromPath(path);
-        _pendingJumpPage = OpenDoc.PendingPage;
-        OpenDoc.Clear();
-        await Recents.TouchAsync(new RecentItem(name, path, format, DateTimeOffset.Now, false));
-        await Tabs.OpenAsync(path, name, format);
-        StateHasChanged();
     }
 
     private void OnTabsChanged()
@@ -3976,6 +3997,7 @@
         ShellDispose();
         Tabs.Changed -= OnTabsChanged;
         OpenDoc.Requested -= OnOpenRequestedLive;
+        Lifecycle.BackRequested -= OnBackRequested;
 
         try
         {

@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Test-only tooling, same versions as tests/ChuvadiReader.Tests. Never shipped. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChuvadiReader.Hosting\ChuvadiReader.Hosting.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The Windows host's registration list, read as text by the drift test. -->
+    <None Include="..\..\src\ChuvadiReader.Windows\App.xaml.cs" Link="WindowsApp.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The Windows Open dialog's filter, read as text by the openable-types test. -->
+    <None Include="..\..\src\ChuvadiReader.Windows\Platform\WpfFilePicker.cs" Link="WpfFilePicker.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

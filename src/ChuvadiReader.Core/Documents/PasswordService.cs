@@ -182,7 +182,7 @@ public sealed class PasswordService
     {
         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
         ArgumentException.ThrowIfNullOrEmpty(outputPath);
-        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(outputPath), cmp))
         {
             throw new InvalidOperationException("Choose a different file name — the original is never overwritten.");

@@ -1,0 +1,1310 @@
+diff --git a/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj b/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
+index 97f9ffa..3426e6e 100644
+--- a/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
++++ b/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
+@@ -1,17 +1,34 @@
+ <Project Sdk="Microsoft.NET.Sdk">
+   <PropertyGroup>
+     <TargetFramework>net10.0</TargetFramework>
++    <!-- One version for every chuvadi-pdf package (they are mono-versioned and must never mix). -->
++    <ChuvadiPdfVersion>3.31.1</ChuvadiPdfVersion>
+   </PropertyGroup>
+ 
+   <ItemGroup>
+     <!--
+-      chuvadi-pdf consumed ONLY as its packaged distribution (the Chuvadi.Pdf
+-      meta-package), restored from the local feed in ./localpackages via the
+-      solution nuget.config. No project reference, no vendored source.
+-      The meta-package pulls Chuvadi.Pdf.Documents + Chuvadi.Pdf.Svg (and the
+-      rest of the cross-platform modules), which is what ChuvadiPdfReader uses.
++      chuvadi-pdf consumed ONLY as packaged distribution, from the committed ci/packages feed
++      (byte-identical to what Windows ships). Individual packages, not the Chuvadi.Pdf umbrella:
++      the umbrella also pulls PdfA (4.3 MB) and the deprecated Fonts.Bundled / Fonts.Woff2, which
++      the app never uses (library report 6 Nov 2026, §5B). Every package must be the same version.
+     -->
+-    <PackageReference Include="Chuvadi.Pdf" Version="3.31.1" />
++    <PackageReference Include="Chuvadi.Cryptography" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Primitives" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Objects" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.IO" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Documents" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Graphics" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Images" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Text" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Rendering" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Rendering.DisplayList" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Svg" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Authoring" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Forms" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Operations" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Redaction" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Watermark" Version="$(ChuvadiPdfVersion)" />
++    <PackageReference Include="Chuvadi.Pdf.Signatures" Version="$(ChuvadiPdfVersion)" />
+     <PackageReference Include="Chuvadi.Docs" Version="1.1.0" />
+     <PackageReference Include="Chuvadi.Sheets" Version="1.1.2" />
+   </ItemGroup>
+diff --git a/src/ChuvadiReader.Core/Documents/DocumentModels.cs b/src/ChuvadiReader.Core/Documents/DocumentModels.cs
+index cf8b786..821d82c 100644
+--- a/src/ChuvadiReader.Core/Documents/DocumentModels.cs
++++ b/src/ChuvadiReader.Core/Documents/DocumentModels.cs
+@@ -45,6 +45,15 @@ public static class DocumentFormatExtensions
+         _ => "PDF",
+     };
+ 
++    /// <summary>Every file extension Chuvadi can open (lower case, with the dot). The single list the
++    /// Open dialogs, window drop and "Open with" use, so they always agree.</summary>
++    public static IReadOnlyList<string> OpenableExtensions { get; } =
++        new[] { ".pdf", ".docx", ".xlsx", ".md", ".markdown", ".txt", ".log", ".html", ".htm" };
++
++    /// <summary>True when <paramref name="path"/> has an extension in <see cref="OpenableExtensions"/>.</summary>
++    public static bool IsOpenable(string path) =>
++        OpenableExtensions.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant());
++
+     public static DocumentFormat FromPath(string path)
+     {
+         var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+diff --git a/src/ChuvadiReader.Core/Documents/PressService.cs b/src/ChuvadiReader.Core/Documents/PressService.cs
+index 5889f8a..b0a4057 100644
+--- a/src/ChuvadiReader.Core/Documents/PressService.cs
++++ b/src/ChuvadiReader.Core/Documents/PressService.cs
+@@ -1,5 +1,7 @@
+ using Chuvadi.Pdf.Documents;
+ using Chuvadi.Pdf.Operations;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -48,7 +50,13 @@ public sealed class PressService
+ {
+     private readonly SaveFolderService _saveFolders;
+ 
+-    public PressService(SaveFolderService saveFolders) => _saveFolders = saveFolders;
++    private readonly IAppPaths? _paths;
++
++    public PressService(SaveFolderService saveFolders, IAppPaths? paths = null)
++    {
++        _saveFolders = saveFolders;
++        _paths = paths;
++    }
+ 
+     public string DefaultFolder => _saveFolders.SubFolder("Compressed");
+ 
+@@ -82,7 +90,7 @@ public sealed class PressService
+             foreach (var quality in new[] { 85, 70, 55, 45, 35, 25 })
+             {
+                 ct.ThrowIfCancellationRequested();
+-                var tmp = Path.Combine(Path.GetTempPath(), $"press-{Guid.NewGuid():N}.pdf");
++                var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"press-{Guid.NewGuid():N}.pdf");
+                 var result = RunCompress(pdfPath, tmp, new PressOptions(true, quality, 128, 2_000), ct);
+                 var size = new FileInfo(tmp).Length;
+ 
+diff --git a/src/ChuvadiReader.Core/Documents/SaveFolderService.cs b/src/ChuvadiReader.Core/Documents/SaveFolderService.cs
+index 3a9ed7b..31194e5 100644
+--- a/src/ChuvadiReader.Core/Documents/SaveFolderService.cs
++++ b/src/ChuvadiReader.Core/Documents/SaveFolderService.cs
+@@ -1,4 +1,5 @@
+ using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -15,10 +16,19 @@ public sealed class SaveFolderService
+     private const string MonthKey = "save-month-folders";
+ 
+     private readonly IAppStorage _storage;
++    private readonly IAppPaths? _paths;
+ 
+-    public SaveFolderService(IAppStorage storage) => _storage = storage;
++    /// <param name="paths">Host folders. The default save folder is "Chuvadi Documents" under the host's
++    /// <see cref="IAppPaths.DefaultSaveFolder"/> (desktop: Documents, as before); a host without a visible
++    /// file system (Web) gets it under its working folder, delivered by write-back.</param>
++    public SaveFolderService(IAppStorage storage, IAppPaths? paths = null)
++    {
++        _storage = storage;
++        _paths = paths;
++        BaseFolder = DefaultFolder;
++    }
+ 
+-    public string BaseFolder { get; private set; } = DefaultBaseFolder();
++    public string BaseFolder { get; private set; }
+ 
+     public bool DateFolders { get; private set; }
+ 
+@@ -26,15 +36,17 @@ public sealed class SaveFolderService
+ 
+     public event Action? Changed;
+ 
+-    public static string DefaultBaseFolder()
+-        => Path.Combine(
+-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+-            "Chuvadi Documents");
++    /// <summary>The default save folder for this host.</summary>
++    public string DefaultFolder => Path.Combine(
++        _paths is null
++            ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
++            : _paths.DefaultSaveFolder ?? ScratchFiles.Folder(_paths),
++        "Chuvadi Documents");
+ 
+     public async Task HydrateAsync()
+     {
+         var custom = await _storage.GetAsync(FolderKey);
+-        BaseFolder = string.IsNullOrWhiteSpace(custom) ? DefaultBaseFolder() : custom!;
++        BaseFolder = string.IsNullOrWhiteSpace(custom) ? DefaultFolder : custom!;
+         DateFolders = string.Equals(await _storage.GetAsync(DateKey), "on", StringComparison.OrdinalIgnoreCase);
+         MonthFolders = string.Equals(await _storage.GetAsync(MonthKey), "on", StringComparison.OrdinalIgnoreCase);
+         Changed?.Invoke();
+@@ -42,7 +54,7 @@ public sealed class SaveFolderService
+ 
+     public async Task SetBaseFolderAsync(string? path)
+     {
+-        BaseFolder = string.IsNullOrWhiteSpace(path) ? DefaultBaseFolder() : path!;
++        BaseFolder = string.IsNullOrWhiteSpace(path) ? DefaultFolder : path!;
+         await _storage.SetAsync(FolderKey, BaseFolder);
+         Changed?.Invoke();
+     }
+diff --git a/src/ChuvadiReader.Core/Documents/StampService.cs b/src/ChuvadiReader.Core/Documents/StampService.cs
+index 941e29d..e36c26d 100644
+--- a/src/ChuvadiReader.Core/Documents/StampService.cs
++++ b/src/ChuvadiReader.Core/Documents/StampService.cs
+@@ -4,6 +4,8 @@ using Chuvadi.Pdf.Graphics;
+ using Chuvadi.Pdf.Operations;
+ using Chuvadi.Pdf.Watermark;
+ using ChuvadiReader.Core.Reader;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -18,6 +20,11 @@ using Path = System.IO.Path;
+ /// </summary>
+ public sealed class StampService
+ {
++    private readonly IAppPaths? _paths;
++
++    /// <param name="paths">Host folders; intermediate files go to its working folder (system temp when null).</param>
++    public StampService(IAppPaths? paths = null) => _paths = paths;
++
+     /// <summary>Stamp a text watermark onto the given pages. Returns the input unchanged
+     /// when there is nothing to do.</summary>
+     public byte[] ApplyWatermark(byte[] src, DeskWatermark? wm, int[] pageIndices)
+@@ -27,7 +34,7 @@ public sealed class StampService
+             return src;
+         }
+ 
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         try
+         {
+             File.WriteAllBytes(temp, src);
+@@ -60,7 +67,7 @@ public sealed class StampService
+             return src;
+         }
+ 
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         try
+         {
+             File.WriteAllBytes(temp, src);
+diff --git a/src/ChuvadiReader.Core/Documents/UserProfileService.cs b/src/ChuvadiReader.Core/Documents/UserProfileService.cs
+index 12c14bb..c75eea1 100644
+--- a/src/ChuvadiReader.Core/Documents/UserProfileService.cs
++++ b/src/ChuvadiReader.Core/Documents/UserProfileService.cs
+@@ -1,4 +1,5 @@
+ using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -13,7 +14,14 @@ public sealed class UserProfileService
+     private readonly IAppStorage _storage;
+     private string? _preferred;
+ 
+-    public UserProfileService(IAppStorage storage) => _storage = storage;
++    private readonly IAccount? _account;
++
++    /// <param name="account">Who is using the app (desktop: the OS account; Web: the Sangam identity).</param>
++    public UserProfileService(IAppStorage storage, IAccount? account = null)
++    {
++        _storage = storage;
++        _account = account;
++    }
+ 
+     public async Task HydrateAsync(CancellationToken ct = default)
+         => _preferred = await _storage.GetAsync(StorageKey, ct).ConfigureAwait(false);
+@@ -36,7 +44,7 @@ public sealed class UserProfileService
+ 
+             try
+             {
+-                var os = Environment.UserName;
++                var os = _account?.DisplayName ?? Environment.UserName;
+                 return string.IsNullOrWhiteSpace(os) ? null : Capitalize(os);
+             }
+             catch
+diff --git a/src/ChuvadiReader.Core/Reader/BenchComposer.cs b/src/ChuvadiReader.Core/Reader/BenchComposer.cs
+index 4888a12..12dbca2 100644
+--- a/src/ChuvadiReader.Core/Reader/BenchComposer.cs
++++ b/src/ChuvadiReader.Core/Reader/BenchComposer.cs
+@@ -2,6 +2,8 @@ using Chuvadi.Pdf.Authoring;
+ using Chuvadi.Pdf.Documents;
+ using Chuvadi.Pdf.Graphics;
+ using Chuvadi.Pdf.Operations;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ using Path = System.IO.Path;
+ 
+ namespace ChuvadiReader.Core.Reader;
+@@ -21,6 +23,11 @@ public sealed class BenchComposer
+ {
+     private sealed record Resolved(string Path, int Index, int Rotation);
+ 
++    private readonly IAppPaths? _paths;
++
++    /// <param name="paths">Host folders; intermediate files go to its working folder (system temp when null).</param>
++    public BenchComposer(IAppPaths? paths = null) => _paths = paths;
++
+     public Task ComposeToFileAsync(IReadOnlyList<BenchPage> pages, string outputPath, CancellationToken ct = default, string? normalizeSize = null)
+         => Task.Run(async () =>
+         {
+@@ -147,7 +154,7 @@ public sealed class BenchComposer
+                     var key = page.BackgroundHex ?? "";
+                     if (!blankByColor.TryGetValue(key, out var temp))
+                     {
+-                        temp = Path.GetTempFileName();
++                        temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+                         await File.WriteAllBytesAsync(temp, BuildBlankPdf(page.BackgroundHex), ct).ConfigureAwait(false);
+                         blankByColor[key] = temp;
+                         tempFiles.Add(temp);
+@@ -156,7 +163,7 @@ public sealed class BenchComposer
+                 }
+                 else if (page.IsImage && !string.IsNullOrWhiteSpace(page.ImagePath))
+                 {
+-                    var temp = Path.GetTempFileName();
++                    var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+                     ImagePdfConverter.ConvertFile(page.ImagePath, temp, ImagePdfOptions.Default);
+                     tempFiles.Add(temp);
+                     resolved.Add(new Resolved(temp, 0, ((page.Rotation % 360) + 360) % 360));
+@@ -238,7 +245,7 @@ public sealed class BenchComposer
+                     {
+                         foreach (var idx in want)
+                         {
+-                            var temp = Path.GetTempFileName();
++                            var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+                             await File.WriteAllBytesAsync(temp, await SingleAsync(idx).ConfigureAwait(false), ct).ConfigureAwait(false);
+                             singleTemps.Add(temp);
+                             singleDocs.Add(await PdfDocument.OpenAsync(temp, ct).ConfigureAwait(false));
+@@ -376,7 +383,7 @@ public sealed class BenchComposer
+     /// Fit, everything outside the kept region is then painted white — this both realises the mask
+     /// and hides the surrounding source content that <see cref="PageComposer"/> cannot clip when a
+     /// page is placed (placing never clips, so the neighbours would otherwise bleed in).</summary>
+-    private static byte[] ApplyCrop(byte[] bytes, IReadOnlyList<BenchPage> pages)
++    private byte[] ApplyCrop(byte[] bytes, IReadOnlyList<BenchPage> pages)
+     {
+         if (!pages.Any(p => p.Crop != null)) return bytes;
+ 
+@@ -385,7 +392,7 @@ public sealed class BenchComposer
+         var maskRects = new Dictionary<int, (double X, double Bottom, double W, double H)>();
+ 
+         byte[] composed;
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         try
+         {
+             File.WriteAllBytes(temp, bytes);
+@@ -449,11 +456,11 @@ public sealed class BenchComposer
+     /// the whole page scales, centered, to fit inside the page minus the margins. The page size
+     /// is unchanged (white margins appear around the content). Margins are in the page's own
+     /// space (v1: not re-mapped for rotated pages).</summary>
+-    private static byte[] ApplyMargins(byte[] bytes, IReadOnlyList<BenchPage> pages)
++    private byte[] ApplyMargins(byte[] bytes, IReadOnlyList<BenchPage> pages)
+     {
+         if (!pages.Any(p => p.Margins != null)) return bytes;
+ 
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         try
+         {
+             File.WriteAllBytes(temp, bytes);
+@@ -482,13 +489,13 @@ public sealed class BenchComposer
+ 
+     /// <summary>Rebuilds every page at the target size (A4/Letter), scaling each page to fit
+     /// (aspect preserved, top-anchored) via the library's PageComposer.</summary>
+-    private static byte[] ApplyNormalize(byte[] bytes, string? normalizeSize)
++    private byte[] ApplyNormalize(byte[] bytes, string? normalizeSize)
+     {
+         var target = ParseSize(normalizeSize);
+         if (target == null) return bytes;
+         var (tw, th) = target.Value;
+ 
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         try
+         {
+             File.WriteAllBytes(temp, bytes);
+@@ -544,9 +551,9 @@ public sealed class BenchComposer
+         return ms.ToArray();
+     }
+ 
+-    private static async Task<PdfDocument> OpenBytesAsync(byte[] bytes, CancellationToken ct)
++    private async Task<PdfDocument> OpenBytesAsync(byte[] bytes, CancellationToken ct)
+     {
+-        var temp = Path.GetTempFileName();
++        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
+         await File.WriteAllBytesAsync(temp, bytes, ct).ConfigureAwait(false);
+         return await PdfDocument.OpenAsync(temp, ct).ConfigureAwait(false);
+     }
+diff --git a/src/ChuvadiReader.Core/Reader/BenchService.cs b/src/ChuvadiReader.Core/Reader/BenchService.cs
+index 4ab1c5d..08786d0 100644
+--- a/src/ChuvadiReader.Core/Reader/BenchService.cs
++++ b/src/ChuvadiReader.Core/Reader/BenchService.cs
+@@ -2,6 +2,8 @@ using Chuvadi.Pdf.Authoring;
+ using Chuvadi.Pdf.Documents;
+ using Chuvadi.Pdf.Operations;
+ using Chuvadi.Pdf.Watermark;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Reader;
+ 
+@@ -29,13 +31,16 @@ public sealed class BenchService
+     private BenchSnapshot? _baseline;   // state as of the last accepted edit (the next undo target)
+     private string _baselineSig = "";   // structural signature of that state
+     private bool _restoring;            // true while applying a snapshot, to suppress re-recording
+-    private readonly ChuvadiReader.Core.Documents.StampService _stamp = new();
++    private readonly ChuvadiReader.Core.Documents.StampService _stamp;
++    private readonly IAppPaths? _paths;
+     private readonly ChuvadiReader.Core.Documents.OutlineService _outline = new();
+ 
+     public const int MaxDesks = 30;
+ 
+-    public BenchService(IPdfReader reader, BenchComposer composer, ChuvadiReader.Core.Documents.ExportService export)
++    public BenchService(IPdfReader reader, BenchComposer composer, ChuvadiReader.Core.Documents.ExportService export, IAppPaths? paths = null)
+     {
++        _paths = paths;
++        _stamp = new(paths);
+         _reader = reader;
+         _composer = composer;
+         _export = export;
+@@ -1131,8 +1136,8 @@ public sealed class BenchService
+         var desk = FindDesk(deskId);
+         if (desk is null || desk.IsEmpty || !CanAddDesk) return null;
+ 
+-        var flat = Path.Combine(Path.GetTempPath(), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
+-        var nup = Path.Combine(Path.GetTempPath(), $"chuvadi-nup-{Guid.NewGuid():N}.pdf");
++        var flat = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
++        var nup = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-nup-{Guid.NewGuid():N}.pdf");
+         try
+         {
+             await BindDeskAsync(deskId, flat, ct).ConfigureAwait(false);
+@@ -1157,8 +1162,8 @@ public sealed class BenchService
+         var desk = FindDesk(deskId);
+         if (desk is null || desk.IsEmpty || !CanAddDesk) return null;
+ 
+-        var flat = Path.Combine(Path.GetTempPath(), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
+-        var bk = Path.Combine(Path.GetTempPath(), $"chuvadi-booklet-{Guid.NewGuid():N}.pdf");
++        var flat = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
++        var bk = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-booklet-{Guid.NewGuid():N}.pdf");
+         try
+         {
+             await BindDeskAsync(deskId, flat, ct).ConfigureAwait(false);
+@@ -1364,7 +1369,7 @@ public sealed class BenchService
+             foreach (var desk in desks)
+             {
+                 ct.ThrowIfCancellationRequested();
+-                var tmp = Path.Combine(Path.GetTempPath(), $"chuvadi-combine-{Guid.NewGuid():N}.pdf");
++                var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-combine-{Guid.NewGuid():N}.pdf");
+                 await BindDeskAsync(desk.Id, tmp, ct).ConfigureAwait(false);
+                 temps.Add(tmp);
+             }
+@@ -1424,7 +1429,7 @@ public sealed class BenchService
+             return 0;
+         }
+ 
+-        var tmp = Path.Combine(Path.GetTempPath(), $"chuvadi-bench-{Guid.NewGuid():N}.pdf");
++        var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-bench-{Guid.NewGuid():N}.pdf");
+         try
+         {
+             await _composer.ComposeToFileAsync(pages, tmp, ct, desk.NormalizeSize).ConfigureAwait(false);
+diff --git a/src/ChuvadiReader.Core/Reader/SessionService.cs b/src/ChuvadiReader.Core/Reader/SessionService.cs
+index c898f9d..034e457 100644
+--- a/src/ChuvadiReader.Core/Reader/SessionService.cs
++++ b/src/ChuvadiReader.Core/Reader/SessionService.cs
+@@ -1,6 +1,7 @@
+ using System.IO;
+ using System.Text.Json;
+ using System.Text.Json.Serialization;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Reader;
+ 
+@@ -19,6 +20,11 @@ public sealed class SessionService
+         Converters = { new JsonStringEnumConverter() },
+     };
+ 
++    private readonly IAppPaths? _paths;
++
++    /// <param name="paths">Host folders; desk templates live in its app-data folder.</param>
++    public SessionService(IAppPaths? paths = null) => _paths = paths;
++
+     // ── session files (user-chosen path) ───────────────────────────────────────
+ 
+     public async Task SaveSessionAsync(string path, BenchSessionDto session, CancellationToken ct = default)
+@@ -38,15 +44,30 @@ public sealed class SessionService
+ 
+     // ── desk templates (app-data library) ──────────────────────────────────────
+ 
+-    private static string TemplatesPath
++    private const string TemplatesFile = "desk-templates.json";
++
++    /// <summary>Where templates were kept before the platform layer (%AppData%\ChuvadiReader on Windows).</summary>
++    private static string LegacyTemplatesDir => Path.Combine(
++        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
++        "ChuvadiReader");
++
++    private string TemplatesPath
+     {
+         get
+         {
+-            var dir = Path.Combine(
+-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+-                "ChuvadiReader");
++            var dir = _paths?.AppDataFolder ?? LegacyTemplatesDir;
+             Directory.CreateDirectory(dir);
+-            return Path.Combine(dir, "desk-templates.json");
++            var path = Path.Combine(dir, TemplatesFile);
++
++            // One-time carry-over from the old folder; the old file is left in place.
++            var legacy = Path.Combine(LegacyTemplatesDir, TemplatesFile);
++            if (!File.Exists(path) && File.Exists(legacy)
++                && !string.Equals(Path.GetFullPath(path), Path.GetFullPath(legacy), StringComparison.OrdinalIgnoreCase))
++            {
++                try { File.Copy(legacy, path); } catch (IOException) { /* another instance copied it first */ }
++            }
++
++            return path;
+         }
+     }
+ 
+@@ -89,7 +110,7 @@ public sealed class SessionService
+         }
+     }
+ 
+-    private static async Task PersistTemplatesAsync(List<DeskTemplateDto> list, CancellationToken ct)
++    private async Task PersistTemplatesAsync(List<DeskTemplateDto> list, CancellationToken ct)
+     {
+         var json = JsonSerializer.Serialize(list, Json);
+         await File.WriteAllTextAsync(TemplatesPath, json, ct).ConfigureAwait(false);
+diff --git a/src/ChuvadiReader.Core/Storage/ScratchFiles.cs b/src/ChuvadiReader.Core/Storage/ScratchFiles.cs
+new file mode 100644
+index 0000000..33c636f
+--- /dev/null
++++ b/src/ChuvadiReader.Core/Storage/ScratchFiles.cs
+@@ -0,0 +1,36 @@
++using ChuvadiReader.Platform;
++
++namespace ChuvadiReader.Core.Storage;
++
++/// <summary>
++/// Where intermediate files go (renders, temp PDFs while composing). The host decides the folder through
++/// <see cref="IAppPaths.WorkingFolder"/>: desktop = the system temp folder (unchanged), Web = the
++/// person's session-only encrypted folder. Without a host value it falls back to the system temp folder.
++/// </summary>
++public static class ScratchFiles
++{
++    /// <summary>The working folder to use: the host's, else the system temp folder.</summary>
++    public static string Folder(IAppPaths? paths)
++    {
++        var dir = paths?.WorkingFolder;
++        if (string.IsNullOrWhiteSpace(dir))
++        {
++            return Path.GetTempPath();
++        }
++
++        Directory.CreateDirectory(dir);
++        return dir;
++    }
++
++    /// <summary>A new, unique, empty file in <paramref name="folder"/> — the same contract as
++    /// <see cref="Path.GetTempFileName"/>, in a folder the host chooses.</summary>
++    public static string NewFile(string folder)
++    {
++        var path = Path.Combine(folder, $"tmp{Guid.NewGuid():N}.tmp");
++        using (new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None))
++        {
++        }
++
++        return path;
++    }
++}
+diff --git a/src/ChuvadiReader.Windows/Platform/FileAppStorage.cs b/src/ChuvadiReader.Hosting/Desktop/FileAppStorage.cs
+similarity index 82%
+rename from src/ChuvadiReader.Windows/Platform/FileAppStorage.cs
+rename to src/ChuvadiReader.Hosting/Desktop/FileAppStorage.cs
+index 504f0c7..2544345 100644
+--- a/src/ChuvadiReader.Windows/Platform/FileAppStorage.cs
++++ b/src/ChuvadiReader.Hosting/Desktop/FileAppStorage.cs
+@@ -6,11 +6,14 @@ using System.Threading;
+ using System.Threading.Tasks;
+ using ChuvadiReader.Core.Storage;
+ 
+-namespace ChuvadiReader.Windows.Platform;
++namespace ChuvadiReader.Hosting.Desktop;
+ 
+ /// <summary>
+-/// Stores app state as a single JSON file under %AppData%\Chuvadi. No network,
+-/// no registry — just a file the user owns. Pure BCL (System.Text.Json).
++/// Stores app state as a single JSON file (settings.json) in the host's app-data folder
++/// (Windows: %AppData%\Chuvadi). No network, no registry — just a file the user owns.
++/// Pure BCL (System.Text.Json). Shared by the desktop and Android hosts.
++/// Writes go to a temporary file beside it that then replaces settings.json, so a crash or
++/// power cut mid-write leaves the previous settings intact instead of a truncated file.
+ /// </summary>
+ public sealed class FileAppStorage : IAppStorage
+ {
+@@ -73,7 +76,9 @@ public sealed class FileAppStorage : IAppStorage
+         {
+             _cache[key] = value;
+             var json = JsonSerializer.Serialize(_cache);
+-            await File.WriteAllTextAsync(_file, json, ct).ConfigureAwait(false);
++            var temp = _file + ".tmp";
++            await File.WriteAllTextAsync(temp, json, ct).ConfigureAwait(false);
++            File.Move(temp, _file, overwrite: true);
+         }
+         finally
+         {
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/WriteBackExtensions.cs b/src/ChuvadiReader.Ui/Components/Platform/WriteBackExtensions.cs
+new file mode 100644
+index 0000000..c53e3a1
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/WriteBackExtensions.cs
+@@ -0,0 +1,29 @@
++using ChuvadiReader.Platform;
++
++namespace ChuvadiReader.Ui.Components.Platform;
++
++/// <summary>
++/// One-line delivery of a file Chuvadi has just written (decision F-1 C). Call it inside the save's
++/// existing try block, right after the write:
++/// <code>await WriteBack.DeliverOrThrowAsync(path);</code>
++/// Desktop hosts (Windows, macOS, Linux): returns at once — the path is the real file.
++/// Android: writes the bytes back to the content URI. Web: hands the file to the browser as a download.
++/// A failure throws <see cref="IOException"/> with a user-facing message, so the site's existing
++/// catch shows it exactly like any other save error. A cancelled download is not an error.
++/// </summary>
++public static class WriteBackExtensions
++{
++    public static async Task DeliverOrThrowAsync(this IFileWriteBack writeBack, string? path, CancellationToken ct = default)
++    {
++        if (!writeBack.IsNeeded || string.IsNullOrWhiteSpace(path))
++        {
++            return;
++        }
++
++        var result = await writeBack.CommitAsync(path, ct);
++        if (result.Outcome == WriteBackOutcome.Failed)
++        {
++            throw new IOException(result.Message ?? "The file was written here but couldn't be delivered.");
++        }
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor b/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
+index fa396ed..13226ec 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
+@@ -1,4 +1,5 @@
+ @namespace ChuvadiReader.Ui.Components.Settings
++@inject ChuvadiReader.Platform.IAppPaths Paths
+ 
+ <SettingsSection Title="About" Sub="Versions, licences and privacy.">
+     <SettingsCard Title="Chuvadi Reader">
+@@ -12,7 +13,7 @@
+ 
+     <SettingsCard Title="Privacy">
+         <SettingRow Label="Network" Hint="offline · nothing leaves this device"><ValueChip Text="Offline" /></SettingRow>
+-        <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@AppInfo.DataFolder" Wrap="true" /></SettingRow>
++        <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@Paths.AppDataFolder" Wrap="true" /></SettingRow>
+         <SettingRow Label="Clear recent files & cache" Soon="true"><RowButton>Clear…</RowButton></SettingRow>
+     </SettingsCard>
+ 
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/AppInfo.cs b/src/ChuvadiReader.Ui/Components/Settings/AppInfo.cs
+index 3186a87..024b690 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/AppInfo.cs
++++ b/src/ChuvadiReader.Ui/Components/Settings/AppInfo.cs
+@@ -8,25 +8,31 @@ public static class AppInfo
+     /// <summary>A library Chuvadi is built on.</summary>
+     public sealed record Library(string Role, string Name, string Version);
+ 
+-    /// <summary>Package versions this build references (Core / Ui csproj). Kept in one place so
+-    /// About matches the csproj pins; update together when a library version bumps.</summary>
++    /// <summary>Package versions this build actually loads, read from each library assembly's
++    /// informational version, so About can never drift from the csproj pins.</summary>
+     public static readonly IReadOnlyList<Library> Libraries = new[]
+     {
+-        new Library("PDF engine", "chuvadi-pdf", "3.30.2"),
+-        new Library("Word", "Chuvadi.Docs", "1.1.0"),
+-        new Library("Excel", "Chuvadi.Sheets", "1.1.2"),
+-        new Library("Icons", "LiPicons.Blazor", "1.1.0"),
++        new Library("PDF engine", "chuvadi-pdf", VersionOf(typeof(Chuvadi.Pdf.Documents.PdfDocument))),
++        new Library("Word", "Chuvadi.Docs", VersionOf(typeof(Chuvadi.Docs.Word.Document))),
++        new Library("Excel", "Chuvadi.Sheets", VersionOf(typeof(Chuvadi.Sheets.Excel.Workbook))),
++        new Library("Icons", "LiPicons.Blazor", VersionOf(typeof(LiPicons.Blazor.LipiIcon))),
+     };
+ 
++    private static string VersionOf(Type type)
++    {
++        var asm = type.Assembly;
++        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
++        return !string.IsNullOrEmpty(info)
++            ? info.Split('+')[0]
++            : asm.GetName().Version?.ToString(3) ?? "?";
++    }
++
+     /// <summary>The host app's informational version, e.g. "1.0.0+3f2a…".</summary>
+     public static string FullVersion { get; } = ReadVersion();
+ 
+     /// <summary>The version without the source-revision suffix, e.g. "1.0.0".</summary>
+     public static string Version { get; } = FullVersion.Split('+')[0];
+ 
+-    /// <summary>Where the host keeps settings (the Windows host writes %AppData%\Chuvadi).</summary>
+-    public static string DataFolder { get; } = ReadDataFolder();
+-
+     private static string ReadVersion()
+     {
+         var asm = Assembly.GetEntryAssembly() ?? typeof(AppInfo).Assembly;
+@@ -38,16 +44,4 @@ public static class AppInfo
+ 
+         return asm.GetName().Version?.ToString(3) ?? "1.0.0";
+     }
+-
+-    private static string ReadDataFolder()
+-    {
+-        try
+-        {
+-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Chuvadi");
+-        }
+-        catch
+-        {
+-            return "%AppData%\\Chuvadi";
+-        }
+-    }
+ }
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/LibrarySection.razor b/src/ChuvadiReader.Ui/Components/Settings/LibrarySection.razor
+index 6c78334..e18f802 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/LibrarySection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/LibrarySection.razor
+@@ -4,8 +4,11 @@
+ @inject CategoryService Categories
+ @inject LibraryService Lib
+ @inject IFilePicker Picker
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ <SettingsSection Title="@SectionTitle" Sub="Where Chuvadi looks for documents.">
++    @if (Platform.Capabilities.WatchFolders)
++    {
+     <SettingsCard Title="Library folder">
+         <SettingRow Label="Folder" Hint="The same folder new files are saved to" Stack="true">
+             <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
+@@ -32,6 +35,7 @@
+             <Segmented Options="CheckOptions" Value="5 min" />
+         </SettingRow>
+     </SettingsCard>
++    }
+ 
+     <SettingsCard Title="Categories">
+         @foreach (var c in Categories.Categories)
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/SavingSection.razor b/src/ChuvadiReader.Ui/Components/Settings/SavingSection.razor
+index 2399175..65011ce 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/SavingSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/SavingSection.razor
+@@ -1,13 +1,16 @@
+ @namespace ChuvadiReader.Ui.Components.Settings
+ @inject SaveFolderService SaveFolders
+ @inject IFilePicker Picker
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ <SettingsSection Title="@SectionTitle" Sub="Where new files go, and what they are called.">
++    @if (Platform.Capabilities.PickFolders)
++    {
+     <SettingsCard Title="Where files are saved">
+         <SettingRow Label="Save folder" Hint="Bind, Lift, Scatter and other saves default here" Stack="true">
+             <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
+             <RowButton IconName="folder" OnClick="ChangeFolder">Change folder…</RowButton>
+-            <RowButton OnClick="ResetFolder" Title="@SaveFolderService.DefaultBaseFolder()">Reset to default</RowButton>
++            <RowButton OnClick="ResetFolder" Title="@SaveFolders.DefaultFolder">Reset to default</RowButton>
+         </SettingRow>
+         <SettingRow Label="Month subfolder" Hint="@DateTime.Now.ToString("yyyy-MM")">
+             <Toggle Value="SaveFolders.MonthFolders" ValueChanged="v => SaveFolders.SetMonthFoldersAsync(v)" AriaLabel="Month subfolder" />
+@@ -17,6 +20,7 @@
+         </SettingRow>
+         <p class="note">With neither subfolder on, files land directly in the folder. With both on they nest: month, then date.</p>
+     </SettingsCard>
++    }
+ 
+     <SettingsCard Title="When saving">
+         <SettingRow Label="When I press Save" Hint="Marks, stamps and flatten" Soon="true">
+diff --git a/src/ChuvadiReader.Ui/Pages/Bench.razor b/src/ChuvadiReader.Ui/Pages/Bench.razor
+index 140a9ff..da9e45f 100644
+--- a/src/ChuvadiReader.Ui/Pages/Bench.razor
++++ b/src/ChuvadiReader.Ui/Pages/Bench.razor
+@@ -11,6 +11,8 @@
+ @inject SessionService Session
+ @inject RedactRequestService RedactReq
+ @inject BenchDropService BenchDrop
++@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
++@inject ChuvadiReader.Platform.IAppPaths Paths
+ @inject ChuvadiReader.Platform.IPlatformInfo Platform
+ @implements IAsyncDisposable
+ 
+@@ -657,7 +659,10 @@
+                 <p class="modal-body">Write every page of this desk as its own single-page PDF into:</p>
+                 <div class="folder-row">
+                     <span class="folder-path" title="@_scatterFolder">@_scatterFolder</span>
+-                    <button class="link" @onclick="ChangeScatterFolder">change…</button>
++                    @if (Platform.Capabilities.PickFolders)
++                    {
++                        <button class="link" @onclick="ChangeScatterFolder">change…</button>
++                    }
+                 </div>
+                 <div class="modal-foot">
+                     <span style="flex:1"></span>
+@@ -706,7 +711,10 @@
+                 {
+                     <div class="folder-row">
+                         <span class="folder-path" title="@_expFolder">@_expFolder</span>
++                        @if (Platform.Capabilities.PickFolders)
++                    {
+                         <button class="link" @onclick="ChangeExportFolder">change…</button>
++                    }
+                     </div>
+                 }
+                 <div class="modal-foot">
+@@ -866,7 +874,10 @@
+                 <p class="modal-note">@PresetHint(_pressPreset)</p>
+                 <div class="folder-row">
+                     <span class="folder-path" title="@_pressFolder">@_pressFolder</span>
+-                    <button class="link" @onclick="ChangePressFolder">change…</button>
++                    @if (Platform.Capabilities.PickFolders)
++                    {
++                        <button class="link" @onclick="ChangePressFolder">change…</button>
++                    }
+                 </div>
+                 @if (_pressResult is { } r)
+                 {
+@@ -1504,6 +1515,7 @@
+         try
+         {
+             await Session.SaveSessionAsync(path, BenchSvc.ExportSession());
++            await WriteBack.DeliverOrThrowAsync(path);
+             _error = false;
+             _status = $"Session saved to {System.IO.Path.GetFileName(path)}.";
+         }
+@@ -1605,7 +1617,7 @@
+                 safe = safe.Replace(c, '_');
+             }
+ 
+-            var tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{safe}-{Guid.NewGuid():N}.pdf");
++            var tmp = System.IO.Path.Combine(ScratchFiles.Folder(Paths), $"{safe}-{Guid.NewGuid():N}.pdf");
+             await BenchSvc.BindDeskAsync(deskId, tmp);
+ 
+             if (toRedact)
+@@ -2067,6 +2079,7 @@
+         try
+         {
+             var n = await BenchSvc.BindAllAsync(folder!);
++            if (n > 0) await WriteBack.DeliverOrThrowAsync(folder);
+             _status = n == 0 ? "Nothing to bind." : $"Bound {n} desk{(n == 1 ? "" : "s")} into {folder}";
+             _resultPath = null;
+         }
+@@ -2083,6 +2096,7 @@
+         try
+         {
+             var n = await BenchSvc.CombineAllAsync(path!);
++            if (n > 0) await WriteBack.DeliverOrThrowAsync(path);
+             _status = n == 0 ? "Nothing to combine." : $"Combined {n} desk{(n == 1 ? "" : "s")} → {System.IO.Path.GetFileName(path)}";
+             _resultPath = n == 0 ? null : path;
+         }
+@@ -2097,6 +2111,7 @@
+         try
+         {
+             await action();
++            await WriteBack.DeliverOrThrowAsync(path);
+             _status = $"{verb} → {System.IO.Path.GetFileName(path)}";
+             _resultPath = path;
+         }
+@@ -2625,6 +2640,7 @@
+         try
+         {
+             var n = await BenchSvc.ScatterDeskAsync(deskId, _scatterFolder);
++            if (n > 0) await WriteBack.DeliverOrThrowAsync(_scatterFolder);
+             _scatterDesk = null;
+             _status = $"Scattered {n} page{(n == 1 ? "" : "s")} into {_scatterFolder}";
+             _error = false; _resultPath = null;
+@@ -2680,6 +2696,7 @@
+                     await BenchSvc.BindDeskAsync(deskId, path);
+                 }
+ 
++                await WriteBack.DeliverOrThrowAsync(path);
+                 _expDesk = null;
+                 _status = $"Exported PDF: {System.IO.Path.GetFileName(path)}";
+                 _error = false; _resultPath = path;
+@@ -2693,6 +2710,7 @@
+         try
+         {
+             var n = await BenchSvc.ExportDeskAsync(deskId, _expFolder, _expFormat, _expDpi, _expSelectedOnly);
++            if (n > 0) await WriteBack.DeliverOrThrowAsync(_expFolder);
+             _expDesk = null;
+             _status = $"Exported {n} image{(n == 1 ? "" : "s")} into {_expFolder}";
+             _error = false; _resultPath = null;
+@@ -2739,6 +2757,7 @@
+         try
+         {
+             _pressResult = await Press.PressAsync(_pressSrc, _pressFolder, PressOptions.For(_pressPreset));
++            await WriteBack.DeliverOrThrowAsync(_pressResult?.OutputPath);
+         }
+         catch (Exception ex) { _status = ex.Message; _error = true; _pressSrc = null; }
+         finally { _pressBusy = false; StateHasChanged(); }
+diff --git a/src/ChuvadiReader.Ui/Pages/Library.razor b/src/ChuvadiReader.Ui/Pages/Library.razor
+index 2891582..655c54f 100644
+--- a/src/ChuvadiReader.Ui/Pages/Library.razor
++++ b/src/ChuvadiReader.Ui/Pages/Library.razor
+@@ -5,6 +5,7 @@
+ @inject FolderSearchService Search
+ @inject PressService Press
+ @inject IFilePicker Picker
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ @inject OpenDocumentService OpenDoc
+ @inject RecentFilesService Recents
+ @inject NavigationManager Nav
+@@ -229,7 +230,10 @@
+                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                     <Icon Name="folder" Size="13" />
+                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_pressFolder">@_pressFolder</span>
+-                    <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    @if (Platform.Capabilities.PickFolders)
++                    {
++                        <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    }
+                 </div>
+ 
+                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+diff --git a/src/ChuvadiReader.Ui/Pages/Merge.razor b/src/ChuvadiReader.Ui/Pages/Merge.razor
+index 43da7df..fcf7a87 100644
+--- a/src/ChuvadiReader.Ui/Pages/Merge.razor
++++ b/src/ChuvadiReader.Ui/Pages/Merge.razor
+@@ -4,6 +4,7 @@
+ @inject TabsService Tabs
+ @inject OpenDocumentService OpenDoc
+ @inject NavigationManager Nav
++@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
+ 
+ <PageTitle>Chuvadi · Merge</PageTitle>
+ 
+@@ -137,6 +138,7 @@
+         try
+         {
+             await Tools.MergeAsync(_entries.Select(e => e.Path).ToList(), outPath);
++            await WriteBack.DeliverOrThrowAsync(outPath);
+             _resultPath = outPath;
+             _status = $"Merged {_entries.Count} documents into {System.IO.Path.GetFileName(outPath)}.";
+         }
+diff --git a/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs b/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
+index 26ee95e..b649a4a 100644
+--- a/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
++++ b/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
+@@ -1,5 +1,6 @@
+ using ChuvadiReader.Core.Documents;
+ using ChuvadiReader.Core.Reader;
++using ChuvadiReader.Ui.Components.Platform;
+ using ChuvadiReader.Ui.Components.Viewers;
+ using Microsoft.AspNetCore.Components;
+ using Microsoft.AspNetCore.Components.Web;
+@@ -421,8 +422,13 @@ public partial class Reader
+         }
+ 
+         yield return Sep("3");
+-        yield return new("doc.reveal", "Show in folder", "Document", "folder", null, () => Task.CompletedTask, "Coming soon");
+-        yield return new("doc.copypath", "Copy file path", "Document", "copy", null, () => CopyTextAsync(tab.Path, "File path copied"));
++        // Real paths only exist where there is a file manager (desktop); a working copy's path means nothing to people.
++        if (Platform.Capabilities.RevealInFolder)
++        {
++            yield return new("doc.reveal", "Show in folder", "Document", "folder", null, () => Task.CompletedTask, "Coming soon");
++            yield return new("doc.copypath", "Copy file path", "Document", "copy", null, () => CopyTextAsync(tab.Path, "File path copied"));
++        }
++
+         yield return new("doc.tags", "Tags…", "Document", "tag", null, () => { Nav.NavigateTo("/library"); return Task.CompletedTask; }, null, "library category");
+         yield return Sep("4");
+         yield return new("doc.close", "Close", "Document", "close", "Ctrl W", CloseActiveTab);
+@@ -717,6 +723,16 @@ public partial class Reader
+ 
+     private async Task OnProtectedSaved(string output)
+     {
++        try
++        {
++            await WriteBack.DeliverOrThrowAsync(output);
++        }
++        catch (Exception ex)
++        {
++            Shell.Notify(ex.Message, isError: true);
++            return;
++        }
++
+         var name = System.IO.Path.GetFileName(output);
+         Shell.Notify($"Saved → {name}", false, "Open", () => OpenOutputAsync(output));
+         await Task.CompletedTask;
+diff --git a/src/ChuvadiReader.Ui/Pages/Reader.razor b/src/ChuvadiReader.Ui/Pages/Reader.razor
+index e588728..c8082d2 100644
+--- a/src/ChuvadiReader.Ui/Pages/Reader.razor
++++ b/src/ChuvadiReader.Ui/Pages/Reader.razor
+@@ -21,6 +21,8 @@
+ @inject IEntitlements Entitlements
+ @inject ChuvadiReader.Platform.IPlatformInfo Platform
+ @inject ChuvadiReader.Platform.IClipboard TextClip
++@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
++@inject ChuvadiReader.Platform.IAppPaths Paths
+ @using ChuvadiReader.Core.Documents
+ 
+ <PageTitle>Chuvadi · Reader</PageTitle>
+@@ -191,7 +193,10 @@
+                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                     <Icon Name="folder" Size="13" />
+                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_expFolder">@_expFolder</span>
+-                    <button @onclick="ChangeExportFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    @if (Platform.Capabilities.PickFolders)
++                    {
++                        <button @onclick="ChangeExportFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    }
+                 </div>
+ 
+                 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+@@ -255,7 +260,10 @@
+                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">
+                     <Icon Name="folder" Size="13" />
+                     <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="@_pressFolder">@_pressFolder</span>
+-                    <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    @if (Platform.Capabilities.PickFolders)
++                    {
++                        <button @onclick="ChangePressFolder" style="background:none;border:none;color:var(--chvd-binding);cursor:pointer;font-family:var(--chvd-mono);font-size:11px">change…</button>
++                    }
+                 </div>
+ 
+                 @if (_pressResult is not null)
+@@ -1190,7 +1198,7 @@
+             try
+             {
+                 var temp = System.IO.Path.Combine(
+-                    System.IO.Path.GetTempPath(),
++                    ScratchFiles.Folder(Paths),
+                     System.IO.Path.GetFileNameWithoutExtension(active.Path) + "-toredact-" + Guid.NewGuid().ToString("N").Substring(0, 8) + ".pdf");
+                 await Redact.FlattenToFileAsync(
+                     active.Path, temp,
+@@ -1271,6 +1279,7 @@
+         try
+         {
+             var n = await Export.ExportAsync(active.Path, _expFolder, _expFormat, _expAll, CurPage - 1, _expDpi);
++            if (n > 0) await WriteBack.DeliverOrThrowAsync(_expFolder);
+             _expStatus = $"Exported {n} file{(n == 1 ? "" : "s")} → {_expFolder}";
+         }
+         catch (Exception ex)
+@@ -1334,6 +1343,7 @@
+                 _pressResult = await Press.PressAsync(active.Path, _pressFolder, opts);
+             }
+ 
++            await WriteBack.DeliverOrThrowAsync(_pressResult?.OutputPath);
+             _pressStatus = null;
+         }
+         catch (Exception ex)
+@@ -1821,6 +1831,7 @@
+             {
+                 _stampStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
+             }
++            await WriteBack.DeliverOrThrowAsync(inPlace ? finalPath : output);
+             _stampError = false;
+         }
+         catch (Exception ex)
+@@ -1885,6 +1896,7 @@
+         try
+         {
+             await System.IO.File.WriteAllBytesAsync(path!, bytes);
++            await WriteBack.DeliverOrThrowAsync(path);
+             ShowToast("Saved snapshot");
+             CloseSnapMenu();
+         }
+@@ -1933,7 +1945,7 @@
+         if (bytes is null) return null;
+         try
+         {
+-            var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "chuvadi-snaps");
++            var dir = System.IO.Path.Combine(ScratchFiles.Folder(Paths), "chuvadi-snaps");
+             System.IO.Directory.CreateDirectory(dir);
+             var path = System.IO.Path.Combine(dir, $"snap-{Guid.NewGuid():N}.png");
+             await System.IO.File.WriteAllBytesAsync(path, bytes);
+@@ -2190,7 +2202,7 @@
+         _bmBusy = true; _bmStatus = null; StateHasChanged();
+         try
+         {
+-            var output = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"chuvadi-toc-{Guid.NewGuid():N}.pdf");
++            var output = System.IO.Path.Combine(ScratchFiles.Folder(Paths), $"chuvadi-toc-{Guid.NewGuid():N}.pdf");
+             await _outline.WriteToFileAsync(path, output, _bmTree);
+             await Tabs.ReloadActiveAsync(async () =>
+             {
+@@ -2206,6 +2218,7 @@
+                 }
+                 await Task.CompletedTask;
+             });
++            await WriteBack.DeliverOrThrowAsync(path);
+             _bmStatus = $"Saved {BmFlat().Count()} bookmark(s)";
+         }
+         catch (Exception ex) { _bmStatus = ex.Message; }
+@@ -2998,6 +3011,8 @@
+                 await Task.CompletedTask;
+             });
+ 
++            await WriteBack.DeliverOrThrowAsync(src);
++
+             // Flattened into the file now — clear the editable overlays.
+             _texts.Clear();
+             _shapes.Clear();
+@@ -3037,6 +3052,7 @@
+             var shps = BuildShapesDict();
+ 
+             await Redact.FlattenToFileAsync(active.Path, output!, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
++            await WriteBack.DeliverOrThrowAsync(output);
+             _mkSavedPath = output;
+             _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
+             _mkError = false;
+@@ -3143,6 +3159,7 @@
+             if (string.IsNullOrEmpty(output)) return;
+ 
+             await Flatten.FlattenToFileAsync(source!, output);
++            await WriteBack.DeliverOrThrowAsync(output);
+ 
+             var name = System.IO.Path.GetFileName(output);
+             var format = DocumentFormatExtensions.FromPath(output);
+diff --git a/src/ChuvadiReader.Ui/Pages/Redact.razor b/src/ChuvadiReader.Ui/Pages/Redact.razor
+index c0f8eec..01cacc9 100644
+--- a/src/ChuvadiReader.Ui/Pages/Redact.razor
++++ b/src/ChuvadiReader.Ui/Pages/Redact.razor
+@@ -9,6 +9,7 @@
+ @inject NavigationManager Nav
+ @inject IEntitlements Entitlements
+ @inject IJSRuntime JS
++@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
+ 
+ <div class="redact-root mview">
+     <div class="rd-col">
+@@ -582,6 +583,7 @@
+             var boxesArg = boxesByPage.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<NormBox>)kv.Value);
+ 
+             await RedactSvc.ApplyAsync(_path, output!, boxesArg, patterns, _glyphOnly, _color, padding: 1.5);
++            await WriteBack.DeliverOrThrowAsync(output);
+             _savedPath = output;
+             _status = $"Saved → {System.IO.Path.GetFileName(output)}";
+             _statusErr = false;
+diff --git a/src/ChuvadiReader.Ui/Pages/Split.razor b/src/ChuvadiReader.Ui/Pages/Split.razor
+index 08d0416..92db8f5 100644
+--- a/src/ChuvadiReader.Ui/Pages/Split.razor
++++ b/src/ChuvadiReader.Ui/Pages/Split.razor
+@@ -5,6 +5,7 @@
+ @inject OpenDocumentService OpenDoc
+ @inject NavigationManager Nav
+ @inject IAppStorage Storage
++@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
+ 
+ <PageTitle>Chuvadi · Split</PageTitle>
+ 
+@@ -209,6 +210,7 @@
+             try
+             {
+                 var n = await Tools.SplitToFolderAsync(_sourcePath, dir);
++                if (n > 0) await WriteBack.DeliverOrThrowAsync(dir);
+                 _status = $"Wrote {n} files to {dir}.";
+             }
+             catch (Exception ex)
+@@ -238,6 +240,7 @@
+             try
+             {
+                 await Tools.ExtractRangeAsync(_sourcePath, outPath, from - 1, to - from + 1);
++                await WriteBack.DeliverOrThrowAsync(outPath);
+                 _resultPath = outPath;
+                 _status = $"Saved pages {from}–{to} to {System.IO.Path.GetFileName(outPath)}.";
+             }
+diff --git a/src/ChuvadiReader.Windows/App.xaml.cs b/src/ChuvadiReader.Windows/App.xaml.cs
+index 4d8dfea..970a0e3 100644
+--- a/src/ChuvadiReader.Windows/App.xaml.cs
++++ b/src/ChuvadiReader.Windows/App.xaml.cs
+@@ -11,6 +11,7 @@ using ChuvadiReader.Core.Theme;
+ using ChuvadiReader.Core.Window;
+ using ChuvadiReader.Windows.Platform;
+ using ChuvadiReader.Hosting;
++using ChuvadiReader.Hosting.Desktop;
+ using ChuvadiReader.Platform;
+ using Microsoft.Extensions.DependencyInjection;
+ 
+diff --git a/src/ChuvadiReader.Windows/MainWindow.xaml.cs b/src/ChuvadiReader.Windows/MainWindow.xaml.cs
+index ff00047..41f3e7d 100644
+--- a/src/ChuvadiReader.Windows/MainWindow.xaml.cs
++++ b/src/ChuvadiReader.Windows/MainWindow.xaml.cs
+@@ -38,10 +38,9 @@ public partial class MainWindow : Window
+         Drop += OnFileDrop;
+     }
+ 
+-    private static readonly string[] DropExtensions = { ".pdf", ".docx", ".doc", ".xlsx", ".xls" };
+-
++    // Same list as the Open dialog (Core: DocumentFormatExtensions.OpenableExtensions).
+     private static bool IsSupportedFile(string path)
+-        => DropExtensions.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant());
++        => ChuvadiReader.Core.Documents.DocumentFormatExtensions.IsOpenable(path);
+ 
+     private static bool HasSupportedFile(DragEventArgs e)
+         => e.Data.GetDataPresent(DataFormats.FileDrop)
+diff --git a/tests/ChuvadiReader.Hosting.Tests/ChuvadiReader.Hosting.Tests.csproj b/tests/ChuvadiReader.Hosting.Tests/ChuvadiReader.Hosting.Tests.csproj
+index 7cbd7cf..444d9b7 100644
+--- a/tests/ChuvadiReader.Hosting.Tests/ChuvadiReader.Hosting.Tests.csproj
++++ b/tests/ChuvadiReader.Hosting.Tests/ChuvadiReader.Hosting.Tests.csproj
+@@ -16,5 +16,7 @@
+   <ItemGroup>
+     <!-- The Windows host's registration list, read as text by the drift test. -->
+     <None Include="..\..\src\ChuvadiReader.Windows\App.xaml.cs" Link="WindowsApp.xaml.cs.txt" CopyToOutputDirectory="PreserveNewest" />
++    <!-- The Windows Open dialog's filter, read as text by the openable-types test. -->
++    <None Include="..\..\src\ChuvadiReader.Windows\Platform\WpfFilePicker.cs" Link="WpfFilePicker.cs.txt" CopyToOutputDirectory="PreserveNewest" />
+   </ItemGroup>
+ </Project>
+diff --git a/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs b/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs
+new file mode 100644
+index 0000000..e054b13
+--- /dev/null
++++ b/tests/ChuvadiReader.Hosting.Tests/GroupBcTests.cs
+@@ -0,0 +1,133 @@
++using System.Text.RegularExpressions;
++using ChuvadiReader.Core.Documents;
++using ChuvadiReader.Core.Reader;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Hosting.Desktop;
++using ChuvadiReader.Platform;
++using Xunit;
++
++namespace ChuvadiReader.Hosting.Tests;
++
++/// <summary>Guards for the Group B/C edits: write-back at every save, host folders, shared lists.</summary>
++public sealed class GroupBcTests : IDisposable
++{
++    private readonly string _dir = Path.Combine(Path.GetTempPath(), "chvd-tests-" + Guid.NewGuid().ToString("N"));
++
++    public GroupBcTests() => Directory.CreateDirectory(_dir);
++
++    public void Dispose()
++    {
++        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
++    }
++
++    private static string RepoRoot()
++    {
++        var d = new DirectoryInfo(AppContext.BaseDirectory);
++        while (d is not null && !File.Exists(Path.Combine(d.FullName, "ChuvadiReader.Platforms.slnx")))
++        {
++            d = d.Parent;
++        }
++
++        return d?.FullName ?? throw new InvalidOperationException("Repository root not found.");
++    }
++
++    private sealed class Paths(string root) : IAppPaths
++    {
++        public string AppDataFolder => Path.Combine(root, "appdata");
++        public string WorkingFolder => Path.Combine(root, "work");
++        public string? DefaultSaveFolder => null;
++    }
++
++    /// <summary>Every Ui file that asks for a save target delivers at least as many files (F-1 C).</summary>
++    [Fact]
++    public void Every_save_site_delivers_its_file()
++    {
++        var ui = Path.Combine(RepoRoot(), "src", "ChuvadiReader.Ui");
++        var problems = new List<string>();
++        foreach (var file in Directory.EnumerateFiles(ui, "*.*", SearchOption.AllDirectories)
++                     .Where(f => (f.EndsWith(".razor") || f.EndsWith(".cs")) && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")))
++        {
++            var text = File.ReadAllText(file);
++            var saves = Regex.Matches(text, @"Picker\.PickSave\w*Async\(").Count + Regex.Matches(text, @"File\.Replace\(").Count;
++            var delivers = Regex.Matches(text, @"DeliverOrThrowAsync\(").Count;
++            if (saves > delivers)
++            {
++                problems.Add($"{Path.GetFileName(file)}: {saves} save site(s), {delivers} delivery call(s)");
++            }
++        }
++
++        Assert.True(problems.Count == 0, string.Join("; ", problems));
++    }
++
++    /// <summary>Window drop accepts exactly what the Open dialog offers (Mac chat F1).</summary>
++    [Fact]
++    public void Openable_types_match_the_Windows_open_dialog()
++    {
++        var picker = File.ReadAllText(Path.Combine(RepoRoot(), "src", "ChuvadiReader.Windows", "Platform", "WpfFilePicker.cs"));
++        var m = Regex.Match(picker, @"""All supported \(([^)]*)\)\|");
++        Assert.True(m.Success, "Open filter not found");
++        var dialog = m.Groups[1].Value.Split(';').Select(e => e.Trim().TrimStart('*').ToLowerInvariant()).OrderBy(e => e);
++        Assert.Equal(dialog, DocumentFormatExtensions.OpenableExtensions.OrderBy(e => e));
++        Assert.False(DocumentFormatExtensions.IsOpenable("old.doc"));
++        Assert.False(DocumentFormatExtensions.IsOpenable("old.xls"));
++        Assert.True(DocumentFormatExtensions.IsOpenable("Notes.MD"));
++    }
++
++    /// <summary>Settings are replaced atomically; no temporary file is left behind (Mac chat F3).</summary>
++    [Fact]
++    public async Task Settings_write_replaces_the_file()
++    {
++        var store = new FileAppStorage(_dir);
++        await store.SetAsync("theme", "dark");
++        await store.SetAsync("scale", "125");
++        Assert.False(File.Exists(Path.Combine(_dir, "settings.json.tmp")));
++
++        var again = new FileAppStorage(_dir);
++        Assert.Equal("dark", await again.GetAsync("theme"));
++        Assert.Equal("125", await again.GetAsync("scale"));
++    }
++
++    /// <summary>Desk templates live in the host's app-data folder (Mac chat F2).</summary>
++    [Fact]
++    public async Task Templates_live_in_the_host_app_data_folder()
++    {
++        var paths = new Paths(_dir);
++        var sessions = new SessionService(paths);
++        await sessions.SaveTemplateAsync(new DeskTemplateDto { Name = "Discharge" });
++        Assert.True(File.Exists(Path.Combine(paths.AppDataFolder, "desk-templates.json")));
++        Assert.Contains(await sessions.ListTemplatesAsync(), t => t.Name == "Discharge");
++    }
++
++    [Fact]
++    public void Scratch_files_go_to_the_host_working_folder()
++    {
++        var paths = new Paths(_dir);
++        var folder = ScratchFiles.Folder(paths);
++        Assert.Equal(paths.WorkingFolder, folder);
++        var a = ScratchFiles.NewFile(folder);
++        var b = ScratchFiles.NewFile(folder);
++        Assert.NotEqual(a, b);
++        Assert.Equal(0, new FileInfo(a).Length);
++        Assert.Equal(Path.GetTempPath(), ScratchFiles.Folder(null));
++    }
++
++    [Fact]
++    public void Default_save_folder_follows_the_host()
++    {
++        var paths = new Paths(_dir);
++        var saves = new SaveFolderService(new NullStorage(), paths);
++        Assert.Equal(Path.Combine(paths.WorkingFolder, "Chuvadi Documents"), saves.DefaultFolder);
++
++        var desktop = new SaveFolderService(new NullStorage());
++        Assert.Equal(
++            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Chuvadi Documents"),
++            desktop.DefaultFolder);
++    }
++
++    private sealed class NullStorage : IAppStorage
++    {
++        public Task<string?> GetAsync(string key, CancellationToken ct = default) => Task.FromResult<string?>(null);
++
++        public Task SetAsync(string key, string value, CancellationToken ct = default) => Task.CompletedTask;
++    }
++}

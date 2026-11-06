@@ -45,6 +45,15 @@ public static class DocumentFormatExtensions
         _ => "PDF",
     };
 
+    /// <summary>Every file extension Chuvadi can open (lower case, with the dot). The single list the
+    /// Open dialogs, window drop and "Open with" use, so they always agree.</summary>
+    public static IReadOnlyList<string> OpenableExtensions { get; } =
+        new[] { ".pdf", ".docx", ".xlsx", ".md", ".markdown", ".txt", ".log", ".html", ".htm" };
+
+    /// <summary>True when <paramref name="path"/> has an extension in <see cref="OpenableExtensions"/>.</summary>
+    public static bool IsOpenable(string path) =>
+        OpenableExtensions.Contains(System.IO.Path.GetExtension(path).ToLowerInvariant());
+
     public static DocumentFormat FromPath(string path)
     {
         var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();

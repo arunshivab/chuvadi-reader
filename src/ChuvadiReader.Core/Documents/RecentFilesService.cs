@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -14,7 +15,15 @@ public sealed class RecentFilesService
     private readonly IAppStorage _storage;
     private readonly List<RecentItem> _items = new();
 
-    public RecentFilesService(IAppStorage storage) => _storage = storage;
+    private readonly bool _samples;
+
+    /// <param name="platform">The host. No Phase 0 samples on a server (Web H8): every portal session
+    /// starts empty and the sample files don't exist there. Desktop unchanged.</param>
+    public RecentFilesService(IAppStorage storage, IPlatformInfo? platform = null)
+    {
+        _storage = storage;
+        _samples = platform?.Capabilities.ServerSide != true;
+    }
 
     public IReadOnlyList<RecentItem> Items => _items;
 
@@ -43,7 +52,7 @@ public sealed class RecentFilesService
             }
         }
 
-        if (_items.Count == 0)
+        if (_items.Count == 0 && _samples)
         {
             SeedSample();
         }

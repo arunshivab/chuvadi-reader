@@ -1,13 +1,16 @@
 @namespace ChuvadiReader.Ui.Components.Settings
 @inject SaveFolderService SaveFolders
 @inject IFilePicker Picker
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <SettingsSection Title="@SectionTitle" Sub="Where new files go, and what they are called.">
+    @if (Platform.Capabilities.PickFolders)
+    {
     <SettingsCard Title="Where files are saved">
         <SettingRow Label="Save folder" Hint="Bind, Lift, Scatter and other saves default here" Stack="true">
             <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
             <RowButton IconName="folder" OnClick="ChangeFolder">Change folder…</RowButton>
-            <RowButton OnClick="ResetFolder" Title="@SaveFolderService.DefaultBaseFolder()">Reset to default</RowButton>
+            <RowButton OnClick="ResetFolder" Title="@SaveFolders.DefaultFolder">Reset to default</RowButton>
         </SettingRow>
         <SettingRow Label="Month subfolder" Hint="@DateTime.Now.ToString("yyyy-MM")">
             <Toggle Value="SaveFolders.MonthFolders" ValueChanged="v => SaveFolders.SetMonthFoldersAsync(v)" AriaLabel="Month subfolder" />
@@ -17,6 +20,7 @@
         </SettingRow>
         <p class="note">With neither subfolder on, files land directly in the folder. With both on they nest: month, then date.</p>
     </SettingsCard>
+    }
 
     <SettingsCard Title="When saving">
         <SettingRow Label="When I press Save" Hint="Marks, stamps and flatten" Soon="true">

@@ -4,6 +4,8 @@ using Chuvadi.Pdf.Graphics;
 using Chuvadi.Pdf.Operations;
 using Chuvadi.Pdf.Watermark;
 using ChuvadiReader.Core.Reader;
+using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -18,6 +20,11 @@ using Path = System.IO.Path;
 /// </summary>
 public sealed class StampService
 {
+    private readonly IAppPaths? _paths;
+
+    /// <param name="paths">Host folders; intermediate files go to its working folder (system temp when null).</param>
+    public StampService(IAppPaths? paths = null) => _paths = paths;
+
     /// <summary>Stamp a text watermark onto the given pages. Returns the input unchanged
     /// when there is nothing to do.</summary>
     public byte[] ApplyWatermark(byte[] src, DeskWatermark? wm, int[] pageIndices)
@@ -27,7 +34,7 @@ public sealed class StampService
             return src;
         }
 
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         try
         {
             File.WriteAllBytes(temp, src);
@@ -60,7 +67,7 @@ public sealed class StampService
             return src;
         }
 
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         try
         {
             File.WriteAllBytes(temp, src);

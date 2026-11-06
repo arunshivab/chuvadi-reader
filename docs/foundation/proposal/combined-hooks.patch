@@ -1,0 +1,3067 @@
+diff --git a/ChuvadiReader.Platforms.slnx b/ChuvadiReader.Platforms.slnx
+index 4b18b64..529acc6 100644
+--- a/ChuvadiReader.Platforms.slnx
++++ b/ChuvadiReader.Platforms.slnx
+@@ -12,5 +12,9 @@
+   <Folder Name="/tests/">
+     <Project Path="tests/ChuvadiReader.Tests/ChuvadiReader.Tests.csproj" />
+     <Project Path="tests/ChuvadiReader.Hosting.Tests/ChuvadiReader.Hosting.Tests.csproj" />
++    <Project Path="tests/ChuvadiReader.MobileUi.Tests/ChuvadiReader.MobileUi.Tests.csproj" />
++    <Project Path="tests/ChuvadiReader.WebUi.Tests/ChuvadiReader.WebUi.Tests.csproj" />
++    <!-- Dev preview host (testing only, never shipped); built here so it keeps compiling. -->
++    <Project Path="tests/ChuvadiReader.MobileUi.Preview/ChuvadiReader.MobileUi.Preview.csproj" />
+   </Folder>
+ </Solution>
+diff --git a/src/ChuvadiReader.Core/Documents/CertificateSignService.cs b/src/ChuvadiReader.Core/Documents/CertificateSignService.cs
+index d868858..b360031 100644
+--- a/src/ChuvadiReader.Core/Documents/CertificateSignService.cs
++++ b/src/ChuvadiReader.Core/Documents/CertificateSignService.cs
+@@ -114,7 +114,8 @@ public sealed class CertificateSignService
+ 
+     private static (X509Certificate2 Leaf, List<X509Certificate2> Others) LoadPfx(string pfxPath, string pfxPassword)
+     {
+-        var flags = OperatingSystem.IsMacOS() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet;
++        // Mac Catalyst (the MAUI Mac host) reports IsMacOS() == false but has the same keychain limits.
++        var flags = OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst() ? X509KeyStorageFlags.DefaultKeySet : X509KeyStorageFlags.EphemeralKeySet;
+         var all = X509CertificateLoader.LoadPkcs12CollectionFromFile(pfxPath, pfxPassword, flags);
+         var leaf = all.FirstOrDefault(c => c.HasPrivateKey);
+         if (leaf is null)
+diff --git a/src/ChuvadiReader.Core/Documents/PasswordService.cs b/src/ChuvadiReader.Core/Documents/PasswordService.cs
+index f1b6b9b..900312a 100644
+--- a/src/ChuvadiReader.Core/Documents/PasswordService.cs
++++ b/src/ChuvadiReader.Core/Documents/PasswordService.cs
+@@ -182,7 +182,7 @@ public sealed class PasswordService
+     {
+         ArgumentException.ThrowIfNullOrEmpty(sourcePath);
+         ArgumentException.ThrowIfNullOrEmpty(outputPath);
+-        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
++        var cmp = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() || OperatingSystem.IsMacCatalyst() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+         if (string.Equals(Path.GetFullPath(sourcePath), Path.GetFullPath(outputPath), cmp))
+         {
+             throw new InvalidOperationException("Choose a different file name — the original is never overwritten.");
+diff --git a/src/ChuvadiReader.Core/Documents/PinnedAndWatchedServices.cs b/src/ChuvadiReader.Core/Documents/PinnedAndWatchedServices.cs
+index 2eb6d3b..be646ea 100644
+--- a/src/ChuvadiReader.Core/Documents/PinnedAndWatchedServices.cs
++++ b/src/ChuvadiReader.Core/Documents/PinnedAndWatchedServices.cs
+@@ -1,5 +1,6 @@
+ using System.Text.Json;
+ using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -10,7 +11,14 @@ public sealed class PinnedService
+     private readonly IAppStorage _storage;
+     private readonly List<PinnedItem> _items = new();
+ 
+-    public PinnedService(IAppStorage storage) => _storage = storage;
++    private readonly bool _samples;
++
++    /// <param name="platform">The host. No Phase 0 samples on a server (Web H8). Desktop unchanged.</param>
++    public PinnedService(IAppStorage storage, IPlatformInfo? platform = null)
++    {
++        _storage = storage;
++        _samples = platform?.Capabilities.ServerSide != true;
++    }
+ 
+     public IReadOnlyList<PinnedItem> Items => _items;
+ 
+@@ -36,7 +44,7 @@ public sealed class PinnedService
+             }
+         }
+ 
+-        if (_items.Count == 0)
++        if (_items.Count == 0 && _samples)
+         {
+             _items.Add(new PinnedItem("aerb_submission.pdf", "~/Documents/Chuvadi/aerb_submission.pdf", false, DocumentFormat.Pdf));
+             _items.Add(new PinnedItem("IMCHRC / PET-CT", "~/Documents/Chuvadi/IMCHRC", true, null));
+diff --git a/src/ChuvadiReader.Core/Documents/RecentFilesService.cs b/src/ChuvadiReader.Core/Documents/RecentFilesService.cs
+index dfc951e..38b9f9e 100644
+--- a/src/ChuvadiReader.Core/Documents/RecentFilesService.cs
++++ b/src/ChuvadiReader.Core/Documents/RecentFilesService.cs
+@@ -1,5 +1,6 @@
+ using System.Text.Json;
+ using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Platform;
+ 
+ namespace ChuvadiReader.Core.Documents;
+ 
+@@ -14,7 +15,15 @@ public sealed class RecentFilesService
+     private readonly IAppStorage _storage;
+     private readonly List<RecentItem> _items = new();
+ 
+-    public RecentFilesService(IAppStorage storage) => _storage = storage;
++    private readonly bool _samples;
++
++    /// <param name="platform">The host. No Phase 0 samples on a server (Web H8): every portal session
++    /// starts empty and the sample files don't exist there. Desktop unchanged.</param>
++    public RecentFilesService(IAppStorage storage, IPlatformInfo? platform = null)
++    {
++        _storage = storage;
++        _samples = platform?.Capabilities.ServerSide != true;
++    }
+ 
+     public IReadOnlyList<RecentItem> Items => _items;
+ 
+@@ -43,7 +52,7 @@ public sealed class RecentFilesService
+             }
+         }
+ 
+-        if (_items.Count == 0)
++        if (_items.Count == 0 && _samples)
+         {
+             SeedSample();
+         }
+diff --git a/src/ChuvadiReader.Core/Reader/TabsService.cs b/src/ChuvadiReader.Core/Reader/TabsService.cs
+index 88a3254..2955901 100644
+--- a/src/ChuvadiReader.Core/Reader/TabsService.cs
++++ b/src/ChuvadiReader.Core/Reader/TabsService.cs
+@@ -362,6 +362,12 @@ public sealed class TabsService
+ 
+         foreach (var d in dtos)
+         {
++            // Bug fix (D-48): a host may open a tab before the first restore; never show a file twice.
++            if (_tabs.Any(t => string.Equals(t.Path, d.Path, StringComparison.OrdinalIgnoreCase)))
++            {
++                continue;
++            }
++
+             _tabs.Add(new ReaderTab
+             {
+                 Id = Guid.NewGuid().ToString("N"),
+diff --git a/src/ChuvadiReader.Platform/Services.cs b/src/ChuvadiReader.Platform/Services.cs
+index 496d7a4..1f63de8 100644
+--- a/src/ChuvadiReader.Platform/Services.cs
++++ b/src/ChuvadiReader.Platform/Services.cs
+@@ -83,6 +83,10 @@ public interface IAccount
+     /// <summary>Sangam ID when signed in.</summary>
+     string? Email { get; }
+ 
++    /// <summary>Organisation unit shown after the Sangam ID ("arun@apulki · Records", design 12b), or null.
++    /// Default null, so existing implementations need no change.</summary>
++    string? Unit => null;
++
+     event Action? Changed;
+ 
+     /// <summary>Starts Sangam sign-in. Returns false where sign-in isn't available yet.</summary>
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneAppBar.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneAppBar.razor
+new file mode 100644
+index 0000000..834d750
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneAppBar.razor
+@@ -0,0 +1,189 @@
++@implements IDisposable
++@inject ShellService Shell
++@inject TabsService Tabs
++
++@*
++    Phone app bar (12g-12j), 56 px: back · document title over a mono sub-line · counter · ⋮.
++    Arrange (12i): "N desks · M pages" / "long-press a page to drag", and Bind all where the
++    counter is. Home shows the wordmark; Library and Settings show their name.
++*@
++<header class="ph-bar">
++    @if (ShowBack)
++    {
++        <button class="ph-ib" @onclick="OnBack" aria-label="Back"><Icon Name="arrow-left" Size="21" /></button>
++    }
++    else
++    {
++        <span class="ph-brand cv-brand">C<span class="cv-brand-ta">ச</span>huvadi</span>
++    }
++
++    <span class="ph-title">
++        <span class="ph-t">@Title</span>
++        @if (!string.IsNullOrEmpty(Sub))
++        {
++            <span class="ph-sub">@Sub</span>
++        }
++    </span>
++
++    @if (OnDocView && Shell.Mode == DocMode.Arrange)
++    {
++        if (BindCommand is { } bind)
++        {
++            <button class="ph-pager ph-pager-act" disabled="@(!bind.IsEnabled)" title="@(bind.DisabledReason ?? bind.Label)" @onclick="bind.Run">Bind all</button>
++        }
++    }
++    else if (OnDocView && Shell.HasCounter)
++    {
++        @if (_editing)
++        {
++            <input class="ph-pager ph-pager-in" type="number" inputmode="numeric" min="1" max="@Shell.CounterTotal" value="@Shell.CounterCurrent"
++                   aria-label="@Shell.CounterUnit number" @onchange="Jump" @onblur="() => _editing = false" @ref="_input" />
++        }
++        else
++        {
++            <button class="ph-pager" @onclick="StartEdit" title="@($"{Shell.CounterUnit} {Shell.CounterCurrent} of {Shell.CounterTotal} — tap to go to a {Shell.CounterUnit}")">@Prefix@Shell.CounterCurrent / @Shell.CounterTotal</button>
++        }
++    }
++
++    <button class="ph-ib" @onclick="OnMenu" aria-label="More"><Icon Name="more-vertical" Size="20" /></button>
++</header>
++
++@code {
++    [Parameter] public EventCallback OnBack { get; set; }
++    [Parameter] public EventCallback OnMenu { get; set; }
++    [Parameter] public bool OnDocView { get; set; }
++
++    /// <summary>Title for pages that aren't a document (Library, Settings…); null on Home.</summary>
++    [Parameter] public string? PageTitle { get; set; }
++
++    private bool _editing;
++    private bool _focus;
++    private ElementReference _input;
++
++    protected override void OnInitialized()
++    {
++        Shell.Changed += OnChanged;
++        Tabs.Changed += OnChanged;
++    }
++
++    private bool ShowBack => OnDocView || PageTitle is not null;
++
++    private ShellCommand? BindCommand => Shell.Commands.FirstOrDefault(c => c.Id == Phone.PhoneCommands.ArrangeBind);
++
++    private string Prefix => Shell.CounterUnit switch
++    {
++        "section" => "§ ",
++        "line" => "ln ",
++        "sheet" => "sheet ",
++        _ => "",
++    };
++
++    private string Title
++    {
++        get
++        {
++            if (!OnDocView)
++            {
++                return PageTitle ?? string.Empty;
++            }
++
++            if (Shell.Mode == DocMode.Arrange)
++            {
++                return AfterMode(Shell.Activity, "Arrange") ?? "Arrange";
++            }
++
++            return Tabs.Active?.FileName ?? string.Empty;
++        }
++    }
++
++    private string? Sub
++    {
++        get
++        {
++            if (!OnDocView)
++            {
++                return null;
++            }
++
++            switch (Shell.Mode)
++            {
++                case DocMode.Arrange:
++                    return "long-press a page to drag";
++                case DocMode.Mark:
++                    return AfterMode(Shell.Activity, "Mark");
++                case DocMode.Protect:
++                    return AfterMode(Shell.Activity, "Protect");
++                default:
++                    var n = Tabs.Tabs.Count;
++                    if (n == 0)
++                    {
++                        return null;
++                    }
++
++                    var i = 1;
++                    for (var k = 0; k < n; k++)
++                    {
++                        if (Tabs.Tabs[k].Id == Tabs.Active?.Id)
++                        {
++                            i = k + 1;
++                            break;
++                        }
++                    }
++
++                    return $"{i} of {n} tab{(n == 1 ? "" : "s")}";
++            }
++        }
++    }
++
++    /// <summary>"Mark · 2 marks · unsaved" → "2 marks · unsaved" (the status-bar activity line, which
++    /// the phone has no room for, minus the mode the bottom bar already shows).</summary>
++    private static string? AfterMode(string? activity, string mode)
++    {
++        if (string.IsNullOrEmpty(activity))
++        {
++            return null;
++        }
++
++        var prefix = mode + " · ";
++        var rest = activity.StartsWith(prefix, StringComparison.Ordinal) ? activity[prefix.Length..] : activity;
++        return rest.Length == 0 ? null : char.ToLowerInvariant(rest[0]) + rest[1..];
++    }
++
++    private void StartEdit()
++    {
++        _editing = true;
++        _focus = true;
++    }
++
++    protected override async Task OnAfterRenderAsync(bool firstRender)
++    {
++        if (_focus && _editing)
++        {
++            _focus = false;
++            try
++            {
++                await _input.FocusAsync();
++            }
++            catch (InvalidOperationException)
++            {
++            }
++        }
++    }
++
++    private async Task Jump(ChangeEventArgs e)
++    {
++        _editing = false;
++        if (int.TryParse(e.Value?.ToString(), out var n))
++        {
++            await Shell.GoToAsync(n);
++        }
++    }
++
++    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
++
++    public void Dispose()
++    {
++        Shell.Changed -= OnChanged;
++        Tabs.Changed -= OnChanged;
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneCommands.cs b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneCommands.cs
+new file mode 100644
+index 0000000..c2a276c
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneCommands.cs
+@@ -0,0 +1,89 @@
++using ChuvadiReader.Core.Reader;
++
++namespace ChuvadiReader.Ui.Components.Platform.Phone;
++
++/// <summary>One item of the phone tool strip (Portal &amp; Android 12h / 12j).</summary>
++/// <param name="Label">Short label under the icon, as in the design.</param>
++/// <param name="Icon">LiPicons key, as in the design.</param>
++/// <param name="CommandIds">Shell command ids that carry the action, first registered wins
++/// (the Reader and the redaction view register different ids for the same tool).</param>
++public sealed record StripItem(string Label, string Icon, params string[] CommandIds);
++
++/// <summary>One row of the phone View sheet (12j).</summary>
++public sealed record ViewRow(string Label, string Icon, params string[] CommandIds);
++
++/// <summary>
++/// The phone chrome runs the actions the mode views already publish to <see cref="ShellService"/>
++/// for the Ctrl K command bar, by id. Nothing is re-implemented here: a strip item whose command
++/// is not registered is not shown, and a registered command that is disabled shows greyed with its
++/// reason. The ids are a contract with Reader.Shell.cs, Redact.Shell.cs and Bench.Shell.cs; the
++/// mobile-ui tests fail if one of them disappears.
++/// </summary>
++public static class PhoneCommands
++{
++    /// <summary>12h: Text · Mark · Note · Image · Box · Draw · Sign.</summary>
++    public static readonly IReadOnlyList<StripItem> Mark = new StripItem[]
++    {
++        new("Text", "text-box", "m.text"),
++        new("Mark", "highlight", "m.highlight"),
++        new("Note", "sticky-note", "m.note"),
++        new("Image", "file-image", "m.image"),
++        new("Box", "shape-rect", "m.rect"),
++        new("Draw", "freehand", "m.freehand"),
++        new("Sign", "signature", "m.sign"),
++    };
++
++    /// <summary>12j: Box · Find · Stamp · Flatten · Lock · Sign. In the redaction view the
++    /// redaction tools are its own commands (rd.*); in the Reader they open that view (p.*).</summary>
++    public static readonly IReadOnlyList<StripItem> Protect = new StripItem[]
++    {
++        new("Box", "redact", "rd.box", "p.redact"),
++        new("Find", "find-in-page", "rd.find", "p.find"),
++        new("Stamp", "stamp", "p.stamp"),
++        new("Flatten", "compress", "doc.flatten"),
++        new("Lock", "doc-lock", "doc.password"),
++        new("Sign", "certification", "p.cert"),
++    };
++
++    /// <summary>12j View sheet: Fit width · Fit page · Two-page · Rotate view · Loupe.</summary>
++    public static readonly IReadOnlyList<ViewRow> View = new ViewRow[]
++    {
++        new("Fit width", "fit-width", "v.fitw"),
++        new("Fit page", "fit-page", "v.fitp"),
++        new("Two-page", "page-facing", "v.two"),
++        new("Rotate view", "rotate-cw", "v.rotr"),
++        new("Loupe", "loupe", "v.loupe"),
++    };
++
++    /// <summary>The floating primary action: Mark → Save as new PDF (12h); Arrange → Add desk (12i).</summary>
++    public const string MarkPrimary = "m.saveas";
++    public const string ArrangePrimary = "a.desk";
++
++    /// <summary>12i: "Bind all" sits where the page counter is.</summary>
++    public const string ArrangeBind = "a.bind";
++
++    /// <summary>Every id the phone chrome uses (for the contract test).</summary>
++    public static IEnumerable<string> AllIds =>
++        Mark.SelectMany(i => i.CommandIds)
++            .Concat(Protect.SelectMany(i => i.CommandIds))
++            .Concat(View.SelectMany(r => r.CommandIds))
++            .Append(MarkPrimary).Append(ArrangePrimary).Append(ArrangeBind)
++            .Distinct();
++
++    /// <summary>First registered command among <paramref name="ids"/>, or null.</summary>
++    public static ShellCommand? Find(IReadOnlyList<ShellCommand> commands, IEnumerable<string> ids)
++    {
++        foreach (var id in ids)
++        {
++            foreach (var c in commands)
++            {
++                if (c.Id == id)
++                {
++                    return c;
++                }
++            }
++        }
++
++        return null;
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheet.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheet.razor
+new file mode 100644
+index 0000000..8cf7239
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheet.razor
+@@ -0,0 +1,29 @@
++@*
++    Bottom sheet (12j): surface-hi, 22 px top corners, a grab handle, serif title with a text
++    action on the right, 44 px rows. Tap the scrim, the action or the handle to close; Android back
++    closes it too (PhoneShell). The ⋮ menu uses the same sheet without a title.
++*@
++<div class="ph-scrim" @onclick="OnClose"></div>
++<section class="ph-sheet" role="dialog" aria-modal="true" aria-label="@(Title ?? "Menu")">
++    <button class="ph-handle" @onclick="OnClose" aria-label="Close"><span></span></button>
++    @if (Title is not null)
++    {
++        <div class="ph-sheet-hd">
++            <span class="ph-sheet-t">@Title</span>
++            @if (Action is not null)
++            {
++                <button class="ph-sheet-a" @onclick="OnClose">@Action</button>
++            }
++        </div>
++    }
++    <div class="ph-sheet-body">
++        @ChildContent
++    </div>
++</section>
++
++@code {
++    [Parameter] public string? Title { get; set; }
++    [Parameter] public string? Action { get; set; }
++    [Parameter] public EventCallback OnClose { get; set; }
++    [Parameter] public RenderFragment? ChildContent { get; set; }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheetKind.cs b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheetKind.cs
+new file mode 100644
+index 0000000..36f2de5
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneSheetKind.cs
+@@ -0,0 +1,13 @@
++namespace ChuvadiReader.Ui.Components.Platform.Phone;
++
++/// <summary>Which bottom sheet the phone shell shows.</summary>
++public enum PhoneSheetKind
++{
++    None,
++
++    /// <summary>The ⋮ menu: Open · Find · Library · Settings · View, then the Document menu.</summary>
++    Menu,
++
++    /// <summary>The View sheet (12j).</summary>
++    View,
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneShell.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneShell.razor
+new file mode 100644
+index 0000000..886f2fe
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneShell.razor
+@@ -0,0 +1,388 @@
++@using ChuvadiReader.Platform
++@implements IAsyncDisposable
++@inject ShellService Shell
++@inject TabsService Tabs
++@inject NavigationManager Nav
++@inject IServiceProvider Services
++@inject IJSRuntime JS
++
++@*
++    Android phone shell — Portal & Android 12g-12j. Rendered by MainLayout in place of the top bar,
++    left bar and status bar when the layout is Phone (MainLayout hook). The rails fold:
++      * left bar  → bottom bar (Read · Mark · Arrange · Protect); Open, Find, Library, Settings → ⋮
++      * Tools rail → tool strip above the bottom bar, Mark and Protect only
++      * View rail → pinch / double-tap / swipe (mobile.js) + the View sheet from ⋮
++    Every action is MainLayout's own (passed in) or a command the mode view already registered with
++    ShellService (PhoneCommands) — nothing is re-implemented here.
++*@
++
++<div class="ph-shell" data-mode="@ModeKey">
++    <PhoneAppBar OnBack="Back" OnMenu="() => ShowSheet(PhoneSheetKind.Menu)" OnDocView="OnDocView" PageTitle="@PageTitle" />
++
++    <main class="content ph-content">
++        @ChildContent
++        @if (Fab is { } fab)
++        {
++            <button class="ph-fab" disabled="@(!fab.IsEnabled)" title="@(fab.DisabledReason ?? fab.Label)" aria-label="@fab.Label"
++                    @onclick="() => Run(fab)">
++                <Icon Name="@FabIcon" Size="22" />
++            </button>
++        }
++    </main>
++
++    @if (StripItems is { } items)
++    {
++        <PhoneToolStrip Items="items" Active="@_activeTool" OnPick="PickTool" />
++    }
++
++    <nav class="ph-nav" aria-label="Modes">
++        @foreach (var (mode, icon, label) in Modes)
++        {
++            var m = mode;
++            var on = OnDocView && Shell.Mode == m;
++            var why = ModeDisabledReason?.Invoke(m);
++            <button class="ph-nav-b @(on ? "on" : null)" disabled="@(why is not null)" title="@(why ?? label)"
++                    aria-current="@(on ? "page" : null)" @onclick="() => PickMode(m)">
++                <span class="ph-pill"><Icon Name="@icon" Size="20" /></span>
++                <span class="ph-verb">@label</span>
++            </button>
++        }
++    </nav>
++
++    @if (_sheet == PhoneSheetKind.Menu)
++    {
++        <PhoneSheet Title="@null" OnClose="Close">
++            <button class="ph-row" @onclick="() => Then(Open)"><Icon Name="folder" Size="18" /><span class="ph-row-l">Open</span></button>
++            <button class="ph-row" @onclick="() => Then(Find)"><Icon Name="find-in-page" Size="18" /><span class="ph-row-l">Find</span></button>
++            <button class="ph-row" @onclick='() => Then(() => { Go?.Invoke("/library"); return Task.CompletedTask; })'><Icon Name="library" Size="18" /><span class="ph-row-l">Library</span></button>
++            <button class="ph-row" @onclick='() => Then(() => { Go?.Invoke("/settings"); return Task.CompletedTask; })'><Icon Name="settings" Size="18" /><span class="ph-row-l">Settings</span></button>
++            @if (OnDocView && HasViewRows)
++            {
++                <button class="ph-row" @onclick="() => ShowSheet(PhoneSheetKind.View)"><Icon Name="sliders" Size="18" /><span class="ph-row-l">View</span><Icon Name="chevron-right" Size="15" /></button>
++            }
++            @if (OnDocView && Shell.DocumentMenu.Count > 0)
++            {
++                <span class="ph-sheet-h">Document</span>
++                @foreach (var c in Shell.DocumentMenu)
++                {
++                    var cc = c;
++                    if (cc.Id.StartsWith("sep", StringComparison.Ordinal))
++                    {
++                        continue;
++                    }
++
++                    <button class="ph-row" disabled="@(!cc.IsEnabled)" title="@(cc.DisabledReason ?? cc.Label)" @onclick="() => Then(cc.Run)">
++                        <Icon Name="@cc.Icon" Size="18" /><span class="ph-row-l">@cc.Label</span>
++                        @if (cc.DisabledReason is not null)
++                        {
++                            <span class="ph-row-v">@cc.DisabledReason</span>
++                        }
++                    </button>
++                }
++            }
++        </PhoneSheet>
++    }
++    else if (_sheet == PhoneSheetKind.View)
++    {
++        <PhoneSheet Title="View" Action="Done" OnClose="Close">
++            @foreach (var row in PhoneCommands.View)
++            {
++                var cmd = PhoneCommands.Find(Shell.Commands, row.CommandIds);
++                if (cmd is null)
++                {
++                    continue;
++                }
++
++                var r = row;
++                <button class="ph-row" disabled="@(!cmd.IsEnabled || TwoPageBlocked(r))" title="@(cmd.DisabledReason ?? cmd.Label)" @onclick="() => Run(cmd)">
++                    <Icon Name="@r.Icon" Size="18" /><span class="ph-row-l">@r.Label</span><span class="ph-row-v">@ViewValue(r)</span>
++                </button>
++            }
++        </PhoneSheet>
++    }
++</div>
++
++@code {
++    [Parameter] public RenderFragment? ChildContent { get; set; }
++
++    /// <summary>MainLayout's own mode switch (RequestMode).</summary>
++    [Parameter] public Func<DocMode, Task>? RequestMode { get; set; }
++
++    /// <summary>MainLayout's ModeDisabledReason (Office files are view-only).</summary>
++    [Parameter] public Func<DocMode, string?>? ModeDisabledReason { get; set; }
++
++    /// <summary>MainLayout's AddTab (Open, Ctrl O).</summary>
++    [Parameter] public Func<Task>? Open { get; set; }
++
++    /// <summary>MainLayout's FindNow.</summary>
++    [Parameter] public Func<Task>? Find { get; set; }
++
++    /// <summary>MainLayout's Go(path).</summary>
++    [Parameter] public Action<string>? Go { get; set; }
++
++    /// <summary>True on the Reader, Arrange and Protect views (MainLayout.OnDocView).</summary>
++    [Parameter] public bool OnDocView { get; set; }
++
++    private static readonly (DocMode Mode, string Icon, string Label)[] Modes =
++    {
++        (DocMode.Read, "reading-mode", "Read"),
++        (DocMode.Mark, "edit", "Mark"),
++        (DocMode.Arrange, "grid-view", "Arrange"),
++        (DocMode.Protect, "redact", "Protect"),
++    };
++
++    private PhoneSheetKind _sheet;
++    private string? _activeTool;
++    private DocMode _toolMode;
++    private IAppLifecycle? _life;
++
++    protected override void OnInitialized()
++    {
++        Shell.Changed += OnChanged;
++        Tabs.Changed += OnChanged;
++        Nav.LocationChanged += OnLocation;
++        _life = Services.GetService(typeof(IAppLifecycle)) as IAppLifecycle;
++        if (_life is not null)
++        {
++            _life.BackRequested += OnBackRequested;
++        }
++    }
++
++    private string ModeKey => OnDocView ? Shell.Mode.ToString().ToLowerInvariant() : "none";
++
++    private string? PageTitle
++    {
++        get
++        {
++            var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
++            return path switch
++            {
++                "/" => null,
++                var p when p.StartsWith("/library", StringComparison.OrdinalIgnoreCase) => "Library",
++                var p when p.StartsWith("/settings", StringComparison.OrdinalIgnoreCase) => "Settings",
++                var p when p.StartsWith("/merge", StringComparison.OrdinalIgnoreCase) => "Merge files",
++                var p when p.StartsWith("/split", StringComparison.OrdinalIgnoreCase) => "Split pages",
++                var p when p.StartsWith("/docs", StringComparison.OrdinalIgnoreCase) => "Word viewer",
++                var p when p.StartsWith("/sheets", StringComparison.OrdinalIgnoreCase) => "Excel viewer",
++                _ => null,
++            };
++        }
++    }
++
++    // ── tool strip (Mark / Protect only) ──────────────────────────────────
++    private IReadOnlyList<(StripItem Item, ShellCommand Command)>? StripItems
++    {
++        get
++        {
++            if (!OnDocView)
++            {
++                return null;
++            }
++
++            var source = Shell.Mode switch
++            {
++                DocMode.Mark => PhoneCommands.Mark,
++                DocMode.Protect => PhoneCommands.Protect,
++                _ => null,
++            };
++            if (source is null)
++            {
++                return null;
++            }
++
++            var commands = Shell.Commands;
++            var list = new List<(StripItem, ShellCommand)>();
++            foreach (var item in source)
++            {
++                if (PhoneCommands.Find(commands, item.CommandIds) is { } c)
++                {
++                    list.Add((item, c));
++                }
++            }
++
++            return list.Count == 0 ? null : list;
++        }
++    }
++
++    private async Task PickTool((StripItem Item, ShellCommand Command) pick)
++    {
++        if (!pick.Command.IsEnabled)
++        {
++            return;
++        }
++
++        _activeTool = pick.Item.Label;
++        _toolMode = Shell.Mode;
++        await pick.Command.Run();
++    }
++
++    // ── floating primary action ───────────────────────────────────────────
++    private ShellCommand? Fab => !OnDocView
++        ? null
++        : Shell.Mode switch
++        {
++            DocMode.Mark => PhoneCommands.Find(Shell.Commands, new[] { PhoneCommands.MarkPrimary }),
++            DocMode.Arrange => PhoneCommands.Find(Shell.Commands, new[] { PhoneCommands.ArrangePrimary }),
++            _ => null,
++        };
++
++    private string FabIcon => Shell.Mode == DocMode.Arrange ? "plus" : "download";
++
++    // ── View sheet ────────────────────────────────────────────────────────
++    private bool HasViewRows => PhoneCommands.View.Any(r => PhoneCommands.Find(Shell.Commands, r.CommandIds) is not null);
++
++    private bool _landscape;
++    private DotNetObjectReference<PhoneShell>? _self;
++    private IJSObjectReference? _js;
++
++    protected override async Task OnAfterRenderAsync(bool firstRender)
++    {
++        if (!firstRender)
++        {
++            return;
++        }
++
++        try
++        {
++            _self = DotNetObjectReference.Create(this);
++            _js = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/mobile.js");
++            await _js.InvokeVoidAsync("watchOrientation", _self);
++        }
++        catch (JSDisconnectedException)
++        {
++        }
++        catch (JSException)
++        {
++            // orientation only refines the View sheet; the shell works without it
++        }
++    }
++
++    /// <summary>Called by mobile.js on rotation (12j: "Two-page · landscape only").</summary>
++    [JSInvokable]
++    public void SetLandscape(bool landscape)
++    {
++        if (_landscape != landscape)
++        {
++            _landscape = landscape;
++            _ = InvokeAsync(StateHasChanged);
++        }
++    }
++
++    private bool TwoPageBlocked(ViewRow r) => r.CommandIds.Contains("v.two") && !_landscape;
++
++    private string ViewValue(ViewRow r)
++    {
++        var tab = Tabs.Active;
++        return r.CommandIds[0] switch
++        {
++            "v.fitw" => tab?.FitMode == ReaderFitMode.Width ? "✓" : "",
++            "v.fitp" => tab?.FitMode == ReaderFitMode.Page ? "✓" : "",
++            "v.two" => _landscape ? (tab?.TwoPage == true ? "✓" : "") : "landscape only",
++            "v.rotr" => $"{CurrentRotation(tab)}°",
++            "v.loupe" => "2×",
++            _ => "",
++        };
++    }
++
++    private static int CurrentRotation(ReaderTab? tab) =>
++        tab is not null && tab.PageRotations.TryGetValue(tab.CurrentPage, out var deg) ? ((deg % 360) + 360) % 360 : 0;
++
++    // ── sheets, back, navigation ──────────────────────────────────────────
++    private void ShowSheet(PhoneSheetKind kind) => _sheet = kind;
++
++    private void Close() => _sheet = PhoneSheetKind.None;
++
++    private async Task Then(Func<Task>? action)
++    {
++        _sheet = PhoneSheetKind.None;
++        if (action is not null)
++        {
++            await action();
++        }
++    }
++
++    private async Task Run(ShellCommand c)
++    {
++        if (c.IsEnabled)
++        {
++            await c.Run();
++        }
++    }
++
++    private async Task PickMode(DocMode m)
++    {
++        _sheet = PhoneSheetKind.None;
++        if (RequestMode is not null)
++        {
++            await RequestMode(m);
++        }
++    }
++
++    private void Back()
++    {
++        if (_sheet != PhoneSheetKind.None)
++        {
++            _sheet = PhoneSheetKind.None;
++            return;
++        }
++
++        Go?.Invoke("/");
++    }
++
++    /// <summary>Android back: a sheet closes first; then the host's default.</summary>
++    private bool OnBackRequested()
++    {
++        if (_sheet == PhoneSheetKind.None)
++        {
++            return false;
++        }
++
++        _ = InvokeAsync(() =>
++        {
++            _sheet = PhoneSheetKind.None;
++            StateHasChanged();
++        });
++        return true;
++    }
++
++    private void OnChanged()
++    {
++        if (_activeTool is not null && Shell.Mode != _toolMode)
++        {
++            _activeTool = null;
++        }
++
++        _ = InvokeAsync(StateHasChanged);
++    }
++
++    private void OnLocation(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
++    {
++        _sheet = PhoneSheetKind.None;
++        _ = InvokeAsync(StateHasChanged);
++    }
++
++    public async ValueTask DisposeAsync()
++    {
++        Shell.Changed -= OnChanged;
++        Tabs.Changed -= OnChanged;
++        Nav.LocationChanged -= OnLocation;
++        if (_life is not null)
++        {
++            _life.BackRequested -= OnBackRequested;
++        }
++
++        if (_js is not null)
++        {
++            try
++            {
++                await _js.InvokeVoidAsync("unwatchOrientation");
++                await _js.DisposeAsync();
++            }
++            catch (JSDisconnectedException)
++            {
++            }
++        }
++
++        _self?.Dispose();
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneToolStrip.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneToolStrip.razor
+new file mode 100644
+index 0000000..d3602cd
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/PhoneToolStrip.razor
+@@ -0,0 +1,24 @@
++@*
++    Tool strip (12h Mark, 12j Protect): one 62 px row above the bottom bar, 52 × 50 items with the
++    label under the icon. Scrolls sideways when the tools don't fit. Tools that aren't built yet
++    stay visible and greyed, with the reason as their tooltip (same rule as the desktop rails).
++*@
++<div class="ph-strip" role="toolbar" aria-label="Tools">
++    @foreach (var pick in Items)
++    {
++        var p = pick;
++        var on = Active == p.Item.Label;
++        <button class="ph-tool @(on ? "on" : null)" disabled="@(!p.Command.IsEnabled)" aria-pressed="@(on ? "true" : "false")"
++                title="@(p.Command.DisabledReason is null ? p.Command.Label : $"{p.Command.Label} — {p.Command.DisabledReason}")"
++                @onclick="() => OnPick.InvokeAsync(p)">
++            <Icon Name="@p.Item.Icon" Size="19" />
++            <span>@p.Item.Label</span>
++        </button>
++    }
++</div>
++
++@code {
++    [Parameter, EditorRequired] public IReadOnlyList<(StripItem Item, ShellCommand Command)> Items { get; set; } = Array.Empty<(StripItem, ShellCommand)>();
++    [Parameter] public string? Active { get; set; }
++    [Parameter] public EventCallback<(StripItem Item, ShellCommand Command)> OnPick { get; set; }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/TouchSupport.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/TouchSupport.razor
+new file mode 100644
+index 0000000..267bfe0
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/TouchSupport.razor
+@@ -0,0 +1,96 @@
++@using ChuvadiReader.Ui.Components.Platform
++@implements IAsyncDisposable
++@inject IJSRuntime JS
++@inject ShellService Shell
++@inject TabsService Tabs
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
++
++@*
++    Touch behaviour for the tablet and phone shells (hook H-2): renders nothing; loads mobile.js,
++    which turns touch into what the desktop already understands —
++      * pinch → the Reader's own cursor-anchored zoom (Ctrl + wheel on the page desk)
++      * double-tap → Fit width ⇄ Fit page;  swipe (when the page fits) → next / previous page
++      * tap on the canvas → shows the per-page strip (the desktop shows it on hover)
++      * Arrange: long-press a page to drag it; a quick swipe scrolls the desks instead
++    MainLayout renders this only for the tablet and phone layouts, so desktop and portal pay nothing.
++*@
++
++@code {
++    private IJSObjectReference? _js;
++    private DotNetObjectReference<TouchSupport>? _self;
++    private bool _on;
++
++    private bool Wanted => ChuvadiReader.Platform.ShellLayouts.Shell(Platform) is ChuvadiReader.Platform.ShellLayout.Tablet or ChuvadiReader.Platform.ShellLayout.Phone;
++
++    protected override async Task OnAfterRenderAsync(bool firstRender)
++    {
++        if (Wanted == _on)
++        {
++            return;
++        }
++
++        try
++        {
++            _js ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/mobile.js");
++            if (Wanted)
++            {
++                _self ??= DotNetObjectReference.Create(this);
++                await _js.InvokeVoidAsync("initTouch", _self);
++            }
++            else
++            {
++                await _js.InvokeVoidAsync("disposeTouch");
++            }
++
++            _on = Wanted;
++        }
++        catch (JSDisconnectedException)
++        {
++        }
++    }
++
++    /// <summary>Double-tap on the page (Read): Fit width ⇄ Fit page.</summary>
++    [JSInvokable]
++    public Task OnDoubleTap()
++    {
++        if (Shell.Mode != DocMode.Read)
++        {
++            return Task.CompletedTask;
++        }
++
++        var id = Tabs.Active?.FitMode == ReaderFitMode.Width ? "v.fitp" : "v.fitw";
++        var cmd = Shell.Commands.FirstOrDefault(c => c.Id == id);
++        return cmd is { IsEnabled: true } ? InvokeAsync(cmd.Run) : Task.CompletedTask;
++    }
++
++    /// <summary>Horizontal swipe on a page that fits (Read): next (+1) or previous (−1) page or spread.</summary>
++    [JSInvokable]
++    public Task OnSwipe(int direction)
++    {
++        if (Shell.Mode != DocMode.Read || !Shell.HasCounter)
++        {
++            return Task.CompletedTask;
++        }
++
++        var target = Shell.CounterCurrent + Math.Sign(direction) * Shell.CounterStep;
++        return InvokeAsync(() => Shell.GoToAsync(target));
++    }
++
++    public async ValueTask DisposeAsync()
++    {
++        _self?.Dispose();
++        if (_js is null)
++        {
++            return;
++        }
++
++        try
++        {
++            await _js.InvokeVoidAsync("disposeTouch");
++            await _js.DisposeAsync();
++        }
++        catch (JSDisconnectedException)
++        {
++        }
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Phone/_Imports.razor b/src/ChuvadiReader.Ui/Components/Platform/Phone/_Imports.razor
+new file mode 100644
+index 0000000..f7b9bf1
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Phone/_Imports.razor
+@@ -0,0 +1,2 @@
++@using ChuvadiReader.Platform
++@using ChuvadiReader.Ui.Components.Platform.Phone
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor
+new file mode 100644
+index 0000000..a3758f4
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor
+@@ -0,0 +1,83 @@
++@namespace ChuvadiReader.Ui.Components.Platform.Portal
++@using ChuvadiReader.Platform
++@implements IDisposable
++@inject IAccount Account
++@inject PortalLinks Links
++
++@*
++    Web portal account menu (design: Portal & Android 12b). Sits at the end of the top bar where the
++    desktop draws its window buttons; shown only when IPlatformInfo.Chrome.AccountMenu is true.
++    Scope (Arun, 6 Nov): no per-user storage and no sharing this release, so the handout's storage
++    meter, "My files" and "Shared with me" are left out. Items: Get the desktop app · Account
++    settings · Sign out.
++*@
++<span class="acct-wrap" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
++    <button class="acct-chip @(_open ? "on" : null)" @onclick="Toggle" aria-haspopup="menu" aria-expanded="@(_open ? "true" : "false")"
++            title="@Account.DisplayName" aria-label="Account: @Account.DisplayName">
++        <span class="acct-av">@AccountText.Initials(Account.DisplayName)</span>
++        <span class="acct-first">@AccountText.FirstName(Account.DisplayName)</span>
++        <Icon Name="chevron-down" Size="11" />
++    </button>
++    @if (_open)
++    {
++        <div class="pop-scrim" @onclick="Close"></div>
++        <div class="acct-pop" role="menu" @onkeydown="OnKey">
++            <div class="acct-who">
++                <span class="acct-av acct-av-lg">@AccountText.Initials(Account.DisplayName)</span>
++                <div class="acct-who-t">
++                    <b>@Account.DisplayName</b>
++                    @if (!string.IsNullOrEmpty(Account.Email))
++                    {
++                        <span class="acct-id">@Account.Email@(string.IsNullOrEmpty(Account.Unit) ? null : " · " + Account.Unit)</span>
++                    }
++                </div>
++            </div>
++            <a class="acct-item" role="menuitem" href="@Links.DesktopAppUrl" target="_blank" rel="noopener" @onclick="Close">
++                <Icon Name="download" Size="15" />Get the desktop app
++            </a>
++            @if (Links.AccountSettingsUrl is { } settings)
++            {
++                <a class="acct-item" role="menuitem" href="@settings" target="_blank" rel="noopener" @onclick="Close">
++                    <Icon Name="settings" Size="15" />Account settings
++                </a>
++            }
++            <button class="acct-item acct-out" role="menuitem" @onclick="SignOut" disabled="@_signingOut">
++                <Icon Name="log-out" Size="15" />Sign out
++            </button>
++        </div>
++    }
++</span>
++
++@code {
++    private bool _open;
++    private bool _signingOut;
++
++    protected override void OnInitialized() => Account.Changed += OnAccountChanged;
++
++    private void OnAccountChanged() => InvokeAsync(StateHasChanged);
++
++    private void Toggle() => _open = !_open;
++
++    private void Close() => _open = false;
++
++    private void OnKey(KeyboardEventArgs e)
++    {
++        if (e.Key == "Escape") _open = false;
++    }
++
++    private async Task SignOut()
++    {
++        _signingOut = true;
++        try
++        {
++            await Account.SignOutAsync();
++        }
++        finally
++        {
++            _signingOut = false;
++            _open = false;
++        }
++    }
++
++    public void Dispose() => Account.Changed -= OnAccountChanged;
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor.css b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor.css
+new file mode 100644
+index 0000000..2cc2970
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountMenu.razor.css
+@@ -0,0 +1,49 @@
++/* Portal account menu — Portal & Android 12b. Theme tokens only, so all five themes follow. */
++.acct-wrap { position: relative; display: flex; margin-left: 4px; }
++
++.acct-chip {
++    display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 4px;
++    border: var(--chvd-stroke) solid var(--chvd-border); border-radius: 15px; background: transparent;
++    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 12.5px; cursor: pointer; white-space: nowrap;
++}
++.acct-chip:hover, .acct-chip.on { background: var(--chvd-surface-mid); border-color: var(--chvd-binding); }
++.acct-chip:focus-visible, .acct-item:focus-visible { outline: 1.5px solid var(--chvd-binding); outline-offset: 1px; }
++
++.acct-av {
++    width: 22px; height: 22px; flex: none; border-radius: 50%;
++    background: var(--chvd-binding); color: var(--chvd-on-accent);
++    display: flex; align-items: center; justify-content: center;
++    font-family: var(--chvd-mono); font-size: 9px; letter-spacing: 0;
++}
++.acct-av-lg { width: 34px; height: 34px; font-size: 11px; }
++
++.acct-pop {
++    /* 12b: the card opens just below the top bar, beside the Tools rail (right = Tools + View + 12 px). */
++    position: fixed; top: calc(var(--sh-top, 40px) + 14px); right: calc(var(--sh-tools, 64px) + var(--sh-view, 54px) + 12px);
++    z-index: 81; width: 300px;
++    display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
++    background: var(--chvd-surface-hi); border: var(--chvd-stroke) solid var(--chvd-border);
++    border-radius: var(--chvd-radius-xl); box-shadow: var(--chvd-shadow-popover);
++    font-size: 12.5px; color: var(--chvd-ink);
++}
++
++.acct-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
++.acct-who-t { display: flex; flex-direction: column; min-width: 0; }
++.acct-who-t b { font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.acct-id { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++
++.acct-item {
++    display: flex; align-items: center; gap: 10px; height: 32px; width: 100%; padding: 0;
++    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); background: transparent;
++    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 12.5px;
++    text-align: left; text-decoration: none; cursor: pointer;
++}
++.acct-item:hover { color: var(--chvd-binding); }
++.acct-out, .acct-out:hover { color: var(--chvd-danger); }
++.acct-item:disabled { opacity: .5; cursor: default; }
++
++/* Narrow browsers: the chip keeps only the avatar. */
++@media (max-width: 720px) {
++    .acct-first { display: none; }
++    .acct-pop { right: 12px; width: min(300px, calc(100vw - 24px)); }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountText.cs b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountText.cs
+new file mode 100644
+index 0000000..c167198
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/AccountText.cs
+@@ -0,0 +1,28 @@
++namespace ChuvadiReader.Ui.Components.Platform.Portal;
++
++/// <summary>How the portal shows a person's name: "AS" in the avatar, "Arun" on the chip (design 12b).</summary>
++public static class AccountText
++{
++    /// <summary>First letters of the first and last words, upper-case: "Arun S." → "AS". "?" when empty.</summary>
++    public static string Initials(string? displayName)
++    {
++        var words = Words(displayName);
++        if (words.Length == 0) return "?";
++        var first = char.ToUpperInvariant(words[0][0]);
++        return words.Length == 1 ? first.ToString() : string.Concat(first, char.ToUpperInvariant(words[^1][0]));
++    }
++
++    /// <summary>The first word of the name: "Arun S." → "Arun". Empty when there is no name.</summary>
++    public static string FirstName(string? displayName)
++    {
++        var words = Words(displayName);
++        return words.Length == 0 ? string.Empty : words[0];
++    }
++
++    private static string[] Words(string? s) =>
++        string.IsNullOrWhiteSpace(s)
++            ? []
++            : s.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
++               .Where(w => char.IsLetterOrDigit(w[0]))
++               .ToArray();
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalCredentials.cs b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalCredentials.cs
+new file mode 100644
+index 0000000..cc67afb
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalCredentials.cs
+@@ -0,0 +1,10 @@
++namespace ChuvadiReader.Ui.Components.Platform.Portal;
++
++/// <summary>
++/// What the person typed on the portal sign-in form (12a), handed to the Web host's Sangam client as typed.
++/// <see cref="ToString"/> never includes the password, so the value is safe to log by accident.
++/// </summary>
++public sealed record PortalCredentials(string SangamId, string Password)
++{
++    public override string ToString() => $"PortalCredentials {{ SangamId = {SangamId}, Password = *** }}";
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalLinks.cs b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalLinks.cs
+new file mode 100644
+index 0000000..d7eb7e0
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalLinks.cs
+@@ -0,0 +1,10 @@
++namespace ChuvadiReader.Ui.Components.Platform.Portal;
++
++/// <summary>
++/// Addresses the web portal's chrome links to. Registered by the Web host only (desktop builds never
++/// render portal components). Values come from the Web host's configuration and its Sangam client.
++/// </summary>
++/// <param name="DesktopAppUrl">"Download the desktop app" (12a) and "Get the desktop app" (12b account menu).</param>
++/// <param name="AccountSettingsUrl">"Account settings" in the account menu (12b). Null hides the item.</param>
++/// <param name="ForgotPasswordUrl">"Forgot?" beside the password field (12a). Null hides the link.</param>
++public sealed record PortalLinks(string DesktopAppUrl, string? AccountSettingsUrl, string? ForgotPasswordUrl);
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor
+new file mode 100644
+index 0000000..e51d3a3
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor
+@@ -0,0 +1,98 @@
++@namespace ChuvadiReader.Ui.Components.Platform.Portal
++@inject PortalLinks Links
++
++@*
++    Web portal sign-in page (design: Portal & Android 12a). The whole page below the browser's own
++    chrome. It holds no sign-in logic: the Web host renders it for signed-out visitors and wires the
++    two actions to its Sangam client —
++      * OnContinueWithSangam: "Continue with Sangam" (redirect to Sangam).
++      * OnSubmit:             the Sangam ID + password form.
++    Busy disables both while a sign-in is in flight; Error shows the host's message under the form.
++*@
++<div class="psi">
++    <section class="psi-hero">
++        <span class="psi-water" aria-hidden="true">ச</span>
++        <span class="psi-mark"><BrandMark Size="30" /> <span class="psi-tag">portal</span></span>
++        <div class="psi-pitch">
++            <h1 class="psi-h1">Your documents, from any browser.</h1>
++            <p class="psi-body">@Pitch</p>
++        </div>
++        <ul class="psi-promises">
++            @foreach (var (icon, text) in Promises)
++            {
++                <li><span class="psi-pr-ic"><Icon Name="@icon" Size="16" /></span>@text</li>
++            }
++        </ul>
++    </section>
++
++    <section class="psi-side">
++        <form class="psi-card" @onsubmit="Submit" aria-labelledby="psi-title">
++            <span class="psi-title" id="psi-title">Sign in</span>
++            <button type="button" class="psi-sangam" @onclick="ContinueWithSangam" disabled="@Busy">
++                <span class="psi-s" aria-hidden="true">S</span>Continue with Sangam
++            </button>
++            <div class="psi-or"><span></span>or with your Sangam ID<span></span></div>
++            <label class="psi-field">
++                <span class="psi-label">Sangam ID</span>
++                <input class="psi-input" type="text" name="username" autocomplete="username" spellcheck="false"
++                       autocapitalize="off" @bind="_id" @bind:event="oninput" disabled="@Busy" required />
++            </label>
++            <label class="psi-field">
++                <span class="psi-label">Password
++                    @if (Links.ForgotPasswordUrl is { } forgot)
++                    {
++                        <a href="@forgot" target="_blank" rel="noopener">Forgot?</a>
++                    }
++                </span>
++                <input class="psi-input psi-pw" type="password" name="password" autocomplete="current-password"
++                       @bind="_password" @bind:event="oninput" disabled="@Busy" required />
++            </label>
++            @if (!string.IsNullOrEmpty(Error))
++            {
++                <span class="psi-err" role="alert"><Icon Name="warning" Size="14" />@Error</span>
++            }
++            <button type="submit" class="psi-submit" disabled="@(Busy || !CanSubmit)">Sign in</button>
++            <span class="psi-foot">Prefer to keep files on your computer? <a href="@Links.DesktopAppUrl" target="_blank" rel="noopener">Download the desktop app</a> — no sign-in needed to read.</span>
++        </form>
++    </section>
++</div>
++
++@code {
++    /// <summary>"Continue with Sangam" was pressed.</summary>
++    [Parameter] public EventCallback OnContinueWithSangam { get; set; }
++
++    /// <summary>The Sangam ID form was submitted. The component forgets the password once this returns.</summary>
++    [Parameter] public EventCallback<PortalCredentials> OnSubmit { get; set; }
++
++    /// <summary>True while a sign-in is in flight: both buttons and the fields are disabled.</summary>
++    [Parameter] public bool Busy { get; set; }
++
++    /// <summary>Short, user-facing reason the last sign-in failed, or null.</summary>
++    [Parameter] public string? Error { get; set; }
++
++    // Design text, verbatim from the handout (12a). The storage lines are
++    // pending the coordinator's wording decision (docs/web-ui/OPTIONS-FOR-COORDINATOR.md, U-1).
++    private const string Pitch = "The same Read, Mark, Arrange and Protect as the desktop app. On the portal, files are processed on our server, encrypted at rest, and visible only to you.";
++
++    private static readonly (string Icon, string Text)[] Promises =
++    [
++        ("lock", "Encrypted at rest, per-user storage"),
++        ("user", "Only your Sangam identity can open your files"),
++        ("trash", "Delete a file and it is gone from the server"),
++    ];
++
++    private string _id = string.Empty;
++    private string _password = string.Empty;
++
++    private bool CanSubmit => !string.IsNullOrWhiteSpace(_id) && _password.Length > 0;
++
++    private Task ContinueWithSangam() => OnContinueWithSangam.InvokeAsync();
++
++    private async Task Submit()
++    {
++        if (Busy || !CanSubmit) return;
++        var credentials = new PortalCredentials(_id, _password);
++        _password = string.Empty;
++        await OnSubmit.InvokeAsync(credentials);
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor.css b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor.css
+new file mode 100644
+index 0000000..deee487
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalSignIn.razor.css
+@@ -0,0 +1,85 @@
++/* Portal sign-in — Portal & Android 12a. Measurements from the handout frame (1280 × 720 below the browser chrome). */
++.psi {
++    --psi-field: #ffffff;
++    min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
++    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
++    background: var(--chvd-surface-mid); color: var(--chvd-ink);
++    font-family: var(--chvd-sans-display);
++}
++html[data-theme="dark"] .psi { --psi-field: var(--chvd-surface-lo); }
++
++/* ── Left: the pitch ───────────────────────────────────────────────── */
++.psi-hero {
++    position: relative; overflow: hidden; box-sizing: border-box;
++    display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
++    padding: 56px 60px;
++    background: var(--chvd-surface-hi); border-right: var(--chvd-stroke) solid var(--chvd-border);
++}
++.psi-water {
++    position: absolute; right: -70px; bottom: -80px; pointer-events: none; user-select: none;
++    font-family: var(--chvd-tamil); font-size: 440px; line-height: 1; color: var(--chvd-binding); opacity: .06;
++}
++.psi-mark { position: relative; display: flex; align-items: center; gap: 8px; }
++.psi-tag { font-family: var(--chvd-mono); font-size: 12px; color: var(--chvd-ink-muted); }
++.psi-pitch { position: relative; display: flex; flex-direction: column; gap: 14px; max-width: 440px; }
++.psi-h1 { margin: 0; font-family: var(--chvd-serif-display); font-weight: 400; font-size: 48px; line-height: 1.02; }
++.psi-body { margin: 0; font-family: var(--chvd-serif-body); font-size: 15px; line-height: 1.6; color: var(--chvd-ink-soft); text-wrap: pretty; }
++.psi-promises { position: relative; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--chvd-ink-soft); }
++.psi-promises li { display: flex; align-items: center; gap: 10px; }
++.psi-pr-ic { display: flex; color: var(--chvd-olive); }
++
++/* ── Right: the card ───────────────────────────────────────────────── */
++.psi-side { display: flex; align-items: center; justify-content: center; padding: 24px; }
++.psi-card {
++    width: 400px; max-width: 100%; box-sizing: border-box;
++    display: flex; flex-direction: column; gap: 16px; padding: 32px;
++    background: var(--chvd-surface-hi); border: var(--chvd-stroke) solid var(--chvd-border);
++    border-radius: 14px; box-shadow: 0 20px 50px rgba(26, 19, 16, .12);
++}
++.psi-title { font-family: var(--chvd-serif-display); font-size: 30px; line-height: 1; }
++
++.psi-sangam, .psi-submit {
++    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
++    border: none; border-radius: 9px; font-family: var(--chvd-sans-display); font-weight: 500; cursor: pointer;
++}
++.psi-sangam { height: 46px; background: var(--chvd-ink); color: var(--chvd-surface-hi); font-size: 14.5px; }
++.psi-s {
++    width: 22px; height: 22px; border-radius: 6px; background: var(--chvd-marigold);
++    display: flex; align-items: center; justify-content: center;
++    font-family: var(--chvd-serif-display); font-style: italic; font-size: 15px; color: var(--chvd-ink);
++}
++.psi-submit { height: 42px; background: var(--chvd-binding); color: var(--chvd-on-accent); font-size: 14px; }
++.psi-sangam:hover:not(:disabled), .psi-submit:hover:not(:disabled) { filter: brightness(1.12); }
++.psi-sangam:disabled, .psi-submit:disabled { opacity: .55; cursor: default; }
++.psi-sangam:focus-visible, .psi-submit:focus-visible { outline: 2px solid var(--chvd-marigold); outline-offset: 2px; }
++
++.psi-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--chvd-ink-muted); }
++.psi-or span { flex: 1; height: 0.5px; background: var(--chvd-border-soft); }
++
++.psi-field { display: flex; flex-direction: column; gap: 6px; }
++.psi-label { display: flex; justify-content: space-between; font-size: 12.5px; }
++.psi-label a, .psi-foot a { color: var(--chvd-binding); font-size: 12px; }
++.psi-label a:hover, .psi-foot a:hover { color: var(--chvd-marigold); }
++.psi-input {
++    height: 40px; box-sizing: border-box; padding: 0 12px;
++    border: var(--chvd-stroke) solid var(--chvd-border); border-radius: 8px; background: var(--psi-field);
++    color: var(--chvd-ink); font-family: var(--chvd-mono); font-size: 13px;
++}
++.psi-input:focus { outline: none; border-color: var(--chvd-binding); }
++.psi-pw { letter-spacing: .2em; }
++
++.psi-err { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--chvd-error); }
++.psi-foot { font-size: 12px; line-height: 1.5; color: var(--chvd-ink-muted); }
++
++/* ── Narrow browsers: the card first, the pitch underneath ─────────── */
++@media (max-width: 900px) {
++    .psi { grid-template-columns: minmax(0, 1fr); grid-auto-rows: min-content; }
++    .psi-side { order: -1; padding: 32px 16px 24px; }
++    .psi-hero { padding: 32px 24px; border-right: none; border-top: var(--chvd-stroke) solid var(--chvd-border); }
++    .psi-h1 { font-size: 36px; }
++    .psi-water { font-size: 300px; }
++}
++@media (max-width: 440px) {
++    .psi-side { padding: 16px 16px 24px; }
++    .psi-card { padding: 24px 20px; }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalStatusUser.razor b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalStatusUser.razor
+new file mode 100644
+index 0000000..20e49e1
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/PortalStatusUser.razor
+@@ -0,0 +1,18 @@
++@namespace ChuvadiReader.Ui.Components.Platform.Portal
++@using ChuvadiReader.Platform
++@implements IDisposable
++@inject IAccount Account
++
++@*
++    Status-bar user item on the web portal (design 12b): "Arun S. · Sangam". Replaces the desktop's
++    avatar + computer name, inside the same status-bar item, when IPlatformInfo.Capabilities.ServerSide is true.
++*@
++@Account.DisplayName · Sangam
++
++@code {
++    protected override void OnInitialized() => Account.Changed += OnChanged;
++
++    private void OnChanged() => InvokeAsync(StateHasChanged);
++
++    public void Dispose() => Account.Changed -= OnChanged;
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor
+new file mode 100644
+index 0000000..978e590
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor
+@@ -0,0 +1,75 @@
++@namespace ChuvadiReader.Ui.Components.Platform.Portal
++
++@*
++    Sangam gating (design: Portal & Android 12c). Shown when a person reaches an action that needs a
++    Sangam identity: a scrim with the gate card ("Signing needs a Sangam identity") and, beside it, the
++    "What needs Sangam" list. The text is the handout's by default; every line is a parameter so the
++    caller can name the action that was gated. The host wires OnContinue to its Sangam sign-in.
++    Scope (Arun, 6 Nov): no sharing this release, so the handout's "Share a link" row is left out.
++*@
++@if (Open)
++{
++    <div class="sg-scrim" @onclick="Dismiss" @onkeydown="OnKey" tabindex="-1">
++        <div class="sg-row" @onclick:stopPropagation="true">
++            <div class="sg-card" role="dialog" aria-modal="true" aria-labelledby="sg-title">
++                <span class="sg-ic"><Icon Name="@IconName" Size="22" /></span>
++                <span class="sg-title" id="sg-title">@Title</span>
++                <span class="sg-body">@Body</span>
++                <button class="sg-sangam" @onclick="Continue" disabled="@_busy">
++                    <span class="sg-s" aria-hidden="true">S</span>Continue with Sangam
++                </button>
++                <button class="sg-later" @onclick="Dismiss">Not now</button>
++            </div>
++            @if (ShowList)
++            {
++                <div class="sg-list" aria-label="What needs Sangam">
++                    <span class="sg-list-h">What needs Sangam</span>
++                    @foreach (var g in Rows)
++                    {
++                        <div class="sg-li">
++                            <span class="sg-li-ic @(g.NeedsSangam ? "sangam" : "free")"><Icon Name="@g.Icon" Size="15" /></span>
++                            <span class="sg-li-t">@g.Text</span>
++                            <span class="sg-pill @(g.NeedsSangam ? "sangam" : "free")">@(g.NeedsSangam ? "Sangam" : "free · local")</span>
++                        </div>
++                    }
++                </div>
++            }
++        </div>
++    </div>
++}
++
++@code {
++    /// <summary>Shows the gate. The caller closes it from <see cref="OnDismiss"/> or after <see cref="OnContinue"/>.</summary>
++    [Parameter] public bool Open { get; set; }
++
++    [Parameter] public string IconName { get; set; } = "certification";
++
++    [Parameter] public string Title { get; set; } = "Signing needs a Sangam identity";
++
++    [Parameter] public string Body { get; set; } = "A digital signature has to say who signed. Sign in once; your documents still stay on this computer.";
++
++    /// <summary>Show the "What needs Sangam" list beside the card (as in the handout).</summary>
++    [Parameter] public bool ShowList { get; set; } = true;
++
++    /// <summary>The list's rows. Defaults to the handout's list for this release.</summary>
++    [Parameter] public IReadOnlyList<SangamGatingRow> Rows { get; set; } = SangamGatingRow.Release1;
++
++    /// <summary>"Continue with Sangam" was pressed.</summary>
++    [Parameter] public EventCallback OnContinue { get; set; }
++
++    /// <summary>"Not now", Escape or a click on the scrim.</summary>
++    [Parameter] public EventCallback OnDismiss { get; set; }
++
++    private bool _busy;
++
++    private async Task Continue()
++    {
++        _busy = true;
++        try { await OnContinue.InvokeAsync(); }
++        finally { _busy = false; }
++    }
++
++    private Task Dismiss() => OnDismiss.InvokeAsync();
++
++    private Task OnKey(KeyboardEventArgs e) => e.Key == "Escape" ? Dismiss() : Task.CompletedTask;
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor.css b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor.css
+new file mode 100644
+index 0000000..8c5b3ca
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGate.razor.css
+@@ -0,0 +1,51 @@
++/* Sangam gating — Portal & Android 12c. */
++.sg-scrim {
++    position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center;
++    padding: 16px; box-sizing: border-box; overflow: auto;
++    background: rgba(26, 19, 16, .30); outline: none;
++}
++.sg-row { display: flex; align-items: center; justify-content: center; gap: 28px; flex-wrap: wrap; }
++
++.sg-card, .sg-list {
++    box-sizing: border-box; display: flex; flex-direction: column;
++    background: var(--chvd-surface-hi); color: var(--chvd-ink); border-radius: 14px; box-shadow: var(--chvd-shadow-dialog);
++    font-family: var(--chvd-sans-display);
++}
++.sg-card { width: 420px; max-width: 100%; gap: 14px; padding: 24px; }
++.sg-ic {
++    width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
++    background: color-mix(in srgb, var(--chvd-marigold) 16%, transparent); color: var(--chvd-marigold);
++}
++.sg-title { font-family: var(--chvd-serif-display); font-size: 28px; line-height: 1.08; }
++.sg-body { font-size: 13.5px; line-height: 1.55; color: var(--chvd-ink-soft); }
++.sg-sangam {
++    height: 42px; display: flex; align-items: center; justify-content: center; gap: 10px;
++    border: none; border-radius: 9px; background: var(--chvd-ink); color: var(--chvd-surface-hi);
++    font-family: var(--chvd-sans-display); font-size: 14px; font-weight: 500; cursor: pointer;
++}
++.sg-s {
++    width: 20px; height: 20px; border-radius: 5px; background: var(--chvd-marigold);
++    display: flex; align-items: center; justify-content: center;
++    font-family: var(--chvd-serif-display); font-style: italic; font-size: 14px; color: var(--chvd-ink);
++}
++.sg-later {
++    height: 38px; border: var(--chvd-stroke) solid var(--chvd-border); border-radius: 8px; background: transparent;
++    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 13px; cursor: pointer;
++}
++.sg-sangam:hover:not(:disabled) { filter: brightness(1.12); }
++.sg-sangam:disabled { opacity: .55; cursor: default; }
++.sg-later:hover { background: var(--chvd-surface-mid); }
++.sg-sangam:focus-visible, .sg-later:focus-visible { outline: 2px solid var(--chvd-marigold); outline-offset: 2px; }
++
++.sg-list { width: 440px; max-width: 100%; padding: 20px 22px; }
++.sg-list-h { font-family: var(--chvd-serif-display); font-size: 22px; margin-bottom: 8px; }
++.sg-li { display: flex; align-items: center; gap: 10px; min-height: 36px; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); font-size: 13px; }
++.sg-li-ic { display: flex; }
++.sg-li-ic.sangam { color: var(--chvd-marigold); }
++.sg-li-ic.free { color: var(--chvd-olive); }
++.sg-li-t { flex: 1; }
++.sg-pill { font-family: var(--chvd-mono); font-size: 10.5px; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
++.sg-pill.sangam { background: color-mix(in srgb, var(--chvd-marigold) 14%, transparent); color: color-mix(in srgb, var(--chvd-marigold) 70%, var(--chvd-ink)); }
++.sg-pill.free { background: color-mix(in srgb, var(--chvd-olive) 12%, transparent); color: color-mix(in srgb, var(--chvd-olive) 55%, var(--chvd-ink)); }
++
++@media (max-width: 920px) { .sg-row { flex-direction: column; gap: 16px; } }
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGatingRow.cs b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGatingRow.cs
+new file mode 100644
+index 0000000..272ba01
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/Portal/SangamGatingRow.cs
+@@ -0,0 +1,23 @@
++namespace ChuvadiReader.Ui.Components.Platform.Portal;
++
++/// <summary>One row of the "What needs Sangam" list (design 12c).</summary>
++/// <param name="Icon">Icon name.</param>
++/// <param name="Text">What the row is about.</param>
++/// <param name="NeedsSangam">True: needs a Sangam identity. False: free and local.</param>
++public sealed record SangamGatingRow(string Icon, string Text, bool NeedsSangam)
++{
++    /// <summary>
++    /// The handout's list (12c) for this release. "Share a link" is left out: sharing is not in this
++    /// release (Arun, 6 Nov).
++    /// </summary>
++    public static IReadOnlyList<SangamGatingRow> Release1 { get; } =
++    [
++        new("reading-mode", "Read, find, print", false),
++        new("edit", "Basic markup: text, shapes, highlight", false),
++        new("grid-view", "Arrange, bind, split, compress", false),
++        new("redact", "Redact, stamp, flatten, password", false),
++        new("certification", "Sign with a certificate", true),
++        new("refresh", "Sync across devices", true),
++        new("library", "Anything on the web portal", true),
++    ];
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor b/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
+index e7978ea..b7c3f3c 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/AboutSection.razor
+@@ -21,7 +21,10 @@
+         {
+             <SettingRow Label="Network" Hint="offline · nothing leaves this device"><ValueChip Text="Offline" /></SettingRow>
+         }
+-        <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@Paths.AppDataFolder" Wrap="true" /></SettingRow>
++        @if (!Platform.Capabilities.ServerSide)
++        {
++            <SettingRow Label="Data folder" Hint="Settings, recent files and tabs" Stack="true"><ValueChip Text="@Paths.AppDataFolder" Wrap="true" /></SettingRow>
++        }
+         <SettingRow Label="Clear recent files & cache" Soon="true"><RowButton>Clear…</RowButton></SettingRow>
+     </SettingsCard>
+ 
+diff --git a/src/ChuvadiReader.Ui/Components/Shell/StatusClock.razor b/src/ChuvadiReader.Ui/Components/Shell/StatusClock.razor
+new file mode 100644
+index 0000000..8c9d714
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Shell/StatusClock.razor
+@@ -0,0 +1,21 @@
++@implements IDisposable
++
++@*
++    Status-bar clock. Owns its one-second timer so only this span re-renders each second,
++    not the whole shell (decision D-52). Markup identical to the inline clock it replaces.
++*@
++<span class="sb-clock">@_text</span>
++
++@code {
++    private string _text = DateTime.Now.ToString("HH:mm:ss");
++    private System.Threading.Timer? _timer;
++
++    protected override void OnInitialized() =>
++        _timer = new System.Threading.Timer(_ =>
++        {
++            _text = DateTime.Now.ToString("HH:mm:ss");
++            _ = InvokeAsync(StateHasChanged);
++        }, null, 1000, 1000);
++
++    public void Dispose() => _timer?.Dispose();
++}
+diff --git a/src/ChuvadiReader.Ui/Layout/MainLayout.razor b/src/ChuvadiReader.Ui/Layout/MainLayout.razor
+index 8708395..e0f06f0 100644
+--- a/src/ChuvadiReader.Ui/Layout/MainLayout.razor
++++ b/src/ChuvadiReader.Ui/Layout/MainLayout.razor
+@@ -27,7 +27,20 @@
+ 
+ <div class="shell">
+     <ChuvadiReader.Ui.Components.Settings.PreferencesHost />
++    @if (ShellLayout is ChuvadiReader.Platform.ShellLayout.Tablet or ChuvadiReader.Platform.ShellLayout.Phone)
++    {
++        <ChuvadiReader.Ui.Components.Platform.Phone.TouchSupport />
++    }
+ 
++    @if (ShellLayout == ChuvadiReader.Platform.ShellLayout.Phone)
++    {
++        <ChuvadiReader.Ui.Components.Platform.Phone.PhoneShell RequestMode="RequestMode" ModeDisabledReason="ModeDisabledReason"
++                                                               Open="AddTab" Find="FindNow" Go="Go" OnDocView="OnDocView">
++            @Body
++        </ChuvadiReader.Ui.Components.Platform.Phone.PhoneShell>
++    }
++    else
++    {
+     <header class="topbar @(_leftOpen ? "lb-open" : null)" @onmousedown="StartDrag">
+         <div class="tb-left">
+             @if (Platform.Chrome.Buttons == ChuvadiReader.Platform.WindowButtons.Left)
+@@ -133,6 +146,10 @@
+                     <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
+                 </div>
+             }
++            @if (Platform.Chrome.AccountMenu)
++            {
++                <ChuvadiReader.Ui.Components.Platform.Portal.AccountMenu />
++            }
+         </div>
+     </header>
+ 
+@@ -153,7 +170,7 @@
+                 </button>
+             }
+             <span class="lb-sep"></span>
+-            <button class="lb-btn" @onclick="AddTab" title="Open (@Platform.Keys.Format("Ctrl O"))"><Icon Name="folder" Size="19" /><span class="lb-l">Open</span><span class="lb-k">@Platform.Keys.Format("Ctrl O")</span></button>
++            <button class="lb-btn" @onclick="AddTab" title="@(IsPortal ? "Upload" : "Open") (@Platform.Keys.Format("Ctrl O"))"><Icon Name="@(IsPortal ? "upload" : "folder")" Size="19" /><span class="lb-l">@(IsPortal ? "Upload" : "Open")</span><span class="lb-k">@Platform.Keys.Format("Ctrl O")</span></button>
+             <button class="lb-btn" @onclick="FindNow" title="Find (@Platform.Keys.Format("Ctrl F"))"><Icon Name="find-in-page" Size="19" /><span class="lb-l">Find</span><span class="lb-k">@Platform.Keys.Format("Ctrl F")</span></button>
+             <button class="lb-btn @(IsAt("/library") ? "here" : null)" @onclick='() => Go("/library")' title="Library"><Icon Name="library" Size="19" /><span class="lb-l">Library</span><span class="lb-k"></span></button>
+             <button class="lb-btn @(IsAt("/") ? "here" : null)" @onclick='() => Go("/")' title="Home"><Icon Name="home" Size="19" /><span class="lb-l">Home</span><span class="lb-k"></span></button>
+@@ -168,9 +185,16 @@
+     </div>
+ 
+     <footer class="statusbar">
+-        <span class="sb-item"><span class="status-dot"></span>@(Platform.Capabilities.ServerSide ? "processed on the server · encrypted at rest · only you can see it" : "offline · on this device")</span>
++        <span class="sb-item"><span class="status-dot@(Platform.Capabilities.ServerSide ? " server" : null)"></span>@(Platform.Capabilities.ServerSide ? "processed on the server · encrypted at rest · only you can see it" : "offline · on this device")</span>
+         <span class="sb-div"></span>
+-        <span class="sb-item"><span class="sb-avatar">@Initials</span>@(Profile.Name ?? "This computer")</span>
++        @if (IsPortal)
++        {
++            <span class="sb-item"><ChuvadiReader.Ui.Components.Platform.Portal.PortalStatusUser /></span>
++        }
++        else
++        {
++            <span class="sb-item"><span class="sb-avatar">@Initials</span>@(Profile.Name ?? "This computer")</span>
++        }
+         @if (!string.IsNullOrEmpty(Shell.Activity))
+         {
+             <span class="sb-div"></span>
+@@ -183,9 +207,10 @@
+         }
+         <span class="sb-right">
+             <span class="sb-ver">v1.0.0-preview</span>
+-            <span class="sb-clock">@_clock</span>
++            <StatusClock />
+         </span>
+     </footer>
++    }
+ 
+     @if (Shell.Messages.Count > 0)
+     {
+@@ -237,8 +262,10 @@
+             // remembering the choice is a nicety
+         }
+     }
+-    private string _clock = DateTime.Now.ToString("HH:mm:ss");
+-    private System.Threading.Timer? _clockTimer;
++    // Platform layout (desktop / tablet / phone / portal) and portal chrome (Kind == Web at any size).
++    private ChuvadiReader.Platform.ShellLayout ShellLayout => ChuvadiReader.Platform.ShellLayouts.Shell(Platform);
++
++    private bool IsPortal => Platform.Kind == ChuvadiReader.Platform.PlatformKind.Web;
+     private readonly HashSet<Guid> _fading = new();
+ 
+     protected override void OnInitialized()
+@@ -255,11 +282,6 @@
+             Platform.FormFactorChanged += OnFormFactorChanged;
+         }
+ 
+-        _clockTimer = new System.Threading.Timer(_ =>
+-        {
+-            _clock = DateTime.Now.ToString("HH:mm:ss");
+-            _ = InvokeAsync(StateHasChanged);
+-        }, null, 1000, 1000);
+     }
+ 
+     // ── where are we ──────────────────────────────────────────────────────
+@@ -738,7 +760,6 @@
+         Shell.CommandBarRequested -= OpenCommandBarFromService;
+         OpenDoc.Requested -= OnOpenRequested;
+         Nav.LocationChanged -= OnLocationChanged;
+-        _clockTimer?.Dispose();
+         try
+         {
+             if (_shellJs is not null)
+diff --git a/src/ChuvadiReader.Ui/Pages/Bench.Shell.cs b/src/ChuvadiReader.Ui/Pages/Bench.Shell.cs
+index 5eb3536..e5b0023 100644
+--- a/src/ChuvadiReader.Ui/Pages/Bench.Shell.cs
++++ b/src/ChuvadiReader.Ui/Pages/Bench.Shell.cs
+@@ -1,5 +1,6 @@
+ using ChuvadiReader.Core.Reader;
+ using Microsoft.AspNetCore.Components;
++using Microsoft.JSInterop;
+ 
+ namespace ChuvadiReader.Ui.Pages;
+ 
+@@ -51,6 +52,7 @@ public partial class Bench
+ 
+         var pages = BenchSvc.Desks.Sum(d => d.Pages.Count);
+         var desks = BenchSvc.Desks.Count;
++        PublishDeskCounter(desks);
+         var sel = BenchSvc.SelectedCount;
+         Shell.SetActivity($"Arrange · {desks} desk{(desks == 1 ? "" : "s")} · {pages} page{(pages == 1 ? "" : "s")}{(sel > 0 ? $" · {sel} selected" : "")}");
+         Shell.RegisterCommands(this, ArrangeCommands().ToList());
+@@ -59,6 +61,33 @@ public partial class Bench
+     private void ShellRelease()
+     {
+         Shell.UnregisterCommands(this);
++        if (ReferenceEquals(Shell.CounterHandler, _deskCounterHandler))
++        {
++            Shell.CounterHandler = null;
++        }
++    }
++
++    private Func<int, Task>? _deskCounterHandler;
++
++    /// <summary>Tablet layout only (design 12f, D-46): "‹ 2 desks ›" in the counter, ‹ › moving between
++    /// desks. Desktop and phone keep their Arrange top bar exactly as before (no counter).</summary>
++    private void PublishDeskCounter(int desks)
++    {
++        if (ChuvadiReader.Platform.ShellLayouts.Shell(Platform) != ChuvadiReader.Platform.ShellLayout.Tablet)
++        {
++            return;
++        }
++
++        _deskCounterHandler ??= async n =>
++        {
++            if (_module is null) return;
++            try { await _module.InvokeVoidAsync("scrollDeskTo", n - 1); }
++            catch (JSDisconnectedException) { }
++        };
++        Shell.CounterHandler = _deskCounterHandler;
++        var focus = FocusDeskId is { } id ? BenchSvc.Desks.ToList().FindIndex(d => d.Id == id) + 1 : 0;
++        Shell.SetCounter(desks == 0 ? 0 : Math.Max(1, focus), desks, "desk");
++        Shell.SetCounterStep(1);
+     }
+ 
+     private IEnumerable<ShellCommand> ArrangeCommands()
+diff --git a/src/ChuvadiReader.Ui/Pages/Dashboard.razor b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+index 96d4669..10dd7d6 100644
+--- a/src/ChuvadiReader.Ui/Pages/Dashboard.razor
++++ b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+@@ -29,7 +29,14 @@
+                     <span class="ta" lang="ta">வணக்கம்.</span>
+                 }
+             </h1>
++            @if (Platform.Capabilities.ServerSide)
++            {
++                <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · @ChuvadiReader.Ui.Components.Platform.PlatformText.ServerPrivacy</p>
++            }
++            else
++            {
+             <p class="blurb">@LibCountText in your library · @Recents.EncryptedCount encrypted · nothing leaves this device.</p>
++            }
+         </section>
+ 
+         @if (IsFirstRun)
+@@ -110,7 +117,10 @@
+         <section class="block smap">
+             <h2 class="eye smap-head">
+                 <span>Storage map</span>
+-                <span class="smap-folder" title="@Categories.BaseFolder">@Categories.BaseFolder</span>
++                @if (Platform.Capabilities.RevealInFolder)
++                {
++                    <span class="smap-folder" title="@Categories.BaseFolder">@Categories.BaseFolder</span>
++                }
+                 <span class="smap-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+             </h2>
+             <div class="smap-grid">
+@@ -158,7 +168,14 @@
+         <button type="button" class="shelf" @onclick='() => Nav.NavigateTo("/library")'>
+             <span class="eye shelf-head">
+                 <Icon Name="library" Size="12" /> Library
++                @if (Platform.Capabilities.RevealInFolder)
++                {
+                 <span class="shelf-meta" title="@Lib.FolderPath">@ShortFolder(Lib.FolderPath) · @(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
++                }
++                else
++                {
++                    <span class="shelf-meta">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
++                }
+             </span>
+             <span class="shelf-wrap" aria-hidden="true">
+                 <span class="books">
+@@ -182,6 +199,8 @@
+             <span class="shelf-go">@(Books.Count == 0 ? "Your shelves are empty — open the Library" : "Open the shelves") <Icon Name="chevron-right" Size="13" /></span>
+         </button>
+ 
++        @if (Platform.Capabilities.WatchFolders)
++        {
+         <section class="watch">
+             <h2 class="eye"><Icon Name="folder" Size="12" /> Watched folder</h2>
+             <span class="w-path" title="@Watched.FolderPath">@Watched.FolderPath</span>
+@@ -191,6 +210,7 @@
+                 <button type="button" class="mini" disabled title="Coming soon — one watched folder for now"><Icon Name="plus" Size="11" /> add folder</button>
+             </span>
+         </section>
++        }
+     </aside>
+ 
+ </div>
+diff --git a/src/ChuvadiReader.Ui/Pages/Library.razor b/src/ChuvadiReader.Ui/Pages/Library.razor
+index 655c54f..40467d2 100644
+--- a/src/ChuvadiReader.Ui/Pages/Library.razor
++++ b/src/ChuvadiReader.Ui/Pages/Library.razor
+@@ -16,7 +16,10 @@
+ <div class="libp">
+     <div class="libp-bar">
+         <span class="libp-title">Library</span>
++        @if (Platform.Capabilities.RevealInFolder)
++        {
+         <span class="libp-folder">@Lib.FolderPath</span>
++        }
+         <span class="libp-count">@(Lib.IsScanning ? "scanning…" : $"{Lib.Entries.Count} pdf{(Lib.Entries.Count == 1 ? "" : "s")}")</span>
+     </div>
+ 
+diff --git a/src/ChuvadiReader.Ui/wwwroot/css/mobile.css b/src/ChuvadiReader.Ui/wwwroot/css/mobile.css
+new file mode 100644
+index 0000000..ae9cf9d
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/wwwroot/css/mobile.css
+@@ -0,0 +1,339 @@
++/*
++ * Chuvadi Reader — Android tablet and phone look (Portal & Android 12d-12j).
++ * Every rule is keyed on <html data-shell="tablet"> or <html data-shell="phone">, which PlatformRoot
++ * sets from the host's platform signal, so nothing here can reach the desktop or portal layouts.
++ * Link after shell.css. Colours and type come only from tokens.css, so all five themes work.
++ *
++ *   tablet  top bar 52 · left bar 72 · Tools rail 72 · View rail 60 · 48 px targets · no status bar
++ *           portrait (< 1000 px): View rail folds into Tools (shell.css's own narrow rule)
++ *   phone   app bar 56 · tool strip 62 (Mark, Protect) · bottom bar 80 · sheets · FAB 56
++ */
++
++/* ════════════════════════════════════════════════════════════════════════════
++   Shared by tablet and phone
++   ════════════════════════════════════════════════════════════════════════════ */
++
++/* Edge-to-edge window: the Ui keeps clear of the status bar, the gesture bar and a display cut-out.
++   100dvh follows the on-screen keyboard and the browser chrome; 100vh is the fallback. */
++html[data-shell="tablet"] .shell,
++html[data-shell="phone"] .shell {
++    height: 100vh;
++    height: 100dvh;
++    box-sizing: border-box;
++}
++html[data-shell="tablet"] .shell {
++    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
++}
++
++/* No hover on touch: the hover strip under the page shows on a tap instead (mobile.js). */
++html[data-shell="tablet"] .mview-canvas:hover .pstrip,
++html[data-shell="phone"] .mview-canvas:hover .pstrip { opacity: 0; pointer-events: none; transform: translate(-50%, 8px); }
++html[data-shell="tablet"] .mview-canvas.chvd-strip-on .pstrip,
++html[data-shell="phone"] .mview-canvas.chvd-strip-on .pstrip,
++html[data-shell="tablet"] .pstrip.pinned,
++html[data-shell="phone"] .pstrip.pinned { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
++html[data-shell="tablet"] .pstrip button,
++html[data-shell="phone"] .pstrip button { height: 44px; padding: 0 12px; }
++
++/* The "To desk" chip on a page is hover-only on desktop. On touch the same action is in the
++   per-page strip a tap brings up, so the chip stays hidden instead of covering the page. */
++html[data-shell="tablet"] .rpage-send,
++html[data-shell="phone"] .rpage-send { display: none; }
++
++/* Popovers and menus: 44 px rows. */
++html[data-shell="tablet"] .pop-item,
++html[data-shell="phone"] .pop-item { height: 44px; font-size: 14px; }
++
++/* Arrange: one finger scrolls the desks; a page drags after a long-press (mobile.js). */
++html[data-shell="tablet"] .bpage,
++html[data-shell="tablet"] .shelf-pg,
++html[data-shell="phone"] .bpage,
++html[data-shell="phone"] .shelf-pg { touch-action: pan-x pan-y; -webkit-touch-callout: none; }
++
++/* ════════════════════════════════════════════════════════════════════════════
++   Tablet — 12d (Read), 12e (Mark with a pen), 12f (Arrange, portrait)
++   ════════════════════════════════════════════════════════════════════════════ */
++html[data-shell="tablet"] {
++    --sh-top: 52px;
++    --sh-left: 72px;
++    --sh-left-open: 72px;      /* no hover-expand on touch: the verbs sit under the mode icons */
++    --sh-tools: 72px;
++    --sh-view: 60px;
++    --sh-status: 0px;
++}
++@media (max-width: 999px) {
++    html[data-shell="tablet"] { --sh-left: 72px; --sh-tools: 72px; --sh-view: 0px; }
++}
++
++/* Top bar (12d): wordmark · active tab · +N · ‹ n / N › · Document ▾ · search. The theme toggle
++   stays in Settings › Appearance; there is no status bar. */
++html[data-shell="tablet"] .topbar { padding: 0 12px; gap: 10px; }
++html[data-shell="tablet"] .tb-brandbox,
++html[data-shell="tablet"] .topbar.lb-open .tb-brandbox { width: auto; min-width: max-content; border-right: none; margin-right: 4px; }
++html[data-shell="tablet"] .topbar .cv-brand { font-size: 21px !important; }
++html[data-shell="tablet"] .topbar .rtab:not(.active) { display: none; }
++html[data-shell="tablet"] .topbar .rtab {
++    height: 34px; max-width: 220px; padding: 0 10px; border-radius: 9px; gap: 6px;
++}
++html[data-shell="tablet"] .topbar .rtab-name { font-size: 11.5px; }
++html[data-shell="tablet"] .topbar .rtab-x { display: none; }
++html[data-shell="tablet"] .rtab-more {
++    display: inline-flex; align-items: center; height: 34px; padding: 0 10px; border-radius: 9px;
++    background: var(--chvd-surface-lo); color: var(--chvd-ink-soft);
++}
++/* 12d shows only the active tab and the +N count: Open is in the left bar, Close in Document ▾. */
++html[data-shell="tablet"] .topbar .rtab-add,
++html[data-shell="tablet"] .topbar .rtabs-actions { display: none; }
++html[data-shell="tablet"] .tb-pager { height: 40px; padding: 0 4px; gap: 4px; border-radius: 10px; font-size: 13px; }
++html[data-shell="tablet"] .tb-pg-btn { width: 36px; height: 36px; }
++html[data-shell="tablet"] .tb-pg-btn svg { width: 18px; height: 18px; }
++html[data-shell="tablet"] .tb-pg-box { width: 34px; height: 28px; border-radius: 6px; font-size: 13px; }
++html[data-shell="tablet"] .tb-doc { height: 40px; padding: 0 12px; font-size: 14px; }
++html[data-shell="tablet"] .tb-cmd { width: 40px; height: 40px; padding: 0; justify-content: center; border: none; background: transparent; color: var(--chvd-ink); }
++html[data-shell="tablet"] .tb-cmd svg { width: 19px; height: 19px; }
++html[data-shell="tablet"] .tb-cmd-t,
++html[data-shell="tablet"] .tb-cmd .kbd,
++html[data-shell="tablet"] .topbar .tb-icon,
++html[data-shell="tablet"] .statusbar { display: none; }
++
++/* Left bar (12d): modes as icon over italic verb (60 px), then Open · Find · Library (48 px),
++   Settings at the foot. Home is the wordmark; the expand toggle means nothing on touch. */
++html[data-shell="tablet"] .leftbar { padding: 10px; gap: 4px; }
++html[data-shell="tablet"] .lb-btn { height: 48px; padding: 0; justify-content: center; border-radius: 12px; color: var(--chvd-ink-soft); }
++html[data-shell="tablet"] .lb-btn svg { width: 21px; height: 21px; }
++html[data-shell="tablet"] .lb-btn .lb-l,
++html[data-shell="tablet"] .lb-btn .lb-k { display: none; }
++html[data-shell="tablet"] .lb-mode { height: 60px; flex-direction: column; gap: 2px; }
++html[data-shell="tablet"] .lb-mode svg { width: 22px; height: 22px; }
++html[data-shell="tablet"] .lb-mode .lb-verb { display: block; flex: none; opacity: 1; font-size: 14px; line-height: 1; }
++html[data-shell="tablet"] .lb-mark { display: none; }
++html[data-shell="tablet"] .lb-sep { margin: 6px 4px; }
++html[data-shell="tablet"] .lb-toggle,
++html[data-shell="tablet"] .leftbar .lb-btn[title="Home"] { display: none; }
++
++/* Right rails (12d-12f): 72 px Tools with 52 × 48 buttons, 60 px View with 48 × 46; icon only,
++   never expanding over the page on a tap. */
++html[data-shell="tablet"] .srail { padding: 10px; gap: 4px; align-items: center; }
++html[data-shell="tablet"] .srail-view { padding: 10px 6px; }
++html[data-shell="tablet"] .srail-h { font-size: 9px; padding: 2px 0 4px; }
++html[data-shell="tablet"] .rb { width: 52px; height: 48px; padding: 0; justify-content: center; border-radius: 12px; }
++html[data-shell="tablet"] .rb svg { width: 21px; height: 21px; }
++html[data-shell="tablet"] .srail-view .rb { width: 48px; height: 46px; padding: 0; border-radius: 10px; }
++html[data-shell="tablet"] .srail-view .rb svg { width: 20px; height: 20px; }
++html[data-shell="tablet"] .rb-l,
++html[data-shell="tablet"] .rb-k { display: none; }
++html[data-shell="tablet"] .srail:hover { width: var(--sh-tools); box-shadow: none; z-index: 20; }
++html[data-shell="tablet"] .srail-view:hover { width: var(--sh-view); }
++html[data-shell="tablet"] .srail:hover .srail-h { text-align: center; padding-left: 0; }
++html[data-shell="tablet"] .srail:hover .rtext { justify-content: center; padding-left: 0; }
++
++/* Messages sit above the gesture bar, not above a status bar that isn't there. */
++html[data-shell="tablet"] .msgs { bottom: calc(14px + env(safe-area-inset-bottom)); }
++
++/* Arrange, portrait (12f): desks two across; 76 × 106 page cards; 48 px desk header. */
++@media (max-width: 999px) {
++    html[data-shell="tablet"] .bench-desks { --desk-cols: 2 !important; }
++}
++
++/* ════════════════════════════════════════════════════════════════════════════
++   Phone — 12g (Read), 12h (Mark), 12i (Arrange), 12j (Protect + View sheet)
++   The phone shell (PhoneShell.razor) replaces the top bar, left bar and status bar; the mode
++   views still render, and their rails fold away here.
++   ════════════════════════════════════════════════════════════════════════════ */
++html[data-shell="phone"] {
++    --sh-top: 0px; --sh-left: 0px; --sh-left-open: 0px; --sh-tools: 0px; --sh-view: 0px; --sh-status: 0px;
++    --ph-bar: 56px; --ph-strip: 62px; --ph-nav: 80px;
++}
++
++.ph-shell {
++    flex: 1; min-height: 0; display: flex; flex-direction: column;
++    background: var(--chvd-surface-lo);
++    padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);
++}
++
++/* App bar: back · title / sub-line · counter · ⋮ */
++.ph-bar {
++    flex: none; height: calc(var(--ph-bar) + env(safe-area-inset-top)); padding: env(safe-area-inset-top) 6px 0;
++    display: flex; align-items: center; gap: 4px; box-sizing: border-box;
++    background: var(--chvd-surface-hi); border-bottom: var(--chvd-stroke) solid var(--chvd-border);
++    position: relative; z-index: 30;
++}
++.ph-ib {
++    flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
++    border: none; border-radius: 22px; background: transparent; color: var(--chvd-ink); cursor: pointer;
++}
++.ph-ib:active { background: var(--chvd-surface-mid); }
++.ph-brand { padding: 0 8px 0 10px; font-size: 21px; }
++.ph-title { flex: 1; min-width: 0; display: flex; flex-direction: column; }
++.ph-t { font-size: 15.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--chvd-ink); }
++.ph-sub { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++.ph-pager {
++    flex: none; display: flex; align-items: center; height: 36px; min-width: 44px; padding: 0 6px; box-sizing: border-box;
++    background: var(--chvd-surface-mid); border: var(--chvd-stroke) solid var(--chvd-border-soft); border-radius: 9px;
++    font-family: var(--chvd-mono); font-size: 12px; color: var(--chvd-ink); cursor: pointer; white-space: nowrap;
++}
++.ph-pager-act:disabled { opacity: .45; cursor: default; }
++.ph-pager-in { width: 64px; text-align: center; user-select: text; -webkit-user-select: text; }
++.ph-pager-in:focus { outline: 1.5px solid var(--chvd-binding); outline-offset: 0; }
++
++/* Content: the mode views render here, edge to edge. */
++.ph-content { flex: 1; min-height: 0; position: relative; overflow: auto; margin: 0; }
++
++/* Floating primary action (12h Save as new, 12i Add desk). */
++.ph-fab {
++    position: absolute; right: 16px; bottom: 16px; z-index: 24;
++    width: 56px; height: 56px; border: none; border-radius: 16px;
++    display: flex; align-items: center; justify-content: center;
++    background: var(--chvd-binding); color: var(--chvd-on-accent); box-shadow: 0 6px 16px rgba(0, 0, 0, .25); cursor: pointer;
++}
++.ph-fab:disabled { opacity: .45; cursor: default; }
++/* Arrange: stay clear of the Shelf peek. */
++.ph-shell[data-mode="arrange"] .ph-fab { bottom: 68px; z-index: 45; }
++
++/* Tool strip (Mark / Protect): 62 px, 52 × 50 items, sideways scroll when it overflows. */
++.ph-strip {
++    flex: none; height: var(--ph-strip); display: flex; align-items: center; gap: 2px; padding: 0 6px;
++    background: var(--chvd-surface-mid); border-top: var(--chvd-stroke) solid var(--chvd-border-soft);
++    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
++}
++.ph-strip::-webkit-scrollbar { height: 0; }
++.ph-tool {
++    flex: none; width: 52px; height: 50px; border: none; border-radius: 12px;
++    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
++    background: transparent; color: var(--chvd-ink-soft); font-family: var(--chvd-sans-display); font-size: 10px; cursor: pointer;
++}
++.ph-tool.on { background: var(--chvd-binding-soft); color: var(--chvd-binding); }
++.ph-tool:disabled { opacity: .38; cursor: default; }
++
++/* Bottom bar: Read · Mark · Arrange · Protect — icon in a 60 × 32 pill over the italic verb. */
++.ph-nav {
++    flex: none; height: calc(var(--ph-nav) + env(safe-area-inset-bottom)); box-sizing: border-box;
++    display: grid; grid-template-columns: repeat(4, 1fr); padding: 8px 8px calc(14px + env(safe-area-inset-bottom));
++    background: var(--chvd-surface-hi); border-top: var(--chvd-stroke) solid var(--chvd-border);
++    position: relative; z-index: 30;
++}
++.ph-nav-b {
++    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
++    border: none; background: transparent; color: var(--chvd-ink-soft); cursor: pointer; min-height: 48px; padding: 0;
++}
++.ph-pill { display: flex; align-items: center; justify-content: center; width: 60px; height: 32px; border-radius: 16px; }
++.ph-verb { font-family: var(--chvd-serif-display); font-style: italic; font-size: 15px; line-height: 1; }
++.ph-nav-b.on { color: var(--chvd-binding); }
++.ph-nav-b.on .ph-pill { background: var(--chvd-binding-soft); background: color-mix(in srgb, var(--chvd-binding) 16%, transparent); }
++.ph-nav-b:disabled { opacity: .38; cursor: default; }
++
++/* Bottom sheets: the ⋮ menu and the View sheet (12j). */
++.ph-scrim { position: fixed; inset: 0; z-index: 90; background: var(--chvd-scrim); animation: ph-fade var(--chvd-base); }
++.ph-sheet {
++    position: fixed; left: 0; right: 0; bottom: 0; z-index: 91;
++    max-height: 80dvh; display: flex; flex-direction: column; gap: 10px;
++    padding: 8px calc(16px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
++    background: var(--chvd-surface-hi); border-top: var(--chvd-stroke) solid var(--chvd-border);
++    border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .14);
++    animation: ph-rise var(--chvd-base) var(--chvd-ease);
++}
++.ph-handle { align-self: center; display: flex; align-items: center; justify-content: center; width: 64px; height: 20px; margin: -4px 0 -6px; border: none; background: transparent; cursor: pointer; }
++.ph-handle span { width: 36px; height: 4px; border-radius: 2px; background: var(--chvd-border); }
++.ph-sheet-hd { display: flex; justify-content: space-between; align-items: baseline; }
++.ph-sheet-t { font-family: var(--chvd-serif-display); font-size: 21px; color: var(--chvd-ink); }
++.ph-sheet-a { border: none; background: transparent; color: var(--chvd-binding); font-size: 13px; min-height: 44px; padding: 0 2px 0 12px; cursor: pointer; font-family: var(--chvd-sans-display); }
++.ph-sheet-body { overflow-y: auto; display: flex; flex-direction: column; }
++.ph-sheet-h { font-family: var(--chvd-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--chvd-ink-muted); padding: 14px 0 6px; }
++.ph-row {
++    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0;
++    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border-soft); background: transparent;
++    color: var(--chvd-ink); font-family: var(--chvd-sans-display); font-size: 13.5px; text-align: left; cursor: pointer;
++}
++.ph-row > .cv-icon:first-child { color: var(--chvd-ink-soft); }
++.ph-row-l { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
++.ph-row-v { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); white-space: nowrap; }
++.ph-row:disabled { color: var(--chvd-ink-muted); cursor: default; }
++@keyframes ph-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
++@keyframes ph-fade { from { opacity: 0; } to { opacity: 1; } }
++
++/* Mode views on a phone: the rails fold into the strip / sheet; the page uses the full width. */
++html[data-shell="phone"] .mview-rails { display: none; }
++html[data-shell="phone"] .rdesk { padding: 12px 0 24px; }
++
++/* Pages & outline drawer and Arrange's Shelf: a sheet that rises from the bottom bar. */
++html[data-shell="phone"] .mdrawer,
++html[data-shell="phone"] .bench-shelf:not(.hidden) {
++    position: fixed; left: 0; right: 0; bottom: calc(var(--ph-nav) + env(safe-area-inset-bottom)); z-index: 40;
++    width: auto; height: 60dvh; max-height: calc(100% - 120px);
++    border: none; border-top: var(--chvd-stroke) solid var(--chvd-border); border-radius: 22px 22px 0 0;
++    box-shadow: 0 -10px 30px rgba(0, 0, 0, .14);
++    animation: ph-rise var(--chvd-base) var(--chvd-ease);
++}
++/* The Shelf rests as a 52 px peek above the bottom bar; a tap on it (or a swipe up) opens it. */
++html[data-shell="phone"] .bench-shelf:not(.hidden):not(.chvd-open) { height: 52px; overflow: hidden; padding-top: 22px; cursor: pointer; }
++html[data-shell="phone"] .bench-shelf:not(.hidden) { padding-top: 22px; }
++html[data-shell="phone"] .bench-shelf:not(.hidden)::before {
++    content: ""; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px;
++    border-radius: 2px; background: var(--chvd-border);
++}
++html[data-shell="phone"] .bench-shelf:not(.hidden):not(.chvd-open) > :not(.shelf-head) { visibility: hidden; }
++html[data-shell="phone"] .bench-desks { padding-bottom: 76px; }
++html[data-shell="phone"] .mdrawer-tabs { height: 48px; }
++html[data-shell="phone"] .mdrawer-x { min-width: 44px; min-height: 44px; justify-content: center; align-items: center; }
++html[data-shell="phone"] .mdrawer-body { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 18px; align-content: flex-start; }
++
++/* Settings cards (Text, Find & redact, Layers, Measure, Print…): bottom sheets above the strip. */
++html[data-shell="phone"] .fcards {
++    position: fixed; top: auto; left: 0; right: 0; bottom: calc(var(--ph-nav) + env(safe-area-inset-bottom)); z-index: 40;
++    max-height: 60dvh; gap: 0; overflow-y: auto;
++}
++html[data-shell="phone"] .ph-shell[data-mode="mark"] .fcards,
++html[data-shell="phone"] .ph-shell[data-mode="protect"] .fcards { bottom: var(--ph-strip); }
++html[data-shell="phone"] .fcard {
++    width: auto !important; border-radius: 22px 22px 0 0; border-left: none; border-right: none; border-bottom: none;
++    box-shadow: 0 -10px 30px rgba(0, 0, 0, .14); padding: 14px 16px;
++}
++html[data-shell="phone"] .fc-btn,
++html[data-shell="phone"] .fc-num,
++html[data-shell="phone"] .fc-in,
++html[data-shell="phone"] .fc-sel,
++html[data-shell="phone"] .fc-seg > button { min-height: 44px; }
++html[data-shell="phone"] .fcard-x { min-width: 44px; min-height: 44px; align-items: center; justify-content: center; }
++
++/* Messages: above the bottom bar (and strip). */
++html[data-shell="phone"] .msgs { left: 12px; right: 12px; bottom: calc(var(--ph-nav) + 12px + env(safe-area-inset-bottom)); align-items: stretch; }
++html[data-shell="phone"] .msg { max-width: none; }
++
++/* Command bar (still reachable from Find): full width under the app bar. */
++html[data-shell="phone"] .cmd { top: calc(var(--ph-bar) + env(safe-area-inset-top) + 8px); width: calc(100vw - 16px); }
++
++/* Arrange (12i): desks stack; each desk's pages scroll sideways; 58 × 82 cards; the header keeps
++   name · page count · ⋯ (everything else is in the ⋯ menu). */
++html[data-shell="phone"] .bench-main { flex-direction: column; }
++html[data-shell="phone"] .bench-desks { padding: 12px; gap: 12px; flex-direction: column; flex-wrap: nowrap; padding-bottom: 88px; }
++html[data-shell="phone"] .desk { flex: none; width: 100%; min-height: 0; border-radius: 12px; overflow: hidden; }
++html[data-shell="phone"] .desk-h { height: 46px; padding: 0 4px 0 14px; gap: 8px; }
++html[data-shell="phone"] .desk-swatch,
++html[data-shell="phone"] .desk-wm,
++html[data-shell="phone"] .desk-sel,
++html[data-shell="phone"] .desk-ord,
++html[data-shell="phone"] .desk-dup,
++html[data-shell="phone"] .desk-clear,
++html[data-shell="phone"] .desk-del,
++html[data-shell="phone"] .desk-foot { display: none; }
++html[data-shell="phone"] .desk-name { font-size: 17px; }
++html[data-shell="phone"] .desk-count { font-family: var(--chvd-mono); font-size: 10.5px; color: var(--chvd-ink-muted); }
++html[data-shell="phone"] .desk-more { width: 44px; height: 44px; }
++html[data-shell="phone"] .desk-drop {
++    display: flex; flex-wrap: nowrap; gap: 10px; padding: 2px 14px 14px; min-height: 0;
++    overflow-x: auto; overflow-y: hidden; scrollbar-width: none;
++}
++html[data-shell="phone"] .bpage { flex: none; width: 58px; }
++html[data-shell="phone"] .bthumb { width: 58px; }
++html[data-shell="phone"] .desk-add { min-height: 88px; }
++
++/* Immersive keeps only the page, as on desktop. */
++body.chvd-immersive .ph-bar,
++body.chvd-immersive .ph-strip,
++body.chvd-immersive .ph-nav,
++body.chvd-immersive .ph-fab { display: none !important; }
++
++@media (prefers-reduced-motion: reduce) {
++    .ph-sheet, .ph-scrim, html[data-shell="phone"] .mdrawer, html[data-shell="phone"] .bench-shelf { animation: none; }
++}
++/* Settings › Accessibility › Reduce motion is handled for everything by prefs.css. */
+diff --git a/src/ChuvadiReader.Ui/wwwroot/css/shell.css b/src/ChuvadiReader.Ui/wwwroot/css/shell.css
+index 987219c..88764b0 100644
+--- a/src/ChuvadiReader.Ui/wwwroot/css/shell.css
++++ b/src/ChuvadiReader.Ui/wwwroot/css/shell.css
+@@ -194,6 +194,9 @@
+ }
+ .sb-item { display: flex; align-items: center; gap: 6px; }
+ .statusbar .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--chvd-olive); }
++/* Web portal (design 12b, D-37): processed on the server → blue dot; lighter on the dark papers. */
++.statusbar .status-dot.server { background: #2c3e8c; }
++html[data-theme="dark"] .statusbar .status-dot.server { background: #8fa3e6; }
+ .sb-div { width: 0.5px; height: 12px; background: var(--chvd-border); flex: none; }
+ .sb-avatar {
+     width: 16px; height: 16px; border-radius: 50%; background: var(--chvd-binding); color: var(--chvd-on-accent);
+@@ -424,3 +427,14 @@ body.chvd-immersive .shell-body > .content { margin-left: 0; }
+ /* Immersive keeps its dark screen behind the page */
+ body.chvd-immersive .mview,
+ body.chvd-immersive .mview-canvas { background: #070a0c; }
++
++/* D-39 · WebKit (WKWebView, WebKitGTK, Safari) at 1×–1.25× drops 0.5px-wide boxes at fractional
++   positions, so these hairlines vanish; a 0.5px border always paints. Applied on non-Windows hosts
++   only — <html data-platform> is never set on Windows — so WebView2 output is unchanged (Chromium
++   paints the border variant differently at 125 % and 175 %, which is why it isn't global). */
++html[data-platform] .sb-div { width: 0; background: none; border-left: 0.5px solid var(--chvd-border); }
++html[data-platform] .pop-sep,
++html[data-platform] .lb-sep,
++html[data-platform] .rsepx,
++html[data-platform] .rtabs-msep,
++html[data-platform] .psi-or span { height: 0; background: none; border-top: 0.5px solid var(--chvd-border-soft); }
+diff --git a/src/ChuvadiReader.Ui/wwwroot/js/bench.js b/src/ChuvadiReader.Ui/wwwroot/js/bench.js
+index 197149b..a8ae8df 100644
+--- a/src/ChuvadiReader.Ui/wwwroot/js/bench.js
++++ b/src/ChuvadiReader.Ui/wwwroot/js/bench.js
+@@ -132,6 +132,12 @@ function showShelfPeek(sp) {
+ }
+ 
+ // Scroll the shelf to a page thumbnail and flash it (#25 search jump).
++// Tablet desk counter (D-46): bring desk n (0-based) into view.
++export function scrollDeskTo(index) {
++    const desk = document.querySelectorAll('.bench-desks > .desk')[index];
++    if (desk) desk.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
++}
++
+ export function scrollShelfTo(srcIndex, pageIndex) {
+     if (!root) return;
+     const el = root.querySelector(`[data-shelf="${srcIndex}:${pageIndex}"]`);
+diff --git a/src/ChuvadiReader.Ui/wwwroot/js/mobile.js b/src/ChuvadiReader.Ui/wwwroot/js/mobile.js
+new file mode 100644
+index 0000000..e9f8237
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/wwwroot/js/mobile.js
+@@ -0,0 +1,264 @@
++// Touch for the tablet and phone shells (Portal & Android 12d-12j). Loaded by TouchSupport.razor and
++// PhoneShell.razor only when <html data-shell> is "tablet" or "phone"; never on desktop or portal.
++//
++// It translates touch into what the desktop code already understands, so reader.js and bench.js
++// stay unchanged:
++//   * two-finger pinch on the page desk → Ctrl + wheel, which reader.js turns into its own
++//     cursor-anchored zoom (the same path as a trackpad pinch)
++//   * double-tap on the page → Fit width ⇄ Fit page (Read mode; .NET decides)
++//   * horizontal swipe when the page has no sideways overflow → next / previous page (Read mode)
++//   * tap on the canvas → shows the per-page strip for a few seconds (desktop shows it on hover)
++//   * Arrange: long-press a page (or a shelf page) to drag it; a quick swipe scrolls instead.
++
++let net = null;          // DotNetObjectReference<TouchSupport>
++let attached = false;
++const touches = new Map();   // pointerId → {x, y}
++let pinch = null;            // {dist, desk}
++let tap = null;              // {x, y, t, id, moved}
++let lastTap = null;          // {x, y, t}
++let stripTimer = null;
++let press = null;            // Arrange long-press state
++let guardMove = null;
++
++const DOUBLE_TAP_MS = 300;
++const TAP_SLOP = 10;
++const SWIPE_MIN = 60;
++const LONG_PRESS_MS = 450;
++const ZOOM_K = 0.0015;       // reader.js: next = old * exp(-deltaY * 0.0015)
++
++export function initTouch(dotnetRef) {
++    net = dotnetRef || net;
++    if (attached) return;
++    attached = true;
++    document.addEventListener('pointerdown', onDown, true);
++    document.addEventListener('pointermove', onMove, true);
++    document.addEventListener('pointerup', onUp, true);
++    document.addEventListener('pointercancel', onCancel, true);
++    document.addEventListener('contextmenu', onContextMenu, true);
++}
++
++export function disposeTouch() {
++    if (!attached) return;
++    attached = false;
++    document.removeEventListener('pointerdown', onDown, true);
++    document.removeEventListener('pointermove', onMove, true);
++    document.removeEventListener('pointerup', onUp, true);
++    document.removeEventListener('pointercancel', onCancel, true);
++    document.removeEventListener('contextmenu', onContextMenu, true);
++    endPress();
++    touches.clear();
++    pinch = null; tap = null; lastTap = null;
++    clearTimeout(stripTimer);
++}
++
++function isTouch(e) { return e.pointerType === 'touch'; }
++
++function deskOf(el) { return el && el.closest ? el.closest('.rdesk') : null; }
++
++function interactive(el) {
++    return !!(el && el.closest && el.closest('button, input, select, textarea, a, [contenteditable], .mk-layer, .fcards, .pstrip, .mdrawer'));
++}
++
++// ── pointer routing ─────────────────────────────────────────────────────────
++function onDown(e) {
++    if (!isTouch(e) || e.__chvdSynthetic) return;
++    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
++
++    if (touches.size === 2) {
++        const desk = deskOf(e.target);
++        if (desk) {
++            const [a, b] = [...touches.values()];
++            pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), desk };
++            tap = null;
++            cancelPress();
++        }
++        return;
++    }
++
++    if (touches.size === 1 && beginPress(e)) return;
++
++    tap = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, moved: false, target: e.target };
++}
++
++function onMove(e) {
++    if (!isTouch(e) || !touches.has(e.pointerId)) return;
++    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
++
++    if (press && !press.armed && e.pointerId === press.id) {
++        if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > TAP_SLOP) cancelPress();  // a swipe: let it scroll
++    }
++
++    if (pinch && touches.size >= 2) {
++        const [a, b] = [...touches.values()];
++        const dist = Math.hypot(a.x - b.x, a.y - b.y);
++        if (pinch.dist > 0 && dist > 0) {
++            const ratio = dist / pinch.dist;
++            if (Math.abs(ratio - 1) > 0.01) {
++                const deltaY = -Math.log(ratio) / ZOOM_K;
++                pinch.desk.dispatchEvent(new WheelEvent('wheel', {
++                    bubbles: true, cancelable: true, ctrlKey: true, deltaY,
++                    clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2,
++                }));
++                pinch.dist = dist;
++            }
++        }
++        e.preventDefault();
++        return;
++    }
++
++    if (tap && tap.id === e.pointerId && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > TAP_SLOP) tap.moved = true;
++}
++
++function onUp(e) {
++    if (!isTouch(e) || e.__chvdSynthetic) return;
++    touches.delete(e.pointerId);
++    if (pinch) {
++        if (touches.size < 2) pinch = null;
++        tap = null;
++        return;
++    }
++
++    if (press && e.pointerId === press.id) {
++        if (!press.armed) {
++            // A quick tap on a page: hand bench.js the press it never saw, so it selects the page
++            // exactly as a click does (its pointerup listener runs after this one).
++            replayDown(press);
++            cancelPress();
++        } else {
++            endPress();
++        }
++        return;
++    }
++
++    const t = tap;
++    tap = null;
++    if (!t || t.id !== e.pointerId) return;
++    const dx = e.clientX - t.x, dy = e.clientY - t.y;
++    const desk = deskOf(t.target);
++
++    if (t.moved) {
++        const sh = t.target.closest ? t.target.closest('.bench-shelf') : null;
++        if (sh && document.documentElement.getAttribute('data-shell') === 'phone' && Math.abs(dy) > SWIPE_MIN && Math.abs(dy) > 2 * Math.abs(dx)) {
++            // Swipe up on the peek opens the Shelf; swipe down on its header closes it.
++            if (dy < 0) sh.classList.add('chvd-open');
++            else if (t.target.closest('.shelf-head') || sh.scrollTop <= 0) sh.classList.remove('chvd-open');
++            return;
++        }
++        // Swipe paging: horizontal, fast enough, and the page isn't wider than the view.
++        if (desk && Math.abs(dx) > SWIPE_MIN && Math.abs(dx) > 2 * Math.abs(dy)
++            && performance.now() - t.t < 600 && desk.scrollWidth <= desk.clientWidth + 1) {
++            call('OnSwipe', dx < 0 ? 1 : -1);
++        }
++        return;
++    }
++
++    // Arrange on a phone: the Shelf rests as a peek; a tap on its header (or the peek) opens it.
++    const shelf = t.target.closest ? t.target.closest('.bench-shelf') : null;
++    if (shelf && document.documentElement.getAttribute('data-shell') === 'phone'
++        && (!shelf.classList.contains('chvd-open') || t.target.closest('.shelf-head'))) {
++        shelf.classList.toggle('chvd-open');
++        return;
++    }
++    if (interactive(t.target)) return;
++    const now = performance.now();
++    if (desk && lastTap && now - lastTap.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
++        lastTap = null;
++        call('OnDoubleTap');
++        return;
++    }
++    lastTap = { x: e.clientX, y: e.clientY, t: now };
++    showStrip(t.target);
++}
++
++function onCancel(e) {
++    if (!isTouch(e)) return;
++    touches.delete(e.pointerId);
++    if (touches.size < 2) pinch = null;
++    if (tap && tap.id === e.pointerId) tap = null;
++    if (press && e.pointerId === press.id && !press.armed) cancelPress();
++}
++
++function onContextMenu(e) {
++    // Android shows a context menu / text selection on long-press; not on a page being dragged.
++    if (press && press.armed) e.preventDefault();
++}
++
++function call(method, arg) {
++    if (!net) return;
++    try { arg === undefined ? net.invokeMethodAsync(method) : net.invokeMethodAsync(method, arg); } catch { /* circuit gone */ }
++}
++
++// ── per-page strip: tap shows it (hover on desktop) ─────────────────────────
++function showStrip(target) {
++    const canvas = target && target.closest ? target.closest('.mview-canvas') : null;
++    if (!canvas) return;
++    canvas.classList.add('chvd-strip-on');
++    clearTimeout(stripTimer);
++    stripTimer = setTimeout(() => canvas.classList.remove('chvd-strip-on'), 4000);
++}
++
++// ── Arrange: long-press to drag ─────────────────────────────────────────────
++function beginPress(e) {
++    const card = e.target.closest ? e.target.closest('[data-bench-id], [data-shelf], [data-shelf-all]') : null;
++    if (!card || e.target.closest('button') || e.target.closest('input')) return false;
++    // bench.js would start its press now; hold it back until we know this isn't a scroll.
++    e.stopPropagation();
++    press = { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target, armed: false, timer: 0 };
++    press.timer = setTimeout(armPress, LONG_PRESS_MS);
++    return true;
++}
++
++function armPress() {
++    if (!press) return;
++    press.armed = true;
++    try { navigator.vibrate && navigator.vibrate(12); } catch { /* not allowed */ }
++    // From here on a moving finger drags the page, not the desks: stop the browser panning.
++    guardMove = (ev) => { if (ev.cancelable) ev.preventDefault(); };
++    document.addEventListener('touchmove', guardMove, { passive: false, capture: true });
++    replayDown(press);
++}
++
++function replayDown(p) {
++    const ev = new PointerEvent('pointerdown', {
++        bubbles: true, cancelable: true, composed: true,
++        pointerId: p.id, pointerType: 'touch', isPrimary: true, button: 0, buttons: 1,
++        clientX: p.x, clientY: p.y,
++    });
++    ev.__chvdSynthetic = true;
++    p.target.dispatchEvent(ev);
++}
++
++function cancelPress() {
++    if (!press) return;
++    clearTimeout(press.timer);
++    press = null;
++}
++
++function endPress() {
++    cancelPress();
++    if (guardMove) {
++        document.removeEventListener('touchmove', guardMove, { capture: true });
++        guardMove = null;
++    }
++}
++
++// ── orientation (phone View sheet: "Two-page · landscape only") ──────────────
++let orientRef = null;
++let orientHandler = null;
++
++export function watchOrientation(dotnetRef) {
++    orientRef = dotnetRef;
++    if (orientHandler) window.removeEventListener('resize', orientHandler);
++    orientHandler = () => {
++        if (!orientRef) return;
++        try { orientRef.invokeMethodAsync('SetLandscape', window.innerWidth > window.innerHeight); } catch { /* gone */ }
++    };
++    window.addEventListener('resize', orientHandler);
++    orientHandler();
++}
++
++export function unwatchOrientation() {
++    if (orientHandler) window.removeEventListener('resize', orientHandler);
++    orientHandler = null;
++    orientRef = null;
++}
+diff --git a/src/ChuvadiReader.Ui/wwwroot/js/reader.js b/src/ChuvadiReader.Ui/wwwroot/js/reader.js
+index b925dd4..0716aec 100644
+--- a/src/ChuvadiReader.Ui/wwwroot/js/reader.js
++++ b/src/ChuvadiReader.Ui/wwwroot/js/reader.js
+@@ -31,6 +31,7 @@ let currentTool = 'none';
+ let wheelHandler = null;
+ let deskPointer = null;
+ let panning = null;
++let penSplit = null;
+ let marq = null;
+ let marqEl = null;
+ let loupeEl = null;
+@@ -317,6 +318,21 @@ function setupViewTools(deskEl) {
+     deskRef.addEventListener('pointerup', deskPointer.up);
+     deskRef.addEventListener('pointerleave', deskPointer.leave);
+ 
++    // Tablets with a pen (<html data-input~="pen">, design 12e, D-42): the pen draws on the Mark
++    // layer, a finger pans. A finger on a Mark layer never reaches its (Blazor) stroke handler and
++    // pans the desk instead. data-input is absent on Windows, so nothing changes there.
++    if (penSplit) deskRef.removeEventListener('pointerdown', penSplit, true);
++    penSplit = (e) => {
++        if (e.pointerType !== 'touch') return;
++        if (!/(^|\s)pen(\s|$)/.test(document.documentElement.getAttribute('data-input') || '')) return;
++        const layer = e.target && e.target.closest ? e.target.closest('.mk-layer') : null;
++        if (!layer) return;
++        e.stopPropagation();
++        panning = { x: e.clientX, y: e.clientY, sl: deskRef.scrollLeft, st: deskRef.scrollTop };
++        try { deskRef.setPointerCapture(e.pointerId); } catch (_) { }
++    };
++    deskRef.addEventListener('pointerdown', penSplit, true);
++
+     // Touchscreen: two-finger pinch zooms the page canvas only (chrome never moves);
+     // double-tap toggles a readable zoom. One finger is left alone for native panning.
+     if (touchHandlers) {
+@@ -702,6 +718,7 @@ export function dispose() {
+         deskRef.removeEventListener('pointerup', deskPointer.up);
+         deskRef.removeEventListener('pointerleave', deskPointer.leave);
+     }
++    if (deskRef && penSplit) deskRef.removeEventListener('pointerdown', penSplit, true);
+     if (deskRef && touchHandlers) {
+         deskRef.removeEventListener('touchstart', touchHandlers.start);
+         deskRef.removeEventListener('touchmove', touchHandlers.move);
+@@ -714,7 +731,7 @@ export function dispose() {
+     if (zoomNotifyTimer) { clearTimeout(zoomNotifyTimer); zoomNotifyTimer = 0; }
+     removeMarqEl(); hideLoupe();
+     document.body.classList.remove('chvd-immersive');
+-    wheelHandler = null; deskPointer = null; panning = null; marq = null;
++    wheelHandler = null; deskPointer = null; penSplit = null; panning = null; marq = null;
+     touchHandlers = null; pinch = null; pinchActive = false; tapCand = null; sawPinch = false;
+     deskRef = null; currentTool = 'none';
+ }
+diff --git a/tests/ChuvadiReader.Hosting.Tests/HostingTests.cs b/tests/ChuvadiReader.Hosting.Tests/HostingTests.cs
+index 68a4833..f6adf60 100644
+--- a/tests/ChuvadiReader.Hosting.Tests/HostingTests.cs
++++ b/tests/ChuvadiReader.Hosting.Tests/HostingTests.cs
+@@ -96,6 +96,25 @@ public sealed class HostingTests
+         Assert.True(missing.Count == 0, "Registered by Windows but not by the kit: " + string.Join(", ", missing));
+     }
+ 
++    /// <summary>D-48: restoring the saved tab set never shows the same file twice.</summary>
++    [Fact]
++    public async Task Restore_never_duplicates_a_tab()
++    {
++        var services = new ServiceCollection();
++        services.AddChuvadiReader(AppStateLifetime.Process);
++        var storage = new MemoryStorage();
++        await storage.SetAsync("tabs", """
++            [{"Path":"/nowhere/a.pdf","FileName":"a.pdf"},{"Path":"/NOWHERE/A.pdf","FileName":"A.pdf"},{"Path":"/nowhere/b.pdf","FileName":"b.pdf"}]
++            """);
++        services.AddSingleton<IAppStorage>(storage);
++        using var sp = services.BuildServiceProvider();
++        var tabs = sp.GetRequiredService<TabsService>();
++
++        await tabs.RestoreAsync();
++
++        Assert.Equal(["a.pdf", "b.pdf"], tabs.Tabs.Select(t => t.FileName));
++    }
++
+     [Theory]
+     [InlineData("Ctrl P", "⌘P")]
+     [InlineData("Ctrl Shift S", "⇧⌘S")]
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/ChuvadiReader.MobileUi.Preview.csproj b/tests/ChuvadiReader.MobileUi.Preview/ChuvadiReader.MobileUi.Preview.csproj
+new file mode 100644
+index 0000000..278e0f2
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Preview/ChuvadiReader.MobileUi.Preview.csproj
+@@ -0,0 +1,19 @@
++<Project Sdk="Microsoft.NET.Sdk.Web">
++  <!--
++    TESTING ONLY — never shipped, never referenced by a host. A Blazor Server page that renders the
++    shared Ui at phone / tablet / desktop layouts so the Mobile app UI chat can screenshot it in a
++    headless browser and compare it with the design handout (Portal & Android 12d-12j).
++    It uses only what ships with .NET (Kestrel, Blazor Server). Run it through
++    tools/mobile-ui/preview.sh, which applies the proposed MainLayout hooks in a scratch copy first.
++  -->
++  <PropertyGroup>
++    <TargetFramework>net10.0</TargetFramework>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
++    <IsPackable>false</IsPackable>
++  </PropertyGroup>
++  <ItemGroup>
++    <ProjectReference Include="..\..\src\ChuvadiReader.Hosting\ChuvadiReader.Hosting.csproj" />
++  </ItemGroup>
++</Project>
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/Components/HostPage.razor b/tests/ChuvadiReader.MobileUi.Preview/Components/HostPage.razor
+new file mode 100644
+index 0000000..0cc0130
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Preview/Components/HostPage.razor
+@@ -0,0 +1,25 @@
++@* TESTING ONLY: the document the preview serves. Same stylesheets and order as the Windows host's
++   index.html, plus css/mobile.css (which the Android host links the same way). *@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="utf-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
++    <base href="/" />
++    <link rel="icon" href="data:," />
++    <style>html, body { margin: 0; background: #F2EAD6; }</style>
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/fonts/google/fonts.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/lipi-sans/lipi-sans.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/tokens.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/app.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/shell.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/prefs.css" />
++    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/mobile.css" />
++    <link rel="stylesheet" href="ChuvadiReader.MobileUi.Preview.styles.css" />
++</head>
++<body>
++    <ChuvadiReader.Ui.App @rendermode="InteractiveServer" />
++    <script src="_content/ChuvadiReader.Ui/js/theme.js"></script>
++    <script src="_framework/blazor.web.js"></script>
++</body>
++</html>
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/Components/_Imports.razor b/tests/ChuvadiReader.MobileUi.Preview/Components/_Imports.razor
+new file mode 100644
+index 0000000..276be38
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Preview/Components/_Imports.razor
+@@ -0,0 +1,2 @@
++@using Microsoft.AspNetCore.Components.Web
++@using static Microsoft.AspNetCore.Components.Web.RenderMode
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs b/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs
+new file mode 100644
+index 0000000..9957ac6
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Preview/PreviewServices.cs
+@@ -0,0 +1,115 @@
++using System.Collections.Concurrent;
++using Chuvadi.Pdf.Authoring;
++using Chuvadi.Pdf.Graphics;
++using ChuvadiReader.Core.Reader;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Hosting;
++using ChuvadiReader.Platform;
++using Path = System.IO.Path;
++
++namespace ChuvadiReader.MobileUi.Preview;
++
++/// <summary>Platform facts for the preview: Android phone / tablet, or Windows desktop.</summary>
++public sealed class PreviewPlatform(FormFactor formFactor) : IPlatformInfo
++{
++    public PlatformKind Kind => formFactor == FormFactor.Desktop ? PlatformKind.Windows : PlatformKind.Android;
++
++    public FormFactor FormFactor => formFactor;
++
++    public event Action? FormFactorChanged { add { } remove { } }
++
++    public InputKinds Input => formFactor == FormFactor.Desktop
++        ? InputKinds.Mouse | InputKinds.Keyboard
++        : InputKinds.Touch;
++
++    public ShellChrome Chrome => formFactor == FormFactor.Desktop
++        ? new ShellChrome(WindowButtons.Right, false, false, true, 0)
++        : new ShellChrome(WindowButtons.None, false, false, false, 0);
++
++    public PlatformCapabilities Capabilities => FixedPlatformInfo.DesktopCapabilities;
++
++    public IKeyLabels Keys { get; } = new CtrlKeyLabels();
++}
++
++public sealed class MemoryStorage : IAppStorage
++{
++    private readonly ConcurrentDictionary<string, string> _values = new();
++
++    public Task<string?> GetAsync(string key, CancellationToken ct = default) =>
++        Task.FromResult(_values.TryGetValue(key, out var v) ? v : null);
++
++    public Task SetAsync(string key, string value, CancellationToken ct = default)
++    {
++        _values[key] = value;
++        return Task.CompletedTask;
++    }
++}
++
++/// <summary>"Open" hands back a fresh fixture document; save pickers write to the temp folder.</summary>
++public sealed class FixturePicker : IFilePicker
++{
++    private int _n;
++
++    public Task<string?> PickDocumentAsync(CancellationToken ct = default) =>
++        Task.FromResult<string?>(Fixtures.Document($"opened-{Interlocked.Increment(ref _n)}.pdf", 3));
++
++    public Task<IReadOnlyList<string>> PickDocumentsAsync(CancellationToken ct = default) =>
++        Task.FromResult<IReadOnlyList<string>>(new[] { Fixtures.Document($"opened-{Interlocked.Increment(ref _n)}.pdf", 3) });
++
++    public Task<string?> PickSavePdfAsync(string suggestedName, CancellationToken ct = default) =>
++        Task.FromResult<string?>(Path.Combine(Fixtures.Folder, "saved-" + suggestedName));
++
++    public Task<string?> PickSaveSessionAsync(string suggestedName, CancellationToken ct = default) =>
++        Task.FromResult<string?>(Path.Combine(Fixtures.Folder, suggestedName));
++
++    public Task<string?> PickOpenSessionAsync(CancellationToken ct = default) => Task.FromResult<string?>(null);
++
++    public Task<string?> PickSaveImageAsync(string suggestedName, CancellationToken ct = default) =>
++        Task.FromResult<string?>(Path.Combine(Fixtures.Folder, suggestedName));
++
++    public Task<string?> PickFolderAsync(CancellationToken ct = default) => Task.FromResult<string?>(Fixtures.Folder);
++
++    public Task<IReadOnlyList<string>> PickImagesAsync(CancellationToken ct = default) =>
++        Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
++}
++
++public sealed class NoClipboard : IImageClipboard, IClipboard
++{
++    public bool CanCopyText => true;
++
++    public bool CanCopyImage => true;
++
++    public Task SetTextAsync(string text, CancellationToken ct = default) => Task.CompletedTask;
++
++    public Task SetImageAsync(byte[] pngBytes, CancellationToken ct = default) => Task.CompletedTask;
++}
++
++/// <summary>Fixture PDFs authored in code with chuvadi-pdf (no binary files), like the Reader tests.</summary>
++public static class Fixtures
++{
++    public static readonly string Folder = Directory.CreateTempSubdirectory("chvd-mobile-preview-").FullName;
++
++    public static string Document(string name, int pages)
++    {
++        var b = PdfDocumentBuilder.Create();
++        var widths = new[] { 1.0, .96, 1.0, .88, 1.0, .72, 1.0, .94, 1.0, .60, 1.0, .90, 1.0, .80 };
++        for (var p = 1; p <= pages; p++)
++        {
++            const double w = 595, h = 842;
++            var pb = b.AddPage(new PageSize(w, h));
++            pb.DrawRectangle(0, 0, w, h, Color.FromHex("#FFFFFF"), Color.FromHex("#FFFFFF"), 0);
++            pb.DrawText(p == 1 ? "Discharge summary" : $"Page {p}", 60, 90, "Helvetica-Bold", 22, Color.FromHex("#1A1310"));
++            var y = h - 140;
++            for (var i = 0; i < widths.Length * 2; i++)
++            {
++                var lw = (w - 120) * widths[i % widths.Length];
++                pb.DrawRectangle(60, y, lw, 6, Color.FromHex("#EBE8E2"), Color.FromHex("#EBE8E2"), 0);
++                y -= 22;
++            }
++        }
++
++        var path = Path.Combine(Folder, name);
++        File.WriteAllBytes(path, b.ToByteArray());
++        return path;
++    }
++}
+diff --git a/tests/ChuvadiReader.MobileUi.Preview/Program.cs b/tests/ChuvadiReader.MobileUi.Preview/Program.cs
+new file mode 100644
+index 0000000..27e4646
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Preview/Program.cs
+@@ -0,0 +1,43 @@
++using ChuvadiReader.Core.Documents;
++using ChuvadiReader.Core.Reader;
++using ChuvadiReader.Core.Storage;
++using ChuvadiReader.Hosting;
++using ChuvadiReader.MobileUi.Preview;
++using ChuvadiReader.Platform;
++
++// TESTING ONLY. CHVD_FF = phone | tablet | desktop (default phone). Desktop reports Windows so the
++// desktop chrome renders exactly as the WPF host shows it; phone and tablet report Android.
++var ff = (Environment.GetEnvironmentVariable("CHVD_FF") ?? "phone").ToLowerInvariant() switch
++{
++    "tablet" => FormFactor.Tablet,
++    "desktop" => FormFactor.Desktop,
++    _ => FormFactor.Phone,
++};
++
++var builder = WebApplication.CreateBuilder(args);
++builder.Services.AddRazorComponents().AddInteractiveServerComponents();
++builder.Services.AddChuvadiReader(AppStateLifetime.Process);
++builder.Services.AddSingleton<IAppStorage, MemoryStorage>();
++builder.Services.AddSingleton<IFilePicker, FixturePicker>();
++builder.Services.AddSingleton<IImageClipboard, NoClipboard>();
++builder.Services.AddSingleton<IClipboard, NoClipboard>();
++builder.Services.AddSingleton<IPlatformInfo>(new PreviewPlatform(ff));
++
++var app = builder.Build();
++app.UseAntiforgery();
++app.MapStaticAssets();
++app.MapRazorComponents<ChuvadiReader.MobileUi.Preview.Components.HostPage>()
++   .AddInteractiveServerRenderMode()
++   .AddAdditionalAssemblies(typeof(ChuvadiReader.Ui.App).Assembly);
++
++// Two documents open, like 12g ("1 of 2 tabs" here; the frame shows 4).
++var tabs = app.Services.GetRequiredService<TabsService>();
++var shell = app.Services.GetRequiredService<ShellService>();
++await tabs.RestoreAsync();   // as Dashboard/Reader do first, so the fixtures aren't added twice
++var a = Fixtures.Document("discharge-summary.pdf", 13);
++var b = Fixtures.Document("lab-report.pdf", 4);
++await tabs.OpenAsync(b, Path.GetFileName(b), DocumentFormat.Pdf);
++var first = await tabs.OpenAsync(a, Path.GetFileName(a), DocumentFormat.Pdf);
++shell.SetMode(DocMode.Read, first.Id);
++
++app.Run();
+diff --git a/tests/ChuvadiReader.MobileUi.Tests/ChuvadiReader.MobileUi.Tests.csproj b/tests/ChuvadiReader.MobileUi.Tests/ChuvadiReader.MobileUi.Tests.csproj
+new file mode 100644
+index 0000000..ece1847
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Tests/ChuvadiReader.MobileUi.Tests.csproj
+@@ -0,0 +1,23 @@
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <TargetFramework>net10.0</TargetFramework>
++    <IsPackable>false</IsPackable>
++    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++  </PropertyGroup>
++  <ItemGroup>
++    <!-- Test-only tooling, same versions as tests/ChuvadiReader.Tests. Never shipped. -->
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
++    <PackageReference Include="xunit" Version="2.9.2" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
++  </ItemGroup>
++  <ItemGroup>
++    <ProjectReference Include="..\..\src\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
++  </ItemGroup>
++  <ItemGroup>
++    <!-- The mode views' command registrations, read as text by the contract test. -->
++    <None Include="..\..\src\ChuvadiReader.Ui\Pages\*.Shell.cs" LinkBase="ShellSources" CopyToOutputDirectory="PreserveNewest" />
++    <None Include="..\..\src\ChuvadiReader.Ui\wwwroot\css\mobile.css" Link="mobile.css.txt" CopyToOutputDirectory="PreserveNewest" />
++  </ItemGroup>
++</Project>
+diff --git a/tests/ChuvadiReader.MobileUi.Tests/PhoneContractTests.cs b/tests/ChuvadiReader.MobileUi.Tests/PhoneContractTests.cs
+new file mode 100644
+index 0000000..4da57ad
+--- /dev/null
++++ b/tests/ChuvadiReader.MobileUi.Tests/PhoneContractTests.cs
+@@ -0,0 +1,71 @@
++using System.Text.RegularExpressions;
++using ChuvadiReader.Ui.Components.Platform.Phone;
++using Xunit;
++
++namespace ChuvadiReader.MobileUi.Tests;
++
++/// <summary>
++/// The phone chrome runs the commands the mode views register with ShellService, by id. If a mode
++/// view renames or drops one, the strip / sheet / FAB would silently lose it — these tests fail
++/// instead. They read the registrations as text, like the Foundation's drift test.
++/// </summary>
++public class PhoneContractTests
++{
++    private static string Sources()
++    {
++        var dir = Path.Combine(AppContext.BaseDirectory, "ShellSources");
++        return string.Join('\n', Directory.GetFiles(dir, "*.Shell.cs").Select(File.ReadAllText));
++    }
++
++    [Fact]
++    public void Every_command_id_the_phone_uses_is_registered_by_a_mode_view()
++    {
++        var src = Sources();
++        var missing = PhoneCommands.AllIds
++            .Where(id => !src.Contains($"\"{id}\"", StringComparison.Ordinal)
++                         && !(id.StartsWith("m.", StringComparison.Ordinal) && MarkLoopRegisters(src, id)))
++            .ToList();
++        Assert.Empty(missing);
++    }
++
++    // Reader.Shell.cs registers the drawing tools in a loop: new("m." + t, …) over ("text", …), ("rect", …) …
++    private static bool MarkLoopRegisters(string src, string id) =>
++        src.Contains("\"m.\" + t", StringComparison.Ordinal)
++        && src.Contains($"(\"{id[2..]}\",", StringComparison.Ordinal);
++
++    [Fact]
++    public void Strip_and_sheet_match_the_design_frames()
++    {
++        Assert.Equal(new[] { "Text", "Mark", "Note", "Image", "Box", "Draw", "Sign" }, PhoneCommands.Mark.Select(i => i.Label));
++        Assert.Equal(new[] { "Box", "Find", "Stamp", "Flatten", "Lock", "Sign" }, PhoneCommands.Protect.Select(i => i.Label));
++        Assert.Equal(new[] { "Fit width", "Fit page", "Two-page", "Rotate view", "Loupe" }, PhoneCommands.View.Select(r => r.Label));
++    }
++
++    [Fact]
++    public void Every_mobile_rule_is_scoped_to_the_tablet_or_phone_layout()
++    {
++        // Desktop and portal must be untouched: every selector in mobile.css is keyed on
++        // html[data-shell="tablet|phone"], targets the phone shell's own .ph-* classes, or is
++        // the shared immersive/keyframe/reduced-motion boilerplate for those classes.
++        var css = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "mobile.css.txt"));
++        css = Regex.Replace(css, @"/\*.*?\*/", "", RegexOptions.Singleline);
++        css = Regex.Replace(css, @"@keyframes[^{]+\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}", "");
++        css = Regex.Replace(css, @"@media[^{]+\{", "");
++        var bad = new List<string>();
++        foreach (Match m in Regex.Matches(css, @"([^{}]+)\{[^{}]*\}"))
++        {
++            foreach (var raw in m.Groups[1].Value.Split(','))
++            {
++                var sel = raw.Trim();
++                if (sel.Length == 0) continue;
++                var ok = sel.StartsWith("html[data-shell=\"tablet\"]", StringComparison.Ordinal)
++                         || sel.StartsWith("html[data-shell=\"phone\"]", StringComparison.Ordinal)
++                         || sel.StartsWith(".ph-", StringComparison.Ordinal)
++                         || (sel.StartsWith("body.chvd-immersive .ph-", StringComparison.Ordinal));
++                if (!ok) bad.Add(sel);
++            }
++        }
++
++        Assert.Empty(bad);
++    }
++}
+diff --git a/tests/ChuvadiReader.WebUi.Tests/ChuvadiReader.WebUi.Tests.csproj b/tests/ChuvadiReader.WebUi.Tests/ChuvadiReader.WebUi.Tests.csproj
+new file mode 100644
+index 0000000..f28f3de
+--- /dev/null
++++ b/tests/ChuvadiReader.WebUi.Tests/ChuvadiReader.WebUi.Tests.csproj
+@@ -0,0 +1,18 @@
++<Project Sdk="Microsoft.NET.Sdk">
++  <PropertyGroup>
++    <TargetFramework>net10.0</TargetFramework>
++    <IsPackable>false</IsPackable>
++    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
++    <Nullable>enable</Nullable>
++    <ImplicitUsings>enable</ImplicitUsings>
++  </PropertyGroup>
++  <ItemGroup>
++    <!-- Test-only tooling, same versions as the other test projects. Never shipped. -->
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
++    <PackageReference Include="xunit" Version="2.9.2" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
++  </ItemGroup>
++  <ItemGroup>
++    <ProjectReference Include="..\..\src\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
++  </ItemGroup>
++</Project>
+diff --git a/tests/ChuvadiReader.WebUi.Tests/PortalTextTests.cs b/tests/ChuvadiReader.WebUi.Tests/PortalTextTests.cs
+new file mode 100644
+index 0000000..c71b530
+--- /dev/null
++++ b/tests/ChuvadiReader.WebUi.Tests/PortalTextTests.cs
+@@ -0,0 +1,52 @@
++using ChuvadiReader.Ui.Components.Platform.Portal;
++using Xunit;
++
++namespace ChuvadiReader.WebUi.Tests;
++
++public class AccountTextTests
++{
++    [Theory]
++    [InlineData("Arun S.", "AS")]
++    [InlineData("arun shiva balasubramanian", "AB")]
++    [InlineData("Arun", "A")]
++    [InlineData("  Arun   S.  ", "AS")]
++    [InlineData("", "?")]
++    [InlineData(null, "?")]
++    [InlineData("(Records) Arun", "A")]
++    public void Initials(string? name, string expected) => Assert.Equal(expected, AccountText.Initials(name));
++
++    [Theory]
++    [InlineData("Arun S.", "Arun")]
++    [InlineData("Arun", "Arun")]
++    [InlineData("   ", "")]
++    [InlineData(null, "")]
++    public void FirstName(string? name, string expected) => Assert.Equal(expected, AccountText.FirstName(name));
++}
++
++public class PortalCredentialsTests
++{
++    [Fact]
++    public void ToString_never_contains_the_password()
++    {
++        var c = new PortalCredentials("arun.s@smh.sangam", "hunter2-secret");
++        Assert.DoesNotContain("hunter2-secret", c.ToString());
++        Assert.Contains("arun.s@smh.sangam", c.ToString());
++    }
++
++    [Fact]
++    public void Sangam_id_is_passed_as_typed()
++    {
++        var c = new PortalCredentials("  Arun.S@SMH.sangam ", "x");
++        Assert.Equal("  Arun.S@SMH.sangam ", c.SangamId);
++    }
++}
++
++public class GatingRowsTests
++{
++    [Fact]
++    public void Release1_list_has_no_sharing_row()
++    {
++        Assert.DoesNotContain(SangamGatingRow.Release1, r => r.Text.Contains("Share", StringComparison.OrdinalIgnoreCase));
++        Assert.Equal(7, SangamGatingRow.Release1.Count);
++    }
++}

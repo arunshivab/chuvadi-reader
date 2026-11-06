@@ -1,3 +1,4 @@
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 @*
     One button on a D-10 rail (Tools, View or Arrange). Icons only until the rail is hovered;
     then the label and shortcut show. Unbuilt features pass DisabledReason: the button is
@@ -9,7 +10,7 @@
         @onclick="OnClick">
     <Icon Name="@Icon" Size="@Size" />
     <span class="rb-l">@Label</span>
-    <span class="rb-k">@(DisabledReason is not null ? "soon" : Keys)</span>
+    <span class="rb-k">@(DisabledReason is not null ? "soon" : ShownKeys)</span>
 </button>
 
 @code {
@@ -27,5 +28,7 @@
 
     private string Tip => DisabledReason is not null
         ? $"{Label} — {DisabledReason}"
-        : string.IsNullOrEmpty(Keys) ? Label : $"{Label} ({Keys})";
+        : string.IsNullOrEmpty(Keys) ? Label : $"{Label} ({ShownKeys})";
+
+    private string? ShownKeys => string.IsNullOrEmpty(Keys) ? Keys : Platform.Keys.Format(Keys);
 }

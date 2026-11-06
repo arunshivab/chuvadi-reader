@@ -9,6 +9,7 @@
 @inject NavigationManager Nav
 @inject IEntitlements Entitlements
 @inject IJSRuntime JS
+@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
 
 <div class="redact-root mview">
     <div class="rd-col">
@@ -582,6 +583,7 @@
             var boxesArg = boxesByPage.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<NormBox>)kv.Value);
 
             await RedactSvc.ApplyAsync(_path, output!, boxesArg, patterns, _glyphOnly, _color, padding: 1.5);
+            await WriteBack.DeliverOrThrowAsync(output);
             _savedPath = output;
             _status = $"Saved → {System.IO.Path.GetFileName(output)}";
             _statusErr = false;

@@ -4,6 +4,7 @@
 @inject TabsService Tabs
 @inject OpenDocumentService OpenDoc
 @inject NavigationManager Nav
+@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
 
 <PageTitle>Chuvadi · Merge</PageTitle>
 
@@ -137,6 +138,7 @@
         try
         {
             await Tools.MergeAsync(_entries.Select(e => e.Path).ToList(), outPath);
+            await WriteBack.DeliverOrThrowAsync(outPath);
             _resultPath = outPath;
             _status = $"Merged {_entries.Count} documents into {System.IO.Path.GetFileName(outPath)}.";
         }

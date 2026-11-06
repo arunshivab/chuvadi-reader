@@ -9,6 +9,9 @@ public sealed class PdfDocumentVm
 
     public bool IsEncrypted { get; init; }
 
+    /// <summary>False when the file's own permissions forbid printing (<see cref="PrintPermission"/>).</summary>
+    public bool AllowsPrinting { get; init; } = true;
+
     /// <summary>True when the document is an XFA-based form. The SVG renderer can't
     /// display XFA content (it lives in a separate stream), so the UI shows a notice
     /// instead of a blank page.</summary>

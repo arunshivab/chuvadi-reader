@@ -5,6 +5,7 @@
 @inject OpenDocumentService OpenDoc
 @inject NavigationManager Nav
 @inject IAppStorage Storage
+@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
 
 <PageTitle>Chuvadi · Split</PageTitle>
 
@@ -209,6 +210,7 @@
             try
             {
                 var n = await Tools.SplitToFolderAsync(_sourcePath, dir);
+                if (n > 0) await WriteBack.DeliverOrThrowAsync(dir);
                 _status = $"Wrote {n} files to {dir}.";
             }
             catch (Exception ex)
@@ -238,6 +240,7 @@
             try
             {
                 await Tools.ExtractRangeAsync(_sourcePath, outPath, from - 1, to - from + 1);
+                await WriteBack.DeliverOrThrowAsync(outPath);
                 _resultPath = outPath;
                 _status = $"Saved pages {from}–{to} to {System.IO.Path.GetFileName(outPath)}.";
             }

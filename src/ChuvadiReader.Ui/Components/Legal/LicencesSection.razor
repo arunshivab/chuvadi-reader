@@ -1,0 +1,62 @@
+@namespace ChuvadiReader.Ui.Components.Legal
+@using ChuvadiReader.Ui.Components.Settings
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
+@inject IServiceProvider Services
+
+@*
+    Licences (About › Help › Licences; /licence, /terms, /privacy): the legal documents as shipped.
+    Apps: licence agreement, licence, privacy, third-party notices. Web portal: terms of use, privacy,
+    cookies, third-party notices. Every host shows the same component; no host code.
+*@
+<SettingsSection Title="@Title" Sub="Chuvadi Reader is free to use. It is proprietary software, not open source.">
+    <Lead>
+        <div class="lic-bar">
+            @if (OnBack.HasDelegate)
+            {
+                <RowButton IconName="chevron-left" OnClick="() => OnBack.InvokeAsync()">About</RowButton>
+            }
+            <Segmented Options="Options" Value="@Current.Id" ValueChanged="v => _part = v" AriaLabel="Document" />
+        </div>
+        <pre class="lic-text" tabindex="0" aria-label="@Current.Label">@TextOf(Current)</pre>
+    </Lead>
+</SettingsSection>
+
+@code {
+    /// <summary>When set, a "‹ About" button returns to Settings › About.</summary>
+    [Parameter] public EventCallback OnBack { get; set; }
+
+    /// <summary>Which document opens first (an id from <see cref="LegalTexts"/>); default the first.</summary>
+    [Parameter] public string? Part { get; set; }
+
+    /// <summary>Section title; default "Licences".</summary>
+    [Parameter] public string Title { get; set; } = "Licences";
+
+    private string? _part;
+
+    private const string HostId = "host";
+
+    private ChuvadiReader.Platform.IHostNotices? _host;
+    private string? _hostText;
+
+    // Optional host seam (kit default: none). Resolved here, not injected, so a host built without the kit still renders.
+    private ChuvadiReader.Platform.IHostNotices? Host =>
+        _host ??= Services.GetService(typeof(ChuvadiReader.Platform.IHostNotices)) as ChuvadiReader.Platform.IHostNotices;
+
+    private IReadOnlyList<LegalDoc> Docs
+    {
+        get
+        {
+            var docs = Platform.Capabilities.ServerSide ? LegalTexts.PortalDocs : LegalTexts.AppDocs;
+            return Host?.Title is { Length: > 0 } title ? [.. docs, new LegalDoc(HostId, title, string.Empty)] : docs;
+        }
+    }
+
+    // The host's text is read when its tab is first shown, then kept.
+    private string TextOf(LegalDoc doc) => doc.Id == HostId ? _hostText ??= Host!.ReadText() : LegalTexts.Text(doc);
+
+    private IReadOnlyList<SegOption> Options => Docs.Select(d => new SegOption(d.Id, d.Label)).ToList();
+
+    private LegalDoc Current => Docs.FirstOrDefault(d => d.Id == _part) ?? Docs[0];
+
+    protected override void OnParametersSet() => _part = Part;
+}

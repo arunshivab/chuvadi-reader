@@ -11,6 +11,9 @@
 @inject SessionService Session
 @inject RedactRequestService RedactReq
 @inject BenchDropService BenchDrop
+@inject ChuvadiReader.Platform.IFileWriteBack WriteBack
+@inject ChuvadiReader.Platform.IAppPaths Paths
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 @implements IAsyncDisposable
 
 <PageTitle>Chuvadi · Bench</PageTitle>
@@ -215,7 +218,7 @@
                         <span class="desk-count">@desk.Pages.Count pg</span>
                         @if (!desk.IsEmpty)
                         {
-                            <button class="desk-sel" @onclick="() => BenchSvc.SelectAllInDesk(deskId)" title="Select all pages on this desk (Ctrl+A)" aria-label="Select all">All</button>
+                            <button class="desk-sel" @onclick="() => BenchSvc.SelectAllInDesk(deskId)" title="Select all pages on this desk (@Platform.Keys.Format("Ctrl A"))" aria-label="Select all">All</button>
                             <button class="desk-sel" @onclick="() => BenchSvc.InvertSelectionInDesk(deskId)" title="Invert selection on this desk" aria-label="Invert selection">Inv</button>
                         }
                         @if (!string.IsNullOrEmpty(desk.NormalizeSize))
@@ -656,7 +659,10 @@
                 <p class="modal-body">Write every page of this desk as its own single-page PDF into:</p>
                 <div class="folder-row">
                     <span class="folder-path" title="@_scatterFolder">@_scatterFolder</span>
-                    <button class="link" @onclick="ChangeScatterFolder">change…</button>
+                    @if (Platform.Capabilities.PickFolders)
+                    {
+                        <button class="link" @onclick="ChangeScatterFolder">change…</button>
+                    }
                 </div>
                 <div class="modal-foot">
                     <span style="flex:1"></span>
@@ -705,7 +711,10 @@
                 {
                     <div class="folder-row">
                         <span class="folder-path" title="@_expFolder">@_expFolder</span>
+                        @if (Platform.Capabilities.PickFolders)
+                    {
                         <button class="link" @onclick="ChangeExportFolder">change…</button>
+                    }
                     </div>
                 }
                 <div class="modal-foot">
@@ -865,7 +874,10 @@
                 <p class="modal-note">@PresetHint(_pressPreset)</p>
                 <div class="folder-row">
                     <span class="folder-path" title="@_pressFolder">@_pressFolder</span>
-                    <button class="link" @onclick="ChangePressFolder">change…</button>
+                    @if (Platform.Capabilities.PickFolders)
+                    {
+                        <button class="link" @onclick="ChangePressFolder">change…</button>
+                    }
                 </div>
                 @if (_pressResult is { } r)
                 {
@@ -1503,6 +1515,7 @@
         try
         {
             await Session.SaveSessionAsync(path, BenchSvc.ExportSession());
+            await WriteBack.DeliverOrThrowAsync(path);
             _error = false;
             _status = $"Session saved to {System.IO.Path.GetFileName(path)}.";
         }
@@ -1604,7 +1617,7 @@
                 safe = safe.Replace(c, '_');
             }
 
-            var tmp = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"{safe}-{Guid.NewGuid():N}.pdf");
+            var tmp = System.IO.Path.Combine(ScratchFiles.Folder(Paths), $"{safe}-{Guid.NewGuid():N}.pdf");
             await BenchSvc.BindDeskAsync(deskId, tmp);
 
             if (toRedact)
@@ -2066,6 +2079,7 @@
         try
         {
             var n = await BenchSvc.BindAllAsync(folder!);
+            if (n > 0) await WriteBack.DeliverOrThrowAsync(folder);
             _status = n == 0 ? "Nothing to bind." : $"Bound {n} desk{(n == 1 ? "" : "s")} into {folder}";
             _resultPath = null;
         }
@@ -2082,6 +2096,7 @@
         try
         {
             var n = await BenchSvc.CombineAllAsync(path!);
+            if (n > 0) await WriteBack.DeliverOrThrowAsync(path);
             _status = n == 0 ? "Nothing to combine." : $"Combined {n} desk{(n == 1 ? "" : "s")} → {System.IO.Path.GetFileName(path)}";
             _resultPath = n == 0 ? null : path;
         }
@@ -2096,6 +2111,7 @@
         try
         {
             await action();
+            await WriteBack.DeliverOrThrowAsync(path);
             _status = $"{verb} → {System.IO.Path.GetFileName(path)}";
             _resultPath = path;
         }
@@ -2624,6 +2640,7 @@
         try
         {
             var n = await BenchSvc.ScatterDeskAsync(deskId, _scatterFolder);
+            if (n > 0) await WriteBack.DeliverOrThrowAsync(_scatterFolder);
             _scatterDesk = null;
             _status = $"Scattered {n} page{(n == 1 ? "" : "s")} into {_scatterFolder}";
             _error = false; _resultPath = null;
@@ -2679,6 +2696,7 @@
                     await BenchSvc.BindDeskAsync(deskId, path);
                 }
 
+                await WriteBack.DeliverOrThrowAsync(path);
                 _expDesk = null;
                 _status = $"Exported PDF: {System.IO.Path.GetFileName(path)}";
                 _error = false; _resultPath = path;
@@ -2692,6 +2710,7 @@
         try
         {
             var n = await BenchSvc.ExportDeskAsync(deskId, _expFolder, _expFormat, _expDpi, _expSelectedOnly);
+            if (n > 0) await WriteBack.DeliverOrThrowAsync(_expFolder);
             _expDesk = null;
             _status = $"Exported {n} image{(n == 1 ? "" : "s")} into {_expFolder}";
             _error = false; _resultPath = null;
@@ -2738,6 +2757,7 @@
         try
         {
             _pressResult = await Press.PressAsync(_pressSrc, _pressFolder, PressOptions.For(_pressPreset));
+            await WriteBack.DeliverOrThrowAsync(_pressResult?.OutputPath);
         }
         catch (Exception ex) { _status = ex.Message; _error = true; _pressSrc = null; }
         finally { _pressBusy = false; StateHasChanged(); }

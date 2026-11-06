@@ -362,6 +362,12 @@ public sealed class TabsService
 
         foreach (var d in dtos)
         {
+            // Bug fix (D-48): a host may open a tab before the first restore; never show a file twice.
+            if (_tabs.Any(t => string.Equals(t.Path, d.Path, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
+
             _tabs.Add(new ReaderTab
             {
                 Id = Guid.NewGuid().ToString("N"),

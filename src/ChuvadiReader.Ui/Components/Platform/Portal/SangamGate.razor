@@ -1,0 +1,75 @@
+@namespace ChuvadiReader.Ui.Components.Platform.Portal
+
+@*
+    Sangam gating (design: Portal & Android 12c). Shown when a person reaches an action that needs a
+    Sangam identity: a scrim with the gate card ("Signing needs a Sangam identity") and, beside it, the
+    "What needs Sangam" list. The text is the handout's by default; every line is a parameter so the
+    caller can name the action that was gated. The host wires OnContinue to its Sangam sign-in.
+    Scope (Arun, 6 Nov): no sharing this release, so the handout's "Share a link" row is left out.
+*@
+@if (Open)
+{
+    <div class="sg-scrim" @onclick="Dismiss" @onkeydown="OnKey" tabindex="-1">
+        <div class="sg-row" @onclick:stopPropagation="true">
+            <div class="sg-card" role="dialog" aria-modal="true" aria-labelledby="sg-title">
+                <span class="sg-ic"><Icon Name="@IconName" Size="22" /></span>
+                <span class="sg-title" id="sg-title">@Title</span>
+                <span class="sg-body">@Body</span>
+                <button class="sg-sangam" @onclick="Continue" disabled="@_busy">
+                    <span class="sg-s" aria-hidden="true">S</span>Continue with Sangam
+                </button>
+                <button class="sg-later" @onclick="Dismiss">Not now</button>
+            </div>
+            @if (ShowList)
+            {
+                <div class="sg-list" aria-label="What needs Sangam">
+                    <span class="sg-list-h">What needs Sangam</span>
+                    @foreach (var g in Rows)
+                    {
+                        <div class="sg-li">
+                            <span class="sg-li-ic @(g.NeedsSangam ? "sangam" : "free")"><Icon Name="@g.Icon" Size="15" /></span>
+                            <span class="sg-li-t">@g.Text</span>
+                            <span class="sg-pill @(g.NeedsSangam ? "sangam" : "free")">@(g.NeedsSangam ? "Sangam" : "free · local")</span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Shows the gate. The caller closes it from <see cref="OnDismiss"/> or after <see cref="OnContinue"/>.</summary>
+    [Parameter] public bool Open { get; set; }
+
+    [Parameter] public string IconName { get; set; } = "certification";
+
+    [Parameter] public string Title { get; set; } = "Signing needs a Sangam identity";
+
+    [Parameter] public string Body { get; set; } = "A digital signature has to say who signed. Sign in once; your documents still stay on this computer.";
+
+    /// <summary>Show the "What needs Sangam" list beside the card (as in the handout).</summary>
+    [Parameter] public bool ShowList { get; set; } = true;
+
+    /// <summary>The list's rows. Defaults to the handout's list for this release.</summary>
+    [Parameter] public IReadOnlyList<SangamGatingRow> Rows { get; set; } = SangamGatingRow.Release1;
+
+    /// <summary>"Continue with Sangam" was pressed.</summary>
+    [Parameter] public EventCallback OnContinue { get; set; }
+
+    /// <summary>"Not now", Escape or a click on the scrim.</summary>
+    [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private bool _busy;
+
+    private async Task Continue()
+    {
+        _busy = true;
+        try { await OnContinue.InvokeAsync(); }
+        finally { _busy = false; }
+    }
+
+    private Task Dismiss() => OnDismiss.InvokeAsync();
+
+    private Task OnKey(KeyboardEventArgs e) => e.Key == "Escape" ? Dismiss() : Task.CompletedTask;
+}

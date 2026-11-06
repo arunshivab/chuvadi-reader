@@ -1,0 +1,38 @@
+DRAFT, to be reviewed by counsel. Do not publish until this line is removed.
+
+CHUVADI WEB PORTAL - COOKIE AND BROWSER STORAGE NOTICE
+
+Copyright © 2026 Sthraas Intelligence Pvt Ltd. All rights reserved.
+
+The Chuvadi web portal uses only what it needs to sign you in and keep your session safe. It uses no advertising, analytics or tracking cookies, and no third-party cookies. Because these cookies are strictly necessary for the portal to work, they cannot be switched off; blocking them in your browser stops the portal from working.
+
+1. Cookies
+
+   __Host-chvd (chvd.session when testing without HTTPS)
+   What: keeps you signed in; holds your sign-in details from Sangam, encrypted.
+   Kind: strictly necessary, first-party, HttpOnly, Secure, SameSite=Lax.
+   How long: until you sign out, and at most 8 hours after you sign in.
+
+   Sign-in cookie
+   What: protects the sign-in round trip to Sangam (it checks that the reply belongs to the sign-in you started).
+   Kind: strictly necessary, first-party, encrypted, HttpOnly.
+   How long: about 10 minutes, or until sign-in completes.
+
+   .AspNetCore.Antiforgery.<id>
+   What: protects forms against cross-site request forgery.
+   Kind: strictly necessary, first-party, HttpOnly.
+   How long: until you close the browser.
+
+2. Browser storage (local storage, session storage, IndexedDB)
+
+   Today the portal stores nothing in your browser's storage. Your appearance settings (for example the theme) are kept in memory on the server for your session only and are forgotten when you sign out.
+
+   [If a later version keeps appearance settings in browser storage, this section will list each item. For example: "chvd-theme - your theme choice; stays in this browser until you clear it; never sent to Sthraas; contains no personal data." - to be completed by the Web team when that happens.]
+
+3. Managing cookies
+
+   You can delete cookies in your browser's settings at any time; you will be signed out. Signing out deletes the portal's session cookie.
+
+Contact: see the Chuvadi Privacy Notice.
+
+Last updated: [date - to be set on publication]

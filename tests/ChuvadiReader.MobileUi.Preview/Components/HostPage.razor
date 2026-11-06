@@ -1,0 +1,25 @@
+@* TESTING ONLY: the document the preview serves. Same stylesheets and order as the Windows host's
+   index.html, plus css/mobile.css (which the Android host links the same way). *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <base href="/" />
+    <link rel="icon" href="data:," />
+    <style>html, body { margin: 0; background: #F2EAD6; }</style>
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/fonts/google/fonts.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/lipi-sans/lipi-sans.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/tokens.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/app.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/shell.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/prefs.css" />
+    <link rel="stylesheet" href="_content/ChuvadiReader.Ui/css/mobile.css" />
+    <link rel="stylesheet" href="ChuvadiReader.MobileUi.Preview.styles.css" />
+</head>
+<body>
+    <ChuvadiReader.Ui.App @rendermode="InteractiveServer" />
+    <script src="_content/ChuvadiReader.Ui/js/theme.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>

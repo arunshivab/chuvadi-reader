@@ -1,0 +1,85 @@
+/* Portal sign-in — Portal & Android 12a. Measurements from the handout frame (1280 × 720 below the browser chrome). */
+.psi {
+    --psi-field: #ffffff;
+    min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
+    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    background: var(--chvd-surface-mid); color: var(--chvd-ink);
+    font-family: var(--chvd-sans-display);
+}
+html[data-theme="dark"] .psi { --psi-field: var(--chvd-surface-lo); }
+
+/* ── Left: the pitch ───────────────────────────────────────────────── */
+.psi-hero {
+    position: relative; overflow: hidden; box-sizing: border-box;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 32px;
+    padding: 56px 60px;
+    background: var(--chvd-surface-hi); border-right: var(--chvd-stroke) solid var(--chvd-border);
+}
+.psi-water {
+    position: absolute; right: -70px; bottom: -80px; pointer-events: none; user-select: none;
+    font-family: var(--chvd-tamil); font-size: 440px; line-height: 1; color: var(--chvd-binding); opacity: .06;
+}
+.psi-mark { position: relative; display: flex; align-items: center; gap: 8px; }
+.psi-tag { font-family: var(--chvd-mono); font-size: 12px; color: var(--chvd-ink-muted); }
+.psi-pitch { position: relative; display: flex; flex-direction: column; gap: 14px; max-width: 440px; }
+.psi-h1 { margin: 0; font-family: var(--chvd-serif-display); font-weight: 400; font-size: 48px; line-height: 1.02; }
+.psi-body { margin: 0; font-family: var(--chvd-serif-body); font-size: 15px; line-height: 1.6; color: var(--chvd-ink-soft); text-wrap: pretty; }
+.psi-promises { position: relative; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--chvd-ink-soft); }
+.psi-promises li { display: flex; align-items: center; gap: 10px; }
+.psi-pr-ic { display: flex; color: var(--chvd-olive); }
+
+/* ── Right: the card ───────────────────────────────────────────────── */
+.psi-side { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.psi-card {
+    width: 400px; max-width: 100%; box-sizing: border-box;
+    display: flex; flex-direction: column; gap: 16px; padding: 32px;
+    background: var(--chvd-surface-hi); border: var(--chvd-stroke) solid var(--chvd-border);
+    border-radius: 14px; box-shadow: 0 20px 50px rgba(26, 19, 16, .12);
+}
+.psi-title { font-family: var(--chvd-serif-display); font-size: 30px; line-height: 1; }
+
+.psi-sangam, .psi-submit {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+    border: none; border-radius: 9px; font-family: var(--chvd-sans-display); font-weight: 500; cursor: pointer;
+}
+.psi-sangam { height: 46px; background: var(--chvd-ink); color: var(--chvd-surface-hi); font-size: 14.5px; }
+.psi-s {
+    width: 22px; height: 22px; border-radius: 6px; background: var(--chvd-marigold);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--chvd-serif-display); font-style: italic; font-size: 15px; color: var(--chvd-ink);
+}
+.psi-submit { height: 42px; background: var(--chvd-binding); color: var(--chvd-on-accent); font-size: 14px; }
+.psi-sangam:hover:not(:disabled), .psi-submit:hover:not(:disabled) { filter: brightness(1.12); }
+.psi-sangam:disabled, .psi-submit:disabled { opacity: .55; cursor: default; }
+.psi-sangam:focus-visible, .psi-submit:focus-visible { outline: 2px solid var(--chvd-marigold); outline-offset: 2px; }
+
+.psi-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--chvd-ink-muted); }
+.psi-or span { flex: 1; height: 0.5px; background: var(--chvd-border-soft); }
+
+.psi-field { display: flex; flex-direction: column; gap: 6px; }
+.psi-label { display: flex; justify-content: space-between; font-size: 12.5px; }
+.psi-label a, .psi-foot a { color: var(--chvd-binding); font-size: 12px; }
+.psi-label a:hover, .psi-foot a:hover { color: var(--chvd-marigold); }
+.psi-input {
+    height: 40px; box-sizing: border-box; padding: 0 12px;
+    border: var(--chvd-stroke) solid var(--chvd-border); border-radius: 8px; background: var(--psi-field);
+    color: var(--chvd-ink); font-family: var(--chvd-mono); font-size: 13px;
+}
+.psi-input:focus { outline: none; border-color: var(--chvd-binding); }
+
+.psi-err { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--chvd-error); }
+.psi-foot { font-size: 12px; line-height: 1.5; color: var(--chvd-ink-muted); }
+.psi-terms { margin-top: -8px; }
+
+/* ── Narrow browsers: the card first, the pitch underneath ─────────── */
+@media (max-width: 900px) {
+    .psi { grid-template-columns: minmax(0, 1fr); grid-auto-rows: min-content; }
+    .psi-side { order: -1; padding: 32px 16px 24px; }
+    .psi-hero { padding: 32px 24px; border-right: none; border-top: var(--chvd-stroke) solid var(--chvd-border); }
+    .psi-h1 { font-size: 36px; }
+    .psi-water { font-size: 300px; }
+}
+@media (max-width: 440px) {
+    .psi-side { padding: 16px 16px 24px; }
+    .psi-card { padding: 24px 20px; }
+}

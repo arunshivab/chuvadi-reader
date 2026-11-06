@@ -1,0 +1,55 @@
+@namespace ChuvadiReader.Ui.Components.Platform.Portal
+@using ChuvadiReader.Platform
+@implements IDisposable
+@inject IAccount Account
+@inject PortalLinks Links
+
+@*
+    The portal's account and server status on a phone-sized browser (D-32). The phone shell has no top
+    bar or status bar, so what 12b puts there goes at the foot of the phone ⋮ sheet: who is signed in,
+    the server line, Get the desktop app, Account settings, Sign out. Rows use the phone sheet's own
+    .ph-row styles (mobile.css), so they look like the sheet's other rows.
+    Shown through the Mobile UI chat's PhoneShell menu slot (request in docs/web-ui/HOOKS-FOR-APPROVAL.md).
+*@
+<div class="ppa">
+    <div class="ppa-who">
+        <span class="ppa-av">@AccountText.Initials(Account.DisplayName)</span>
+        <span class="ppa-t">
+            <b>@Account.DisplayName</b>
+            @if (!string.IsNullOrEmpty(Account.Email))
+            {
+                <span class="ppa-id">@Account.Email@(string.IsNullOrEmpty(Account.Unit) ? null : " · " + Account.Unit)</span>
+            }
+        </span>
+    </div>
+    <span class="ppa-server"><span class="status-dot server"></span>processed on the server · encrypted at rest · only you can see it</span>
+</div>
+<a class="ph-row" href="@Links.DesktopAppUrl" target="_blank" rel="noopener" @onclick="Done"><Icon Name="download" Size="18" /><span class="ph-row-l">Get the desktop app</span></a>
+@if (Links.AccountSettingsUrl is { } settings)
+{
+    <a class="ph-row" href="@settings" target="_blank" rel="noopener" @onclick="Done"><Icon Name="settings" Size="18" /><span class="ph-row-l">Account settings</span></a>
+}
+<button class="ph-row ppa-out" @onclick="SignOut" disabled="@_signingOut"><Icon Name="log-out" Size="18" /><span class="ph-row-l">Sign out</span></button>
+
+@code {
+    /// <summary>Raised after a row was used, so the sheet can close.</summary>
+    [Parameter] public EventCallback OnDone { get; set; }
+
+    private bool _signingOut;
+
+    protected override void OnInitialized() => Account.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private Task Done() => OnDone.InvokeAsync();
+
+    private async Task SignOut()
+    {
+        _signingOut = true;
+        try { await Account.SignOutAsync(); }
+        finally { _signingOut = false; }
+        await OnDone.InvokeAsync();
+    }
+
+    public void Dispose() => Account.Changed -= OnChanged;
+}

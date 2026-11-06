@@ -8,6 +8,7 @@
 @inject WatchedFolderService Watched
 @inject LibraryService Lib
 @inject NavigationManager Nav
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <PageTitle>Chuvadi · Settings</PageTitle>
 
@@ -21,7 +22,7 @@
         <h1 class="snav-title" tabindex="-1">Settings</h1>
         @foreach (var s in Sections)
         {
-            var on = s.Id == _active;
+            var on = s.Id == _active || (s.Id == "about" && _active == "licences");
             <button type="button" class="snav-item @(on ? "on" : null)" aria-current="@(on ? "page" : null)" @onclick="() => Show(s.Id)">
                 <Icon Name="@s.Icon" Size="17" />
                 <span class="snav-label">@s.Label</span>
@@ -34,7 +35,7 @@
         <div class="snav-foot">
             Chuvadi @AppInfo.Version · chuvadi-pdf @AppInfo.Libraries[0].Version<br />
             Changes save automatically<br />
-            Stored on this device only
+            @(Platform.Capabilities.ServerSide ? ChuvadiReader.Ui.Components.Platform.PlatformText.ServerPrivacy : "Stored on this device only")
         </div>
     </nav>
 
@@ -66,7 +67,10 @@
                 <ShortcutsSection />
                 break;
             case "about":
-                <AboutSection OnShowShortcuts='() => Show("shortcuts")' />
+                <AboutSection OnShowShortcuts='() => Show("shortcuts")' OnShowLicences='() => Show("licences")' />
+                break;
+            case "licences":
+                <ChuvadiReader.Ui.Components.Legal.LicencesSection OnBack='() => Show("about")' />
                 break;
             default:
                 <AppearanceSection Rev="_rev" />
@@ -110,7 +114,7 @@
 
     protected override void OnParametersSet()
     {
-        if (!string.IsNullOrEmpty(SectionQuery) && Sections.Any(s => s.Id == SectionQuery))
+        if (!string.IsNullOrEmpty(SectionQuery) && (Sections.Any(s => s.Id == SectionQuery) || SectionQuery == "licences"))
         {
             _active = SectionQuery!;
         }

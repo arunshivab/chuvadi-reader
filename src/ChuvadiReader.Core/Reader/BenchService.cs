@@ -2,6 +2,8 @@ using Chuvadi.Pdf.Authoring;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Operations;
 using Chuvadi.Pdf.Watermark;
+using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Reader;
 
@@ -29,13 +31,16 @@ public sealed class BenchService
     private BenchSnapshot? _baseline;   // state as of the last accepted edit (the next undo target)
     private string _baselineSig = "";   // structural signature of that state
     private bool _restoring;            // true while applying a snapshot, to suppress re-recording
-    private readonly ChuvadiReader.Core.Documents.StampService _stamp = new();
+    private readonly ChuvadiReader.Core.Documents.StampService _stamp;
+    private readonly IAppPaths? _paths;
     private readonly ChuvadiReader.Core.Documents.OutlineService _outline = new();
 
     public const int MaxDesks = 30;
 
-    public BenchService(IPdfReader reader, BenchComposer composer, ChuvadiReader.Core.Documents.ExportService export)
+    public BenchService(IPdfReader reader, BenchComposer composer, ChuvadiReader.Core.Documents.ExportService export, IAppPaths? paths = null)
     {
+        _paths = paths;
+        _stamp = new(paths);
         _reader = reader;
         _composer = composer;
         _export = export;
@@ -1131,8 +1136,8 @@ public sealed class BenchService
         var desk = FindDesk(deskId);
         if (desk is null || desk.IsEmpty || !CanAddDesk) return null;
 
-        var flat = Path.Combine(Path.GetTempPath(), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
-        var nup = Path.Combine(Path.GetTempPath(), $"chuvadi-nup-{Guid.NewGuid():N}.pdf");
+        var flat = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
+        var nup = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-nup-{Guid.NewGuid():N}.pdf");
         try
         {
             await BindDeskAsync(deskId, flat, ct).ConfigureAwait(false);
@@ -1157,8 +1162,8 @@ public sealed class BenchService
         var desk = FindDesk(deskId);
         if (desk is null || desk.IsEmpty || !CanAddDesk) return null;
 
-        var flat = Path.Combine(Path.GetTempPath(), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
-        var bk = Path.Combine(Path.GetTempPath(), $"chuvadi-booklet-{Guid.NewGuid():N}.pdf");
+        var flat = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-flat-{Guid.NewGuid():N}.pdf");
+        var bk = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-booklet-{Guid.NewGuid():N}.pdf");
         try
         {
             await BindDeskAsync(deskId, flat, ct).ConfigureAwait(false);
@@ -1364,7 +1369,7 @@ public sealed class BenchService
             foreach (var desk in desks)
             {
                 ct.ThrowIfCancellationRequested();
-                var tmp = Path.Combine(Path.GetTempPath(), $"chuvadi-combine-{Guid.NewGuid():N}.pdf");
+                var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-combine-{Guid.NewGuid():N}.pdf");
                 await BindDeskAsync(desk.Id, tmp, ct).ConfigureAwait(false);
                 temps.Add(tmp);
             }
@@ -1424,7 +1429,7 @@ public sealed class BenchService
             return 0;
         }
 
-        var tmp = Path.Combine(Path.GetTempPath(), $"chuvadi-bench-{Guid.NewGuid():N}.pdf");
+        var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"chuvadi-bench-{Guid.NewGuid():N}.pdf");
         try
         {
             await _composer.ComposeToFileAsync(pages, tmp, ct, desk.NormalizeSize).ConfigureAwait(false);

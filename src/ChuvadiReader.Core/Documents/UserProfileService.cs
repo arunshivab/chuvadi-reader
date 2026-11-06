@@ -1,4 +1,5 @@
 using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -13,7 +14,14 @@ public sealed class UserProfileService
     private readonly IAppStorage _storage;
     private string? _preferred;
 
-    public UserProfileService(IAppStorage storage) => _storage = storage;
+    private readonly IAccount? _account;
+
+    /// <param name="account">Who is using the app (desktop: the OS account; Web: the Sangam identity).</param>
+    public UserProfileService(IAppStorage storage, IAccount? account = null)
+    {
+        _storage = storage;
+        _account = account;
+    }
 
     public async Task HydrateAsync(CancellationToken ct = default)
         => _preferred = await _storage.GetAsync(StorageKey, ct).ConfigureAwait(false);
@@ -36,7 +44,7 @@ public sealed class UserProfileService
 
             try
             {
-                var os = Environment.UserName;
+                var os = _account?.DisplayName ?? Environment.UserName;
                 return string.IsNullOrWhiteSpace(os) ? null : Capitalize(os);
             }
             catch

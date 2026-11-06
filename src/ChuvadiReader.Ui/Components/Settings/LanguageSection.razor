@@ -1,6 +1,7 @@
 @namespace ChuvadiReader.Ui.Components.Settings
 @inject UserProfileService Profile
 @inject PreferencesService Prefs
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <SettingsSection Title="Language" Sub="Interface language. Documents keep their own.">
     <SettingsCard Title="Interface" IsNew="true" Full="true">
@@ -13,7 +14,7 @@
     </SettingsCard>
 
     <SettingsCard Title="Greeting">
-        <SettingRow Label="Preferred name" Hint="Leave blank to use your computer's name. Stored locally, never sent anywhere." Stack="true">
+        <SettingRow Label="Preferred name" Hint="@PlatformText.PreferredNameHint(Platform)" Stack="true">
             <input class="name-in" value="@_name" @oninput="OnNameInput" placeholder="@Profile.Name" aria-label="Preferred name" spellcheck="false" />
         </SettingRow>
         <SettingRow Label="Show Tamil greeting" Hint="வணக்கம்.">

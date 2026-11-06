@@ -2,6 +2,8 @@ using Chuvadi.Pdf.Authoring;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Graphics;
 using Chuvadi.Pdf.Operations;
+using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 using Path = System.IO.Path;
 
 namespace ChuvadiReader.Core.Reader;
@@ -20,6 +22,11 @@ namespace ChuvadiReader.Core.Reader;
 public sealed class BenchComposer
 {
     private sealed record Resolved(string Path, int Index, int Rotation);
+
+    private readonly IAppPaths? _paths;
+
+    /// <param name="paths">Host folders; intermediate files go to its working folder (system temp when null).</param>
+    public BenchComposer(IAppPaths? paths = null) => _paths = paths;
 
     public Task ComposeToFileAsync(IReadOnlyList<BenchPage> pages, string outputPath, CancellationToken ct = default, string? normalizeSize = null)
         => Task.Run(async () =>
@@ -147,7 +154,7 @@ public sealed class BenchComposer
                     var key = page.BackgroundHex ?? "";
                     if (!blankByColor.TryGetValue(key, out var temp))
                     {
-                        temp = Path.GetTempFileName();
+                        temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
                         await File.WriteAllBytesAsync(temp, BuildBlankPdf(page.BackgroundHex), ct).ConfigureAwait(false);
                         blankByColor[key] = temp;
                         tempFiles.Add(temp);
@@ -156,7 +163,7 @@ public sealed class BenchComposer
                 }
                 else if (page.IsImage && !string.IsNullOrWhiteSpace(page.ImagePath))
                 {
-                    var temp = Path.GetTempFileName();
+                    var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
                     ImagePdfConverter.ConvertFile(page.ImagePath, temp, ImagePdfOptions.Default);
                     tempFiles.Add(temp);
                     resolved.Add(new Resolved(temp, 0, ((page.Rotation % 360) + 360) % 360));
@@ -238,7 +245,7 @@ public sealed class BenchComposer
                     {
                         foreach (var idx in want)
                         {
-                            var temp = Path.GetTempFileName();
+                            var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
                             await File.WriteAllBytesAsync(temp, await SingleAsync(idx).ConfigureAwait(false), ct).ConfigureAwait(false);
                             singleTemps.Add(temp);
                             singleDocs.Add(await PdfDocument.OpenAsync(temp, ct).ConfigureAwait(false));
@@ -376,7 +383,7 @@ public sealed class BenchComposer
     /// Fit, everything outside the kept region is then painted white — this both realises the mask
     /// and hides the surrounding source content that <see cref="PageComposer"/> cannot clip when a
     /// page is placed (placing never clips, so the neighbours would otherwise bleed in).</summary>
-    private static byte[] ApplyCrop(byte[] bytes, IReadOnlyList<BenchPage> pages)
+    private byte[] ApplyCrop(byte[] bytes, IReadOnlyList<BenchPage> pages)
     {
         if (!pages.Any(p => p.Crop != null)) return bytes;
 
@@ -385,7 +392,7 @@ public sealed class BenchComposer
         var maskRects = new Dictionary<int, (double X, double Bottom, double W, double H)>();
 
         byte[] composed;
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         try
         {
             File.WriteAllBytes(temp, bytes);
@@ -449,11 +456,11 @@ public sealed class BenchComposer
     /// the whole page scales, centered, to fit inside the page minus the margins. The page size
     /// is unchanged (white margins appear around the content). Margins are in the page's own
     /// space (v1: not re-mapped for rotated pages).</summary>
-    private static byte[] ApplyMargins(byte[] bytes, IReadOnlyList<BenchPage> pages)
+    private byte[] ApplyMargins(byte[] bytes, IReadOnlyList<BenchPage> pages)
     {
         if (!pages.Any(p => p.Margins != null)) return bytes;
 
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         try
         {
             File.WriteAllBytes(temp, bytes);
@@ -482,13 +489,13 @@ public sealed class BenchComposer
 
     /// <summary>Rebuilds every page at the target size (A4/Letter), scaling each page to fit
     /// (aspect preserved, top-anchored) via the library's PageComposer.</summary>
-    private static byte[] ApplyNormalize(byte[] bytes, string? normalizeSize)
+    private byte[] ApplyNormalize(byte[] bytes, string? normalizeSize)
     {
         var target = ParseSize(normalizeSize);
         if (target == null) return bytes;
         var (tw, th) = target.Value;
 
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         try
         {
             File.WriteAllBytes(temp, bytes);
@@ -544,9 +551,9 @@ public sealed class BenchComposer
         return ms.ToArray();
     }
 
-    private static async Task<PdfDocument> OpenBytesAsync(byte[] bytes, CancellationToken ct)
+    private async Task<PdfDocument> OpenBytesAsync(byte[] bytes, CancellationToken ct)
     {
-        var temp = Path.GetTempFileName();
+        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
         await File.WriteAllBytesAsync(temp, bytes, ct).ConfigureAwait(false);
         return await PdfDocument.OpenAsync(temp, ct).ConfigureAwait(false);
     }

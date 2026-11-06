@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Reader;
 
@@ -18,6 +19,11 @@ public sealed class SessionService
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         Converters = { new JsonStringEnumConverter() },
     };
+
+    private readonly IAppPaths? _paths;
+
+    /// <param name="paths">Host folders; desk templates live in its app-data folder.</param>
+    public SessionService(IAppPaths? paths = null) => _paths = paths;
 
     // ── session files (user-chosen path) ───────────────────────────────────────
 
@@ -38,15 +44,30 @@ public sealed class SessionService
 
     // ── desk templates (app-data library) ──────────────────────────────────────
 
-    private static string TemplatesPath
+    private const string TemplatesFile = "desk-templates.json";
+
+    /// <summary>Where templates were kept before the platform layer (%AppData%\ChuvadiReader on Windows).</summary>
+    private static string LegacyTemplatesDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ChuvadiReader");
+
+    private string TemplatesPath
     {
         get
         {
-            var dir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "ChuvadiReader");
+            var dir = _paths?.AppDataFolder ?? LegacyTemplatesDir;
             Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "desk-templates.json");
+            var path = Path.Combine(dir, TemplatesFile);
+
+            // One-time carry-over from the old folder; the old file is left in place.
+            var legacy = Path.Combine(LegacyTemplatesDir, TemplatesFile);
+            if (!File.Exists(path) && File.Exists(legacy)
+                && !string.Equals(Path.GetFullPath(path), Path.GetFullPath(legacy), StringComparison.OrdinalIgnoreCase))
+            {
+                try { File.Copy(legacy, path); } catch (IOException) { /* another instance copied it first */ }
+            }
+
+            return path;
         }
     }
 
@@ -89,7 +110,7 @@ public sealed class SessionService
         }
     }
 
-    private static async Task PersistTemplatesAsync(List<DeskTemplateDto> list, CancellationToken ct)
+    private async Task PersistTemplatesAsync(List<DeskTemplateDto> list, CancellationToken ct)
     {
         var json = JsonSerializer.Serialize(list, Json);
         await File.WriteAllTextAsync(TemplatesPath, json, ct).ConfigureAwait(false);

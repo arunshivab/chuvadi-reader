@@ -1,0 +1,29 @@
+@*
+    Bottom sheet (12j): surface-hi, 22 px top corners, a grab handle, serif title with a text
+    action on the right, 44 px rows. Tap the scrim, the action or the handle to close; Android back
+    closes it too (PhoneShell). The ⋮ menu uses the same sheet without a title.
+*@
+<div class="ph-scrim" @onclick="OnClose"></div>
+<section class="ph-sheet" role="dialog" aria-modal="true" aria-label="@(Title ?? "Menu")">
+    <button class="ph-handle" @onclick="OnClose" aria-label="Close"><span></span></button>
+    @if (Title is not null)
+    {
+        <div class="ph-sheet-hd">
+            <span class="ph-sheet-t">@Title</span>
+            @if (Action is not null)
+            {
+                <button class="ph-sheet-a" @onclick="OnClose">@Action</button>
+            }
+        </div>
+    }
+    <div class="ph-sheet-body">
+        @ChildContent
+    </div>
+</section>
+
+@code {
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? Action { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

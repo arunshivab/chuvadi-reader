@@ -5,6 +5,13 @@
 // keyboard shortcuts. During a toolbar-driven scroll the indicator tracking is
 // suppressed so it does not flicker through the pages it passes.
 
+// The primary shortcut modifier: ⌘ on macOS (data-platform set by MainLayout), Ctrl everywhere else.
+function isPrimary(e) {
+    return document.documentElement.getAttribute('data-platform') === 'macos'
+        ? (e.metaKey === true && e.ctrlKey !== true)
+        : (e.ctrlKey === true && e.metaKey !== true);
+}
+
 let lazy = null;
 let spy = null;
 let dotnet = null;
@@ -24,6 +31,7 @@ let currentTool = 'none';
 let wheelHandler = null;
 let deskPointer = null;
 let panning = null;
+let penSplit = null;
 let marq = null;
 let marqEl = null;
 let loupeEl = null;
@@ -95,7 +103,7 @@ export function init(deskEl, dotnetRef) {
         if (e.key === 'Escape') { invoke('OnEscape'); return; }
 
         // Tab-close shortcuts: handle the Alt/Shift variants of W before the no-Alt block.
-        if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'w') {
+        if (isPrimary(e) && e.key.toLowerCase() === 'w') {
             e.preventDefault();
             if (e.altKey) invoke('CloseOtherTabs');
             else if (e.shiftKey) invoke('CloseAllTabs');
@@ -103,7 +111,7 @@ export function init(deskEl, dotnetRef) {
             return;
         }
 
-        if (e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (isPrimary(e) && !e.altKey) {
             const k = e.key.toLowerCase();
             if (k === 'z') { e.preventDefault(); invoke('Undo'); }
             else if (e.key === 'Tab') { e.preventDefault(); invoke('CycleTab', e.shiftKey ? -1 : 1); }
@@ -114,7 +122,7 @@ export function init(deskEl, dotnetRef) {
             else if (k === 'f') { e.preventDefault(); invoke('OpenFind'); }   // app find, not WebView2's native find
             return;
         }
-        if (e.altKey || e.metaKey) return;
+        if (e.altKey || e.metaKey || e.ctrlKey) return;
 
         // Below here are bare navigation keys; don't steal them from focused controls.
         if (tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return;
@@ -309,6 +317,21 @@ function setupViewTools(deskEl) {
     deskRef.addEventListener('pointermove', deskPointer.move);
     deskRef.addEventListener('pointerup', deskPointer.up);
     deskRef.addEventListener('pointerleave', deskPointer.leave);
+
+    // Tablets with a pen (<html data-input~="pen">, design 12e, D-42): the pen draws on the Mark
+    // layer, a finger pans. A finger on a Mark layer never reaches its (Blazor) stroke handler and
+    // pans the desk instead. data-input is absent on Windows, so nothing changes there.
+    if (penSplit) deskRef.removeEventListener('pointerdown', penSplit, true);
+    penSplit = (e) => {
+        if (e.pointerType !== 'touch') return;
+        if (!/(^|\s)pen(\s|$)/.test(document.documentElement.getAttribute('data-input') || '')) return;
+        const layer = e.target && e.target.closest ? e.target.closest('.mk-layer') : null;
+        if (!layer) return;
+        e.stopPropagation();
+        panning = { x: e.clientX, y: e.clientY, sl: deskRef.scrollLeft, st: deskRef.scrollTop };
+        try { deskRef.setPointerCapture(e.pointerId); } catch (_) { }
+    };
+    deskRef.addEventListener('pointerdown', penSplit, true);
 
     // Touchscreen: two-finger pinch zooms the page canvas only (chrome never moves);
     // double-tap toggles a readable zoom. One finger is left alone for native panning.
@@ -695,6 +718,7 @@ export function dispose() {
         deskRef.removeEventListener('pointerup', deskPointer.up);
         deskRef.removeEventListener('pointerleave', deskPointer.leave);
     }
+    if (deskRef && penSplit) deskRef.removeEventListener('pointerdown', penSplit, true);
     if (deskRef && touchHandlers) {
         deskRef.removeEventListener('touchstart', touchHandlers.start);
         deskRef.removeEventListener('touchmove', touchHandlers.move);
@@ -707,7 +731,7 @@ export function dispose() {
     if (zoomNotifyTimer) { clearTimeout(zoomNotifyTimer); zoomNotifyTimer = 0; }
     removeMarqEl(); hideLoupe();
     document.body.classList.remove('chvd-immersive');
-    wheelHandler = null; deskPointer = null; panning = null; marq = null;
+    wheelHandler = null; deskPointer = null; penSplit = null; panning = null; marq = null;
     touchHandlers = null; pinch = null; pinchActive = false; tapCand = null; sawPinch = false;
     deskRef = null; currentTool = 'none';
 }

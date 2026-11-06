@@ -1,0 +1,388 @@
+@using ChuvadiReader.Platform
+@implements IAsyncDisposable
+@inject ShellService Shell
+@inject TabsService Tabs
+@inject NavigationManager Nav
+@inject IServiceProvider Services
+@inject IJSRuntime JS
+
+@*
+    Android phone shell — Portal & Android 12g-12j. Rendered by MainLayout in place of the top bar,
+    left bar and status bar when the layout is Phone (MainLayout hook). The rails fold:
+      * left bar  → bottom bar (Read · Mark · Arrange · Protect); Open, Find, Library, Settings → ⋮
+      * Tools rail → tool strip above the bottom bar, Mark and Protect only
+      * View rail → pinch / double-tap / swipe (mobile.js) + the View sheet from ⋮
+    Every action is MainLayout's own (passed in) or a command the mode view already registered with
+    ShellService (PhoneCommands) — nothing is re-implemented here.
+*@
+
+<div class="ph-shell" data-mode="@ModeKey">
+    <PhoneAppBar OnBack="Back" OnMenu="() => ShowSheet(PhoneSheetKind.Menu)" OnDocView="OnDocView" PageTitle="@PageTitle" />
+
+    <main class="content ph-content">
+        @ChildContent
+        @if (Fab is { } fab)
+        {
+            <button class="ph-fab" disabled="@(!fab.IsEnabled)" title="@(fab.DisabledReason ?? fab.Label)" aria-label="@fab.Label"
+                    @onclick="() => Run(fab)">
+                <Icon Name="@FabIcon" Size="22" />
+            </button>
+        }
+    </main>
+
+    @if (StripItems is { } items)
+    {
+        <PhoneToolStrip Items="items" Active="@_activeTool" OnPick="PickTool" />
+    }
+
+    <nav class="ph-nav" aria-label="Modes">
+        @foreach (var (mode, icon, label) in Modes)
+        {
+            var m = mode;
+            var on = OnDocView && Shell.Mode == m;
+            var why = ModeDisabledReason?.Invoke(m);
+            <button class="ph-nav-b @(on ? "on" : null)" disabled="@(why is not null)" title="@(why ?? label)"
+                    aria-current="@(on ? "page" : null)" @onclick="() => PickMode(m)">
+                <span class="ph-pill"><Icon Name="@icon" Size="20" /></span>
+                <span class="ph-verb">@label</span>
+            </button>
+        }
+    </nav>
+
+    @if (_sheet == PhoneSheetKind.Menu)
+    {
+        <PhoneSheet Title="@null" OnClose="Close">
+            <button class="ph-row" @onclick="() => Then(Open)"><Icon Name="folder" Size="18" /><span class="ph-row-l">Open</span></button>
+            <button class="ph-row" @onclick="() => Then(Find)"><Icon Name="find-in-page" Size="18" /><span class="ph-row-l">Find</span></button>
+            <button class="ph-row" @onclick='() => Then(() => { Go?.Invoke("/library"); return Task.CompletedTask; })'><Icon Name="library" Size="18" /><span class="ph-row-l">Library</span></button>
+            <button class="ph-row" @onclick='() => Then(() => { Go?.Invoke("/settings"); return Task.CompletedTask; })'><Icon Name="settings" Size="18" /><span class="ph-row-l">Settings</span></button>
+            @if (OnDocView && HasViewRows)
+            {
+                <button class="ph-row" @onclick="() => ShowSheet(PhoneSheetKind.View)"><Icon Name="sliders" Size="18" /><span class="ph-row-l">View</span><Icon Name="chevron-right" Size="15" /></button>
+            }
+            @if (OnDocView && Shell.DocumentMenu.Count > 0)
+            {
+                <span class="ph-sheet-h">Document</span>
+                @foreach (var c in Shell.DocumentMenu)
+                {
+                    var cc = c;
+                    if (cc.Id.StartsWith("sep", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    <button class="ph-row" disabled="@(!cc.IsEnabled)" title="@(cc.DisabledReason ?? cc.Label)" @onclick="() => Then(cc.Run)">
+                        <Icon Name="@cc.Icon" Size="18" /><span class="ph-row-l">@cc.Label</span>
+                        @if (cc.DisabledReason is not null)
+                        {
+                            <span class="ph-row-v">@cc.DisabledReason</span>
+                        }
+                    </button>
+                }
+            }
+        </PhoneSheet>
+    }
+    else if (_sheet == PhoneSheetKind.View)
+    {
+        <PhoneSheet Title="View" Action="Done" OnClose="Close">
+            @foreach (var row in PhoneCommands.View)
+            {
+                var cmd = PhoneCommands.Find(Shell.Commands, row.CommandIds);
+                if (cmd is null)
+                {
+                    continue;
+                }
+
+                var r = row;
+                <button class="ph-row" disabled="@(!cmd.IsEnabled || TwoPageBlocked(r))" title="@(cmd.DisabledReason ?? cmd.Label)" @onclick="() => Run(cmd)">
+                    <Icon Name="@r.Icon" Size="18" /><span class="ph-row-l">@r.Label</span><span class="ph-row-v">@ViewValue(r)</span>
+                </button>
+            }
+        </PhoneSheet>
+    }
+</div>
+
+@code {
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>MainLayout's own mode switch (RequestMode).</summary>
+    [Parameter] public Func<DocMode, Task>? RequestMode { get; set; }
+
+    /// <summary>MainLayout's ModeDisabledReason (Office files are view-only).</summary>
+    [Parameter] public Func<DocMode, string?>? ModeDisabledReason { get; set; }
+
+    /// <summary>MainLayout's AddTab (Open, Ctrl O).</summary>
+    [Parameter] public Func<Task>? Open { get; set; }
+
+    /// <summary>MainLayout's FindNow.</summary>
+    [Parameter] public Func<Task>? Find { get; set; }
+
+    /// <summary>MainLayout's Go(path).</summary>
+    [Parameter] public Action<string>? Go { get; set; }
+
+    /// <summary>True on the Reader, Arrange and Protect views (MainLayout.OnDocView).</summary>
+    [Parameter] public bool OnDocView { get; set; }
+
+    private static readonly (DocMode Mode, string Icon, string Label)[] Modes =
+    {
+        (DocMode.Read, "reading-mode", "Read"),
+        (DocMode.Mark, "edit", "Mark"),
+        (DocMode.Arrange, "grid-view", "Arrange"),
+        (DocMode.Protect, "redact", "Protect"),
+    };
+
+    private PhoneSheetKind _sheet;
+    private string? _activeTool;
+    private DocMode _toolMode;
+    private IAppLifecycle? _life;
+
+    protected override void OnInitialized()
+    {
+        Shell.Changed += OnChanged;
+        Tabs.Changed += OnChanged;
+        Nav.LocationChanged += OnLocation;
+        _life = Services.GetService(typeof(IAppLifecycle)) as IAppLifecycle;
+        if (_life is not null)
+        {
+            _life.BackRequested += OnBackRequested;
+        }
+    }
+
+    private string ModeKey => OnDocView ? Shell.Mode.ToString().ToLowerInvariant() : "none";
+
+    private string? PageTitle
+    {
+        get
+        {
+            var path = "/" + Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0].TrimEnd('/');
+            return path switch
+            {
+                "/" => null,
+                var p when p.StartsWith("/library", StringComparison.OrdinalIgnoreCase) => "Library",
+                var p when p.StartsWith("/settings", StringComparison.OrdinalIgnoreCase) => "Settings",
+                var p when p.StartsWith("/merge", StringComparison.OrdinalIgnoreCase) => "Merge files",
+                var p when p.StartsWith("/split", StringComparison.OrdinalIgnoreCase) => "Split pages",
+                var p when p.StartsWith("/docs", StringComparison.OrdinalIgnoreCase) => "Word viewer",
+                var p when p.StartsWith("/sheets", StringComparison.OrdinalIgnoreCase) => "Excel viewer",
+                _ => null,
+            };
+        }
+    }
+
+    // ── tool strip (Mark / Protect only) ──────────────────────────────────
+    private IReadOnlyList<(StripItem Item, ShellCommand Command)>? StripItems
+    {
+        get
+        {
+            if (!OnDocView)
+            {
+                return null;
+            }
+
+            var source = Shell.Mode switch
+            {
+                DocMode.Mark => PhoneCommands.Mark,
+                DocMode.Protect => PhoneCommands.Protect,
+                _ => null,
+            };
+            if (source is null)
+            {
+                return null;
+            }
+
+            var commands = Shell.Commands;
+            var list = new List<(StripItem, ShellCommand)>();
+            foreach (var item in source)
+            {
+                if (PhoneCommands.Find(commands, item.CommandIds) is { } c)
+                {
+                    list.Add((item, c));
+                }
+            }
+
+            return list.Count == 0 ? null : list;
+        }
+    }
+
+    private async Task PickTool((StripItem Item, ShellCommand Command) pick)
+    {
+        if (!pick.Command.IsEnabled)
+        {
+            return;
+        }
+
+        _activeTool = pick.Item.Label;
+        _toolMode = Shell.Mode;
+        await pick.Command.Run();
+    }
+
+    // ── floating primary action ───────────────────────────────────────────
+    private ShellCommand? Fab => !OnDocView
+        ? null
+        : Shell.Mode switch
+        {
+            DocMode.Mark => PhoneCommands.Find(Shell.Commands, new[] { PhoneCommands.MarkPrimary }),
+            DocMode.Arrange => PhoneCommands.Find(Shell.Commands, new[] { PhoneCommands.ArrangePrimary }),
+            _ => null,
+        };
+
+    private string FabIcon => Shell.Mode == DocMode.Arrange ? "plus" : "download";
+
+    // ── View sheet ────────────────────────────────────────────────────────
+    private bool HasViewRows => PhoneCommands.View.Any(r => PhoneCommands.Find(Shell.Commands, r.CommandIds) is not null);
+
+    private bool _landscape;
+    private DotNetObjectReference<PhoneShell>? _self;
+    private IJSObjectReference? _js;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        try
+        {
+            _self = DotNetObjectReference.Create(this);
+            _js = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/mobile.js");
+            await _js.InvokeVoidAsync("watchOrientation", _self);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+            // orientation only refines the View sheet; the shell works without it
+        }
+    }
+
+    /// <summary>Called by mobile.js on rotation (12j: "Two-page · landscape only").</summary>
+    [JSInvokable]
+    public void SetLandscape(bool landscape)
+    {
+        if (_landscape != landscape)
+        {
+            _landscape = landscape;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private bool TwoPageBlocked(ViewRow r) => r.CommandIds.Contains("v.two") && !_landscape;
+
+    private string ViewValue(ViewRow r)
+    {
+        var tab = Tabs.Active;
+        return r.CommandIds[0] switch
+        {
+            "v.fitw" => tab?.FitMode == ReaderFitMode.Width ? "✓" : "",
+            "v.fitp" => tab?.FitMode == ReaderFitMode.Page ? "✓" : "",
+            "v.two" => _landscape ? (tab?.TwoPage == true ? "✓" : "") : "landscape only",
+            "v.rotr" => $"{CurrentRotation(tab)}°",
+            "v.loupe" => "2×",
+            _ => "",
+        };
+    }
+
+    private static int CurrentRotation(ReaderTab? tab) =>
+        tab is not null && tab.PageRotations.TryGetValue(tab.CurrentPage, out var deg) ? ((deg % 360) + 360) % 360 : 0;
+
+    // ── sheets, back, navigation ──────────────────────────────────────────
+    private void ShowSheet(PhoneSheetKind kind) => _sheet = kind;
+
+    private void Close() => _sheet = PhoneSheetKind.None;
+
+    private async Task Then(Func<Task>? action)
+    {
+        _sheet = PhoneSheetKind.None;
+        if (action is not null)
+        {
+            await action();
+        }
+    }
+
+    private async Task Run(ShellCommand c)
+    {
+        if (c.IsEnabled)
+        {
+            await c.Run();
+        }
+    }
+
+    private async Task PickMode(DocMode m)
+    {
+        _sheet = PhoneSheetKind.None;
+        if (RequestMode is not null)
+        {
+            await RequestMode(m);
+        }
+    }
+
+    private void Back()
+    {
+        if (_sheet != PhoneSheetKind.None)
+        {
+            _sheet = PhoneSheetKind.None;
+            return;
+        }
+
+        Go?.Invoke("/");
+    }
+
+    /// <summary>Android back: a sheet closes first; then the host's default.</summary>
+    private bool OnBackRequested()
+    {
+        if (_sheet == PhoneSheetKind.None)
+        {
+            return false;
+        }
+
+        _ = InvokeAsync(() =>
+        {
+            _sheet = PhoneSheetKind.None;
+            StateHasChanged();
+        });
+        return true;
+    }
+
+    private void OnChanged()
+    {
+        if (_activeTool is not null && Shell.Mode != _toolMode)
+        {
+            _activeTool = null;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnLocation(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _sheet = PhoneSheetKind.None;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Shell.Changed -= OnChanged;
+        Tabs.Changed -= OnChanged;
+        Nav.LocationChanged -= OnLocation;
+        if (_life is not null)
+        {
+            _life.BackRequested -= OnBackRequested;
+        }
+
+        if (_js is not null)
+        {
+            try
+            {
+                await _js.InvokeVoidAsync("unwatchOrientation");
+                await _js.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+        }
+
+        _self?.Dispose();
+    }
+}

@@ -1,0 +1,705 @@
+diff --git a/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj b/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
+index 86f70d2..97f9ffa 100644
+--- a/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
++++ b/src/ChuvadiReader.Core/ChuvadiReader.Core.csproj
+@@ -15,4 +15,9 @@
+     <PackageReference Include="Chuvadi.Docs" Version="1.1.0" />
+     <PackageReference Include="Chuvadi.Sheets" Version="1.1.2" />
+   </ItemGroup>
++
++  <ItemGroup>
++    <!-- Platform contracts every host implements (contracts only, no dependencies). -->
++    <ProjectReference Include="..\ChuvadiReader.Platform\ChuvadiReader.Platform.csproj" />
++  </ItemGroup>
+ </Project>
+diff --git a/src/ChuvadiReader.Ui/App.razor b/src/ChuvadiReader.Ui/App.razor
+index aa7a013..95e48dc 100644
+--- a/src/ChuvadiReader.Ui/App.razor
++++ b/src/ChuvadiReader.Ui/App.razor
+@@ -2,6 +2,7 @@
+     Root component. Lives in the shared UI library so every host (WPF now,
+     MAUI later) embeds the exact same <App /> with no changes.
+ *@
++<PlatformRoot>
+ <Router AppAssembly="@typeof(App).Assembly">
+     <Found Context="routeData">
+         <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+@@ -15,3 +16,4 @@
+         </LayoutView>
+     </NotFound>
+ </Router>
++</PlatformRoot>
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/PlatformRoot.razor b/src/ChuvadiReader.Ui/Components/Platform/PlatformRoot.razor
+new file mode 100644
+index 0000000..ffbfe1f
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/PlatformRoot.razor
+@@ -0,0 +1,65 @@
++@using ChuvadiReader.Platform
++@implements IAsyncDisposable
++@inject IPlatformInfo Platform
++@inject IJSRuntime JS
++
++@*
++    Publishes the platform to the page and to child components.
++      * <html data-shell="desktop|tablet|phone|portal" data-platform="windows|macos|linux|android|web"
++              data-form-factor="desktop|tablet|phone" data-input="mouse touch pen keyboard"> — CSS for platform components keys on these,
++        and reader.js reads data-platform to pick the primary shortcut modifier (Ctrl or ⌘).
++      * Cascades a PlatformState that changes when the form factor changes, so layouts re-render.
++    Place once, around the app's content.
++*@
++<CascadingValue Value="_state">
++    @ChildContent
++</CascadingValue>
++
++@code {
++    [Parameter]
++    public RenderFragment? ChildContent { get; set; }
++
++    private PlatformState _state = default!;
++    private IJSObjectReference? _module;
++
++    protected override void OnInitialized()
++    {
++        _state = PlatformState.From(Platform);
++        Platform.FormFactorChanged += OnFormFactorChanged;
++    }
++
++    protected override async Task OnAfterRenderAsync(bool firstRender)
++    {
++        if (!firstRender) return;
++        try
++        {
++            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/platform.js");
++            await ApplyAsync();
++        }
++        catch (JSDisconnectedException)
++        {
++        }
++    }
++
++    private void OnFormFactorChanged() => InvokeAsync(async () =>
++    {
++        _state = PlatformState.From(Platform);
++        await ApplyAsync();
++        StateHasChanged();
++    });
++
++    private async Task ApplyAsync()
++    {
++        if (_module is null) return;
++        await _module.InvokeVoidAsync("apply", _state.ShellKey, _state.KindKey, _state.FormFactorKey, _state.InputKey);
++    }
++
++    public async ValueTask DisposeAsync()
++    {
++        Platform.FormFactorChanged -= OnFormFactorChanged;
++        if (_module is not null)
++        {
++            try { await _module.DisposeAsync(); } catch (JSDisconnectedException) { }
++        }
++    }
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/PlatformState.cs b/src/ChuvadiReader.Ui/Components/Platform/PlatformState.cs
+new file mode 100644
+index 0000000..a9d9043
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/PlatformState.cs
+@@ -0,0 +1,38 @@
++using ChuvadiReader.Platform;
++
++namespace ChuvadiReader.Ui.Components.Platform;
++
++/// <summary>Snapshot of the platform facts the Ui renders from; cascaded by <c>PlatformRoot</c>.</summary>
++public sealed record PlatformState(PlatformKind Kind, FormFactor FormFactor, InputKinds Input, ShellChrome Chrome, PlatformCapabilities Capabilities)
++{
++    /// <summary>What the Ui switches chrome on: desktop, tablet, phone or portal.</summary>
++    public ShellLayout Shell => ShellLayouts.From(Kind, FormFactor);
++
++    public string ShellKey => ShellLayouts.Key(Shell);
++
++    public string KindKey => Kind switch
++    {
++        PlatformKind.Windows => "windows",
++        PlatformKind.MacOS => "macos",
++        PlatformKind.Linux => "linux",
++        PlatformKind.Android => "android",
++        _ => "web",
++    };
++
++    public string FormFactorKey => FormFactor switch
++    {
++        FormFactor.Tablet => "tablet",
++        FormFactor.Phone => "phone",
++        _ => "desktop",
++    };
++
++    public string InputKey => string.Join(' ', new[]
++    {
++        Input.HasFlag(InputKinds.Mouse) ? "mouse" : null,
++        Input.HasFlag(InputKinds.Touch) ? "touch" : null,
++        Input.HasFlag(InputKinds.Pen) ? "pen" : null,
++        Input.HasFlag(InputKinds.Keyboard) ? "keyboard" : null,
++    }.Where(s => s is not null));
++
++    public static PlatformState From(IPlatformInfo p) => new(p.Kind, p.FormFactor, p.Input, p.Chrome, p.Capabilities);
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/StatusLocation.razor b/src/ChuvadiReader.Ui/Components/Platform/StatusLocation.razor
+new file mode 100644
+index 0000000..64457ff
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/StatusLocation.razor
+@@ -0,0 +1,13 @@
++@using ChuvadiReader.Platform
++@inject IPlatformInfo Platform
++
++@*
++    Where processing happens, first item of the status bar.
++    Device builds: unchanged "offline · on this device". Web portal (design 12b): server wording.
++*@
++<span class="sb-item"><span class="status-dot"></span>@(Platform.Capabilities.ServerSide ? ServerText : DeviceText)</span>
++
++@code {
++    private const string DeviceText = "offline · on this device";
++    private const string ServerText = "processed on the server · encrypted at rest · only you can see it";
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor b/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor
+new file mode 100644
+index 0000000..bbee63a
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor
+@@ -0,0 +1,41 @@
++@using ChuvadiReader.Platform
++@implements IDisposable
++@inject IPlatformInfo Platform
++@inject IWindowControls Win
++
++@*
++    Window buttons drawn by the Ui. Placed twice in the top bar (Side="Left" at the start,
++    Side="Right" at the end); only the one matching IPlatformInfo.Chrome.Buttons renders.
++    Right = Windows / Linux default, markup identical to the pre-platform top bar.
++    Left  = macOS order (close · minimise · zoom) and Linux desktops whose button layout is on the left.
++    None  = Android and Web: nothing (Web shows the account menu instead).
++*@
++
++@if (Platform.Chrome.Buttons == Side && Side == ChuvadiReader.Platform.WindowButtons.Right)
++{
++    <div class="traffic">
++        <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
++        <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
++        <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
++    </div>
++}
++else if (Platform.Chrome.Buttons == Side && Side == ChuvadiReader.Platform.WindowButtons.Left)
++{
++    <div class="traffic traffic-left" @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true">
++        <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
++        <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
++        <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Exit full screen" : "Zoom")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
++    </div>
++}
++
++@code {
++    /// <summary>Which end of the top bar this instance sits at.</summary>
++    [Parameter, EditorRequired]
++    public ChuvadiReader.Platform.WindowButtons Side { get; set; }
++
++    protected override void OnInitialized() => Win.StateChanged += OnWindowStateChanged;
++
++    private void OnWindowStateChanged() => InvokeAsync(StateHasChanged);
++
++    public void Dispose() => Win.StateChanged -= OnWindowStateChanged;
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor.css b/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor.css
+new file mode 100644
+index 0000000..667480b
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/Components/Platform/WindowButtons.razor.css
+@@ -0,0 +1,11 @@
++/* macOS / left-hand buttons: 15 px dots, gap 9 (design handout, Shell layout). */
++.traffic-left {
++    margin-left: 0;
++    margin-right: 10px;
++    gap: 9px;
++}
++
++.traffic-left .tl {
++    width: 15px;
++    height: 15px;
++}
+diff --git a/src/ChuvadiReader.Ui/Components/Rails/RailButton.razor b/src/ChuvadiReader.Ui/Components/Rails/RailButton.razor
+index ad35047..9877ad5 100644
+--- a/src/ChuvadiReader.Ui/Components/Rails/RailButton.razor
++++ b/src/ChuvadiReader.Ui/Components/Rails/RailButton.razor
+@@ -1,3 +1,4 @@
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ @*
+     One button on a D-10 rail (Tools, View or Arrange). Icons only until the rail is hovered;
+     then the label and shortcut show. Unbuilt features pass DisabledReason: the button is
+@@ -9,7 +10,7 @@
+         @onclick="OnClick">
+     <Icon Name="@Icon" Size="@Size" />
+     <span class="rb-l">@Label</span>
+-    <span class="rb-k">@(DisabledReason is not null ? "soon" : Keys)</span>
++    <span class="rb-k">@(DisabledReason is not null ? "soon" : ShownKeys)</span>
+ </button>
+ 
+ @code {
+@@ -27,5 +28,7 @@
+ 
+     private string Tip => DisabledReason is not null
+         ? $"{Label} — {DisabledReason}"
+-        : string.IsNullOrEmpty(Keys) ? Label : $"{Label} ({Keys})";
++        : string.IsNullOrEmpty(Keys) ? Label : $"{Label} ({ShownKeys})";
++
++    private string? ShownKeys => string.IsNullOrEmpty(Keys) ? Keys : Platform.Keys.Format(Keys);
+ }
+diff --git a/src/ChuvadiReader.Ui/Components/Settings/ShortcutsSection.razor b/src/ChuvadiReader.Ui/Components/Settings/ShortcutsSection.razor
+index 6c54322..ed30fd4 100644
+--- a/src/ChuvadiReader.Ui/Components/Settings/ShortcutsSection.razor
++++ b/src/ChuvadiReader.Ui/Components/Settings/ShortcutsSection.razor
+@@ -1,4 +1,5 @@
+ @namespace ChuvadiReader.Ui.Components.Settings
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ @*
+     Read-only list of keyboard shortcuts. "Works" rows mirror the real key handlers
+@@ -28,7 +29,7 @@
+                                     {
+                                         <span class="or">·</span>
+                                     }
+-                                    <kbd>@k.Chords[i]</kbd>
++                                    <kbd>@Platform.Keys.Format(k.Chords[i])</kbd>
+                                 }
+                             </td>
+                         </tr>
+diff --git a/src/ChuvadiReader.Ui/Components/Shell/CommandBar.razor b/src/ChuvadiReader.Ui/Components/Shell/CommandBar.razor
+index 18bc513..f263a08 100644
+--- a/src/ChuvadiReader.Ui/Components/Shell/CommandBar.razor
++++ b/src/ChuvadiReader.Ui/Components/Shell/CommandBar.razor
+@@ -1,4 +1,5 @@
+ @inject IJSRuntime JS
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ @*
+     Ctrl K command bar: find and run any feature. Commands come from the shell (global)
+@@ -48,7 +49,7 @@
+                     }
+                     @if (cc.Keys is not null)
+                     {
+-                        <span class="kbd">@cc.Keys</span>
++                        <span class="kbd">@Platform.Keys.Format(cc.Keys)</span>
+                     }
+                 </button>
+             }
+diff --git a/src/ChuvadiReader.Ui/Layout/MainLayout.razor b/src/ChuvadiReader.Ui/Layout/MainLayout.razor
+index 4bb1a6e..3b4a972 100644
+--- a/src/ChuvadiReader.Ui/Layout/MainLayout.razor
++++ b/src/ChuvadiReader.Ui/Layout/MainLayout.razor
+@@ -15,6 +15,7 @@
+ @inject ShellService Shell
+ @inject BenchService Bench
+ @inject UserProfileService Profile
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ @*
+     D-10 shell. One thin 40 px top bar (wordmark · tabs · ‹ n / N › · Document ▾ · Ctrl K ·
+@@ -29,6 +30,7 @@
+ 
+     <header class="topbar @(_leftOpen ? "lb-open" : null)" @onmousedown="StartDrag">
+         <div class="tb-left">
++            <WindowButtons Side="ChuvadiReader.Platform.WindowButtons.Left" />
+             <div class="tb-brandbox">
+                 <button class="tb-brand" @onclick='() => Go("/")' @onmousedown:stopPropagation="true" @ondblclick:stopPropagation="true" title="Home">
+                     @if (_leftOpen)
+@@ -58,7 +60,7 @@
+                 {
+                     <span class="rtab-more" title="@(Tabs.Tabs.Count - 1) more tabs">+@(Tabs.Tabs.Count - 1)</span>
+                 }
+-                <button class="rtab-add" @onmousedown:stopPropagation="true" @onclick="AddTab" title="Open document (Ctrl O)" aria-label="Open document"><Icon Name="plus" Size="13" /></button>
++                <button class="rtab-add" @onmousedown:stopPropagation="true" @onclick="AddTab" title="Open document (@Platform.Keys.Format("Ctrl O"))" aria-label="Open document"><Icon Name="plus" Size="13" /></button>
+             </div>
+             @if (Tabs.Tabs.Count > 0)
+             {
+@@ -68,10 +70,10 @@
+                     {
+                         <div class="pop-scrim" @onclick="CloseTabMenu"></div>
+                         <div class="pop tabmenu-pop">
+-                            <button class="pop-item" @onclick="MenuCloseActive"><Icon Name="close" Size="14" /><span class="pop-l">Close active tab</span><span class="pop-k">Ctrl W</span></button>
+-                            <button class="pop-item" @onclick="MenuCloseOthers" disabled="@(Tabs.Tabs.Count < 2)"><Icon Name="close" Size="14" /><span class="pop-l">Close inactive tabs</span><span class="pop-k">Ctrl Alt W</span></button>
++                            <button class="pop-item" @onclick="MenuCloseActive"><Icon Name="close" Size="14" /><span class="pop-l">Close active tab</span><span class="pop-k">@Platform.Keys.Format("Ctrl W")</span></button>
++                            <button class="pop-item" @onclick="MenuCloseOthers" disabled="@(Tabs.Tabs.Count < 2)"><Icon Name="close" Size="14" /><span class="pop-l">Close inactive tabs</span><span class="pop-k">@Platform.Keys.Format("Ctrl Alt W")</span></button>
+                             <div class="pop-sep"></div>
+-                            <button class="pop-item" @onclick="MenuCloseAll"><Icon Name="close" Size="14" /><span class="pop-l">Close all tabs</span><span class="pop-k">Ctrl Shift W</span></button>
++                            <button class="pop-item" @onclick="MenuCloseAll"><Icon Name="close" Size="14" /><span class="pop-l">Close all tabs</span><span class="pop-k">@Platform.Keys.Format("Ctrl Shift W")</span></button>
+                         </div>
+                     }
+                 </span>
+@@ -108,7 +110,7 @@
+                                 else
+                                 {
+                                     <button class="pop-item" disabled="@(!c.IsEnabled)" title="@(c.DisabledReason ?? c.Label)" @onclick="() => RunDocCommand(c)">
+-                                        <Icon Name="@c.Icon" Size="15" /><span class="pop-l">@c.Label</span><span class="pop-k">@c.Keys</span>
++                                        <Icon Name="@c.Icon" Size="15" /><span class="pop-l">@c.Label</span><span class="pop-k">@(c.Keys is null ? null : Platform.Keys.Format(c.Keys))</span>
+                                     </button>
+                                 }
+                             }
+@@ -116,15 +118,11 @@
+                     }
+                 </span>
+             }
+-            <button class="tb-cmd" @onclick="OpenCommandBar" title="Find or do anything (Ctrl K)">
+-                <Icon Name="search" Size="13" /><span class="tb-cmd-t">Find or do anything…</span><span class="kbd">Ctrl K</span>
++            <button class="tb-cmd" @onclick="OpenCommandBar" title="Find or do anything (@Platform.Keys.Format("Ctrl K"))">
++                <Icon Name="search" Size="13" /><span class="tb-cmd-t">Find or do anything…</span><span class="kbd">@Platform.Keys.Format("Ctrl K")</span>
+             </button>
+             <button class="tb-icon" @onclick="ToggleTheme" title="@(Theme.Current.IsDark() ? "Switch to Cream paper" : "Switch to Night paper")" aria-label="Toggle light and dark"><Icon Name="@(Theme.Current.IsDark() ? "shift-day" : "shift-night")" Size="16" /></button>
+-            <div class="traffic">
+-                <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
+-                <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
+-                <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
+-            </div>
++            <WindowButtons Side="ChuvadiReader.Platform.WindowButtons.Right" />
+         </div>
+     </header>
+ 
+@@ -145,8 +143,8 @@
+                 </button>
+             }
+             <span class="lb-sep"></span>
+-            <button class="lb-btn" @onclick="AddTab" title="Open (Ctrl O)"><Icon Name="folder" Size="19" /><span class="lb-l">Open</span><span class="lb-k">Ctrl O</span></button>
+-            <button class="lb-btn" @onclick="FindNow" title="Find (Ctrl F)"><Icon Name="find-in-page" Size="19" /><span class="lb-l">Find</span><span class="lb-k">Ctrl F</span></button>
++            <button class="lb-btn" @onclick="AddTab" title="Open (@Platform.Keys.Format("Ctrl O"))"><Icon Name="folder" Size="19" /><span class="lb-l">Open</span><span class="lb-k">@Platform.Keys.Format("Ctrl O")</span></button>
++            <button class="lb-btn" @onclick="FindNow" title="Find (@Platform.Keys.Format("Ctrl F"))"><Icon Name="find-in-page" Size="19" /><span class="lb-l">Find</span><span class="lb-k">@Platform.Keys.Format("Ctrl F")</span></button>
+             <button class="lb-btn @(IsAt("/library") ? "here" : null)" @onclick='() => Go("/library")' title="Library"><Icon Name="library" Size="19" /><span class="lb-l">Library</span><span class="lb-k"></span></button>
+             <button class="lb-btn @(IsAt("/") ? "here" : null)" @onclick='() => Go("/")' title="Home"><Icon Name="home" Size="19" /><span class="lb-l">Home</span><span class="lb-k"></span></button>
+             <span class="lb-spacer"></span>
+@@ -160,7 +158,7 @@
+     </div>
+ 
+     <footer class="statusbar">
+-        <span class="sb-item"><span class="status-dot"></span>offline · on this device</span>
++        <StatusLocation />
+         <span class="sb-div"></span>
+         <span class="sb-item"><span class="sb-avatar">@Initials</span>@(Profile.Name ?? "This computer")</span>
+         @if (!string.IsNullOrEmpty(Shell.Activity))
+@@ -641,7 +639,7 @@
+ 
+     private void StartDrag(MouseEventArgs e)
+     {
+-        if (e.Button != 0)
++        if (e.Button != 0 || !Platform.Chrome.TitleBarDrag)
+         {
+             return;
+         }
+diff --git a/src/ChuvadiReader.Ui/Pages/Bench.razor b/src/ChuvadiReader.Ui/Pages/Bench.razor
+index c33ff62..140a9ff 100644
+--- a/src/ChuvadiReader.Ui/Pages/Bench.razor
++++ b/src/ChuvadiReader.Ui/Pages/Bench.razor
+@@ -11,6 +11,7 @@
+ @inject SessionService Session
+ @inject RedactRequestService RedactReq
+ @inject BenchDropService BenchDrop
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ @implements IAsyncDisposable
+ 
+ <PageTitle>Chuvadi · Bench</PageTitle>
+@@ -215,7 +216,7 @@
+                         <span class="desk-count">@desk.Pages.Count pg</span>
+                         @if (!desk.IsEmpty)
+                         {
+-                            <button class="desk-sel" @onclick="() => BenchSvc.SelectAllInDesk(deskId)" title="Select all pages on this desk (Ctrl+A)" aria-label="Select all">All</button>
++                            <button class="desk-sel" @onclick="() => BenchSvc.SelectAllInDesk(deskId)" title="Select all pages on this desk (@Platform.Keys.Format("Ctrl A"))" aria-label="Select all">All</button>
+                             <button class="desk-sel" @onclick="() => BenchSvc.InvertSelectionInDesk(deskId)" title="Invert selection on this desk" aria-label="Invert selection">Inv</button>
+                         }
+                         @if (!string.IsNullOrEmpty(desk.NormalizeSize))
+diff --git a/src/ChuvadiReader.Ui/Pages/Dashboard.razor b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+index 2f93e6a..96d4669 100644
+--- a/src/ChuvadiReader.Ui/Pages/Dashboard.razor
++++ b/src/ChuvadiReader.Ui/Pages/Dashboard.razor
+@@ -13,6 +13,7 @@
+ @inject CategoryService Categories
+ @inject SaveFolderService SaveFolders
+ @inject PreferencesService Prefs
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
+ 
+ <PageTitle>Chuvadi · Home</PageTitle>
+ 
+@@ -42,7 +43,7 @@
+                     <button type="button" class="btn" @onclick="ChooseLibraryFolder">Choose a library folder</button>
+                 </span>
+             </div>
+-            <p class="tip">Tip: Ctrl K finds any file or action. Try typing “merge”.</p>
++            <p class="tip">Tip: @Platform.Keys.Format("Ctrl K") finds any file or action. Try typing “merge”.</p>
+         }
+         else
+         {
+diff --git a/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs b/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
+index 578a585..26ee95e 100644
+--- a/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
++++ b/src/ChuvadiReader.Ui/Pages/Reader.Shell.cs
+@@ -514,7 +514,7 @@ public partial class Reader
+     {
+         try
+         {
+-            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
++            await TextClip.SetTextAsync(text);
+             Shell.Notify(done);
+         }
+         catch (Exception ex)
+diff --git a/src/ChuvadiReader.Ui/Pages/Reader.razor b/src/ChuvadiReader.Ui/Pages/Reader.razor
+index 3917514..e588728 100644
+--- a/src/ChuvadiReader.Ui/Pages/Reader.razor
++++ b/src/ChuvadiReader.Ui/Pages/Reader.razor
+@@ -19,6 +19,8 @@
+ @inject ChuvadiReader.Core.Documents.RecoveryService Recovery
+ @inject RedactRequestService RedactHandoff
+ @inject IEntitlements Entitlements
++@inject ChuvadiReader.Platform.IPlatformInfo Platform
++@inject ChuvadiReader.Platform.IClipboard TextClip
+ @using ChuvadiReader.Core.Documents
+ 
+ <PageTitle>Chuvadi · Reader</PageTitle>
+@@ -85,7 +87,7 @@
+             else
+             {
+                 <div class="bm-acts">
+-                    <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page (Ctrl B)"><Icon Name="plus" Size="13" /> Add</button>
++                    <button class="bm-act" @onclick="BmAddCurrent" title="Add a bookmark at the current page (@Platform.Keys.Format("Ctrl B"))"><Icon Name="plus" Size="13" /> Add</button>
+                     <button class="bm-act" @onclick="() => BmMove(-1)" disabled="@(_bmSel is null)" title="Move up"><Icon Name="chevron-up" Size="13" /></button>
+                     <button class="bm-act" @onclick="() => BmMove(1)" disabled="@(_bmSel is null)" title="Move down"><Icon Name="chevron-down" Size="13" /></button>
+                     <button class="bm-act" @onclick="BmIndent" disabled="@(_bmSel is null)" title="Indent (nest under the entry above)"><Icon Name="chevron-right" Size="13" /></button>
+@@ -1029,7 +1031,7 @@
+             <button @onclick="() => RotateCurrent(90)" title="Rotate this page (view only)"><Icon Name="rotate-cw" Size="14" /> Rotate page</button>
+             <button @onclick="() => ToggleSendMenu(CurPage - 1)" title="Send this page to a desk in Arrange"><Icon Name="grid-view" Size="14" /> To desk</button>
+             <button @onclick="() => SetTool(ReaderTool.Snapshot)" title="Snapshot a region (S)"><Icon Name="snapshot" Size="14" /> Snapshot</button>
+-            <button @onclick="AddBookmarkHere" title="Bookmark this page (Ctrl B)"><Icon Name="bookmark" Size="14" /> Bookmark</button>
++            <button @onclick="AddBookmarkHere" title="Bookmark this page (@Platform.Keys.Format("Ctrl B"))"><Icon Name="bookmark" Size="14" /> Bookmark</button>
+             <button disabled title="Peek — coming soon"><Icon Name="eye" Size="14" /> Peek</button>
+         </div>
+     }
+diff --git a/src/ChuvadiReader.Ui/_Imports.razor b/src/ChuvadiReader.Ui/_Imports.razor
+index 3fdf176..f55e897 100644
+--- a/src/ChuvadiReader.Ui/_Imports.razor
++++ b/src/ChuvadiReader.Ui/_Imports.razor
+@@ -20,3 +20,4 @@
+ @using ChuvadiReader.Ui.Components.Viewers
+ @using ChuvadiReader.Ui.Components.Cards
+ @using ChuvadiReader.Ui.Components.Rails
++@using ChuvadiReader.Ui.Components.Platform
+diff --git a/src/ChuvadiReader.Ui/wwwroot/js/platform.js b/src/ChuvadiReader.Ui/wwwroot/js/platform.js
+new file mode 100644
+index 0000000..d2ad507
+--- /dev/null
++++ b/src/ChuvadiReader.Ui/wwwroot/js/platform.js
+@@ -0,0 +1,16 @@
++// Platform attributes on <html>, set by PlatformRoot.razor. Only sets attributes; CSS and other
++// modules read them (e.g. reader.js picks ⌘ or Ctrl from data-platform).
++export function apply(shell, platform, formFactor, input) {
++    const root = document.documentElement;
++    root.setAttribute('data-shell', shell || 'desktop');
++    root.setAttribute('data-platform', platform || 'windows');
++    root.setAttribute('data-form-factor', formFactor || 'desktop');
++    root.setAttribute('data-input', input || '');
++}
++
++// The primary shortcut modifier for this platform: ⌘ on macOS, Ctrl everywhere else.
++export function isPrimary(e) {
++    return document.documentElement.getAttribute('data-platform') === 'macos'
++        ? (e.metaKey === true && e.ctrlKey !== true)
++        : (e.ctrlKey === true && e.metaKey !== true);
++}
+diff --git a/src/ChuvadiReader.Ui/wwwroot/js/reader.js b/src/ChuvadiReader.Ui/wwwroot/js/reader.js
+index 55dfda8..75aceb8 100644
+--- a/src/ChuvadiReader.Ui/wwwroot/js/reader.js
++++ b/src/ChuvadiReader.Ui/wwwroot/js/reader.js
+@@ -5,6 +5,8 @@
+ // keyboard shortcuts. During a toolbar-driven scroll the indicator tracking is
+ // suppressed so it does not flicker through the pages it passes.
+ 
++import { isPrimary } from './platform.js';
++
+ let lazy = null;
+ let spy = null;
+ let dotnet = null;
+@@ -95,7 +97,7 @@ export function init(deskEl, dotnetRef) {
+         if (e.key === 'Escape') { invoke('OnEscape'); return; }
+ 
+         // Tab-close shortcuts: handle the Alt/Shift variants of W before the no-Alt block.
+-        if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'w') {
++        if (isPrimary(e) && e.key.toLowerCase() === 'w') {
+             e.preventDefault();
+             if (e.altKey) invoke('CloseOtherTabs');
+             else if (e.shiftKey) invoke('CloseAllTabs');
+@@ -103,7 +105,7 @@ export function init(deskEl, dotnetRef) {
+             return;
+         }
+ 
+-        if (e.ctrlKey && !e.altKey && !e.metaKey) {
++        if (isPrimary(e) && !e.altKey) {
+             const k = e.key.toLowerCase();
+             if (k === 'z') { e.preventDefault(); invoke('Undo'); }
+             else if (e.key === 'Tab') { e.preventDefault(); invoke('CycleTab', e.shiftKey ? -1 : 1); }
+@@ -114,7 +116,7 @@ export function init(deskEl, dotnetRef) {
+             else if (k === 'f') { e.preventDefault(); invoke('OpenFind'); }   // app find, not WebView2's native find
+             return;
+         }
+-        if (e.altKey || e.metaKey) return;
++        if (e.altKey || e.metaKey || e.ctrlKey) return;
+ 
+         // Below here are bare navigation keys; don't steal them from focused controls.
+         if (tag === 'BUTTON' || tag === 'A' || tag === 'SELECT') return;
+diff --git a/src/ChuvadiReader.Windows/wwwroot/theme.js b/src/ChuvadiReader.Ui/wwwroot/js/theme.js
+similarity index 100%
+rename from src/ChuvadiReader.Windows/wwwroot/theme.js
+rename to src/ChuvadiReader.Ui/wwwroot/js/theme.js
+diff --git a/src/ChuvadiReader.Windows/App.xaml.cs b/src/ChuvadiReader.Windows/App.xaml.cs
+index a0d53ac..4d8dfea 100644
+--- a/src/ChuvadiReader.Windows/App.xaml.cs
++++ b/src/ChuvadiReader.Windows/App.xaml.cs
+@@ -10,6 +10,8 @@ using ChuvadiReader.Core.Storage;
+ using ChuvadiReader.Core.Theme;
+ using ChuvadiReader.Core.Window;
+ using ChuvadiReader.Windows.Platform;
++using ChuvadiReader.Hosting;
++using ChuvadiReader.Platform;
+ using Microsoft.Extensions.DependencyInjection;
+ 
+ namespace ChuvadiReader.Windows;
+@@ -58,49 +60,24 @@ public partial class App : Application
+                 "Chuvadi");
+ 
+             var storage = new FileAppStorage(appDataDir);
++
++            // Every Core service, registered once for all hosts (ChuvadiReader.Hosting).
++            services.AddChuvadiReader(AppStateLifetime.Process);
++
++            // Windows implementations of the platform seams.
+             services.AddSingleton<IAppStorage>(storage);
+-            services.AddSingleton<SaveFolderService>();
+-            services.AddSingleton<CategoryService>();
+-            services.AddSingleton<ThemeService>();
+-            services.AddSingleton<UserProfileService>();
+-            services.AddSingleton<RecentFilesService>();
+-            services.AddSingleton<PinnedService>();
+-            services.AddSingleton<WatchedFolderService>();
+-            services.AddSingleton<LibraryService>();
+-            services.AddSingleton<TagService>();
+-            services.AddSingleton<FolderSearchService>();
+-            services.AddSingleton<DocumentPropertiesService>();
+-            services.AddSingleton<ExportService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.RedactService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.StampService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.DocxViewService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.XlsxViewService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.FlattenService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.RecoveryService>();
+-            services.AddSingleton<PressService>();
+-            services.AddSingleton<IPdfReader, ChuvadiPdfReader>();
+-            services.AddSingleton<TabsService>();
+-            services.AddSingleton<PdfToolsService>();
+-            services.AddSingleton<BenchComposer>();
+-            services.AddSingleton<BenchService>();
+-            services.AddSingleton<SessionService>();
+-            services.AddSingleton<OpenDocumentService>();
+-            services.AddSingleton<BenchDropService>();
+-            services.AddSingleton<RedactRequestService>();
+-            services.AddSingleton<ShellService>();
+             services.AddSingleton<ChuvadiReader.Core.Window.IUiScale, ChuvadiReader.Windows.Platform.WpfUiScale>();
+             services.AddSingleton<ChuvadiReader.Core.Window.IExternalLinks, ChuvadiReader.Windows.Platform.WpfExternalLinks>();
+-            services.AddSingleton<ChuvadiReader.Core.Storage.PreferencesService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.TextViewService>();
+-            services.AddSingleton<MeasureService>();
+-            services.AddSingleton<SignatureCheckService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.PasswordService>();
+-            services.AddSingleton<ChuvadiReader.Core.Documents.CertificateSignService>();
+             services.AddSingleton<IPrintService, ChuvadiReader.Windows.Platform.WpfPrintService>();
+-            services.AddSingleton<ChuvadiReader.Core.Licensing.IEntitlements, ChuvadiReader.Core.Licensing.DefaultEntitlements>();
+             services.AddSingleton<IFilePicker, WpfFilePicker>();
+             services.AddSingleton<IImageClipboard, WpfImageClipboard>();
+-            services.AddSingleton<IAppReadySignal, AppReadySignal>();
++            services.AddSingleton<IClipboard, WpfClipboard>();
++            services.AddSingleton<IPlatformInfo>(new FixedPlatformInfo(
++                PlatformKind.Windows,
++                InputKinds.Mouse | InputKinds.Keyboard | InputKinds.Touch,
++                new ShellChrome(ChuvadiReader.Platform.WindowButtons.Right, NativeMenuBar: false, AccountMenu: false, TitleBarDrag: true, CornerRadiusPx: 0),
++                FixedPlatformInfo.DesktopCapabilities,
++                new CtrlKeyLabels()));
+ 
+             _windowControls = new WpfWindowControls();
+             services.AddSingleton<IWindowControls>(_windowControls);
+diff --git a/src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj b/src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj
+index 348e667..aed7d0e 100644
+--- a/src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj
++++ b/src/ChuvadiReader.Windows/ChuvadiReader.Windows.csproj
+@@ -27,5 +27,6 @@
+   <ItemGroup>
+     <ProjectReference Include="..\ChuvadiReader.Ui\ChuvadiReader.Ui.csproj" />
+     <ProjectReference Include="..\ChuvadiReader.Core\ChuvadiReader.Core.csproj" />
++    <ProjectReference Include="..\ChuvadiReader.Hosting\ChuvadiReader.Hosting.csproj" />
+   </ItemGroup>
+ </Project>
+diff --git a/src/ChuvadiReader.Windows/Platform/WpfClipboard.cs b/src/ChuvadiReader.Windows/Platform/WpfClipboard.cs
+new file mode 100644
+index 0000000..fc8e31a
+--- /dev/null
++++ b/src/ChuvadiReader.Windows/Platform/WpfClipboard.cs
+@@ -0,0 +1,45 @@
++using System.Windows;
++using ChuvadiReader.Platform;
++
++namespace ChuvadiReader.Windows.Platform;
++
++/// <summary>
++/// Text and image clipboard for the Windows host (IClipboard). Text goes through the WPF clipboard
++/// on the UI thread; images reuse <see cref="WpfImageClipboard"/> unchanged.
++/// A failed text copy throws, so the Ui keeps showing "Couldn't copy: …" as it does today.
++/// </summary>
++public sealed class WpfClipboard : IClipboard
++{
++    private readonly WpfImageClipboard _images = new();
++
++    public bool CanCopyText => true;
++
++    public bool CanCopyImage => true;
++
++    public Task SetTextAsync(string text, CancellationToken ct = default)
++    {
++        var dispatcher = Application.Current?.Dispatcher
++            ?? throw new InvalidOperationException("The clipboard isn't available right now.");
++
++        // Another app can hold the clipboard open for a moment (CLIPBRD_E_CANT_OPEN): retry briefly,
++        // then let the last failure surface.
++        dispatcher.Invoke(() =>
++        {
++            for (var attempt = 1; ; attempt++)
++            {
++                try
++                {
++                    Clipboard.SetDataObject(text ?? string.Empty, copy: true);
++                    return;
++                }
++                catch (System.Runtime.InteropServices.ExternalException) when (attempt < 5)
++                {
++                    Thread.Sleep(50);
++                }
++            }
++        });
++        return Task.CompletedTask;
++    }
++
++    public Task SetImageAsync(byte[] pngBytes, CancellationToken ct = default) => _images.SetImageAsync(pngBytes, ct);
++}
+diff --git a/src/ChuvadiReader.Windows/wwwroot/index.html b/src/ChuvadiReader.Windows/wwwroot/index.html
+index bebdfc2..3661293 100644
+--- a/src/ChuvadiReader.Windows/wwwroot/index.html
++++ b/src/ChuvadiReader.Windows/wwwroot/index.html
+@@ -33,7 +33,7 @@
+         An error occurred. <a href="" class="reload">Reload</a>
+     </div>
+ 
+-    <script src="theme.js"></script>
++    <script src="_content/ChuvadiReader.Ui/js/theme.js"></script>
+     <script src="_framework/blazor.webview.js"></script>
+ </body>
+ </html>

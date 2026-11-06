@@ -1,18 +1,40 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- One version for every chuvadi-pdf package (they are mono-versioned and must never mix). -->
+    <ChuvadiPdfVersion>3.31.2</ChuvadiPdfVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <!--
-      chuvadi-pdf consumed ONLY as its packaged distribution (the Chuvadi.Pdf
-      meta-package), restored from the local feed in ./localpackages via the
-      solution nuget.config. No project reference, no vendored source.
-      The meta-package pulls Chuvadi.Pdf.Documents + Chuvadi.Pdf.Svg (and the
-      rest of the cross-platform modules), which is what ChuvadiPdfReader uses.
+      chuvadi-pdf consumed ONLY as packaged distribution, from the committed ci/packages feed
+      (byte-identical to what Windows ships). Individual packages, not the Chuvadi.Pdf umbrella:
+      the umbrella also pulls PdfA (4.3 MB) and the deprecated Fonts.Bundled / Fonts.Woff2, which
+      the app never uses (library report 6 Nov 2026, §5B). Every package must be the same version.
     -->
-    <PackageReference Include="Chuvadi.Pdf" Version="3.31.1" />
+    <PackageReference Include="Chuvadi.Cryptography" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Primitives" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Objects" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.IO" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Documents" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Graphics" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Images" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Text" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Rendering" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Rendering.DisplayList" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Svg" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Authoring" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Forms" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Operations" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Redaction" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Watermark" Version="$(ChuvadiPdfVersion)" />
+    <PackageReference Include="Chuvadi.Pdf.Signatures" Version="$(ChuvadiPdfVersion)" />
     <PackageReference Include="Chuvadi.Docs" Version="1.1.0" />
     <PackageReference Include="Chuvadi.Sheets" Version="1.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Platform contracts every host implements (contracts only, no dependencies). -->
+    <ProjectReference Include="..\ChuvadiReader.Platform\ChuvadiReader.Platform.csproj" />
   </ItemGroup>
 </Project>

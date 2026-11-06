@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ChuvadiReader.Core.Storage;
+using ChuvadiReader.Platform;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -10,7 +11,14 @@ public sealed class PinnedService
     private readonly IAppStorage _storage;
     private readonly List<PinnedItem> _items = new();
 
-    public PinnedService(IAppStorage storage) => _storage = storage;
+    private readonly bool _samples;
+
+    /// <param name="platform">The host. No Phase 0 samples on a server (Web H8). Desktop unchanged.</param>
+    public PinnedService(IAppStorage storage, IPlatformInfo? platform = null)
+    {
+        _storage = storage;
+        _samples = platform?.Capabilities.ServerSide != true;
+    }
 
     public IReadOnlyList<PinnedItem> Items => _items;
 
@@ -36,7 +44,7 @@ public sealed class PinnedService
             }
         }
 
-        if (_items.Count == 0)
+        if (_items.Count == 0 && _samples)
         {
             _items.Add(new PinnedItem("aerb_submission.pdf", "~/Documents/Chuvadi/aerb_submission.pdf", false, DocumentFormat.Pdf));
             _items.Add(new PinnedItem("IMCHRC / PET-CT", "~/Documents/Chuvadi/IMCHRC", true, null));

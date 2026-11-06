@@ -1,0 +1,24 @@
+@*
+    Tool strip (12h Mark, 12j Protect): one 62 px row above the bottom bar, 52 × 50 items with the
+    label under the icon. Scrolls sideways when the tools don't fit. Tools that aren't built yet
+    stay visible and greyed, with the reason as their tooltip (same rule as the desktop rails).
+*@
+<div class="ph-strip" role="toolbar" aria-label="Tools">
+    @foreach (var pick in Items)
+    {
+        var p = pick;
+        var on = Active == p.Item.Label;
+        <button class="ph-tool @(on ? "on" : null)" disabled="@(!p.Command.IsEnabled)" aria-pressed="@(on ? "true" : "false")"
+                title="@(p.Command.DisabledReason is null ? p.Command.Label : $"{p.Command.Label} — {p.Command.DisabledReason}")"
+                @onclick="() => OnPick.InvokeAsync(p)">
+            <Icon Name="@p.Item.Icon" Size="19" />
+            <span>@p.Item.Label</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<(StripItem Item, ShellCommand Command)> Items { get; set; } = Array.Empty<(StripItem, ShellCommand)>();
+    [Parameter] public string? Active { get; set; }
+    [Parameter] public EventCallback<(StripItem Item, ShellCommand Command)> OnPick { get; set; }
+}

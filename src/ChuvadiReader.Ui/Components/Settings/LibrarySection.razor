@@ -4,8 +4,11 @@
 @inject CategoryService Categories
 @inject LibraryService Lib
 @inject IFilePicker Picker
+@inject ChuvadiReader.Platform.IPlatformInfo Platform
 
 <SettingsSection Title="@SectionTitle" Sub="Where Chuvadi looks for documents.">
+    @if (Platform.Capabilities.WatchFolders)
+    {
     <SettingsCard Title="Library folder">
         <SettingRow Label="Folder" Hint="The same folder new files are saved to" Stack="true">
             <ValueChip Text="@SaveFolders.BaseFolder" Wrap="true" />
@@ -32,6 +35,7 @@
             <Segmented Options="CheckOptions" Value="5 min" />
         </SettingRow>
     </SettingsCard>
+    }
 
     <SettingsCard Title="Categories">
         @foreach (var c in Categories.Categories)
@@ -47,7 +51,7 @@
     </SettingsCard>
 
     <SettingsCard Title="Search" IsNew="true">
-        <SettingRow Label="Index text for fast Library search" Hint="Stays on this device" Soon="true">
+        <SettingRow Label="Index text for fast Library search" Hint="@(Platform.Capabilities.ServerSide ? ChuvadiReader.Ui.Components.Platform.PlatformText.ServerPrivacy : "Stays on this device")" Soon="true">
             <Toggle Value="false" />
         </SettingRow>
         <SettingRow Label="Include Word & Excel files" Soon="true">

@@ -34,6 +34,7 @@ public sealed class ChuvadiPdfReader : IPdfReader
             FileName = fileName,
             PageCount = document.PageCount,
             IsEncrypted = !string.IsNullOrEmpty(password),
+            AllowsPrinting = PrintPermission.Allows(document),
             IsXfaForm = IsXfaForm(document),
         };
 

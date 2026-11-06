@@ -1,0 +1,36 @@
+DRAFT, to be reviewed by counsel. Do not give to customers or ship in an installer or app store until this line is removed.
+
+CHUVADI READER - END USER LICENCE AGREEMENT (desktop and mobile apps)
+
+Copyright © 2026 Sthraas Intelligence Pvt Ltd. All rights reserved.
+
+Please read this agreement before installing or using Chuvadi Reader. By installing, copying or using the software you agree to it. If you do not agree, do not install or use the software.
+
+1. Who this agreement is with. This agreement is between you (an individual, or the organisation you install the software for) and Sthraas Intelligence Pvt Ltd, India ("Sthraas"), the owner of Chuvadi Reader. It covers the Chuvadi Reader apps for Windows, macOS, Linux and Android, including updates (the "Software"). The Chuvadi web portal is covered by the Chuvadi Terms of Use instead.
+
+2. Licence. Chuvadi Reader is free. Sthraas grants you a free of charge, non-exclusive, non-transferable, revocable licence to install and use the Software on any number of devices you or your organisation own or control, for personal, educational, commercial or institutional work. The Software is licensed, not sold, and is not open-source software.
+
+3. What you may not do without Sthraas's written permission:
+   - share, publish, sell, rent, lend or redistribute the Software or its installers, or offer it as a hosted service to others;
+   - modify the Software or make derivative works of it;
+   - reverse engineer, decompile or disassemble it, except where the law allows this anyway;
+   - remove or change any copyright, trademark or licence notice.
+   Organisations may deploy the unmodified installer inside their own organisation.
+
+4. Your documents. The apps work on your device; your documents are not sent to Sthraas. You remain the owner of your documents and are responsible for keeping copies of them. Features that work online (for example signing in, or the Chuvadi web portal) are covered by their own terms and the Chuvadi Privacy Notice.
+
+5. Updates. Sthraas may release updates. Updates are covered by this agreement unless they come with their own terms.
+
+6. Third-party components. The Software includes components licensed under their own terms, listed in THIRD-PARTY-NOTICES.txt, which is installed with the Software and shown in the app (Settings › About › Licences). Those terms govern those components; this agreement does not limit any right they grant you.
+
+7. No warranty. The Software is provided "as is", without warranty of any kind, express or implied, including merchantability, fitness for a particular purpose and non-infringement. It is not a medical device and is not intended for diagnosis or treatment decisions.
+
+8. Limitation of liability. To the fullest extent permitted by law, Sthraas is not liable for any indirect, incidental, special or consequential damages, or for loss of data, documents, profits or revenue, arising from the Software. Where liability cannot be excluded, it is limited to the amount you paid for the Software (which is zero).
+
+9. Termination. This agreement ends automatically if you breach it. You must then stop using the Software and delete all copies.
+
+10. App stores. If you obtained the Software from an app store, that store's terms also apply to your use of the store. For the Apple App Store: this agreement is between you and Sthraas only, not Apple; Sthraas, not Apple, is responsible for the Software, its maintenance and support, any product claims (including product liability, legal and regulatory claims) and any claim that it infringes another's intellectual property; to the extent any warranty applies, you may notify Apple of a failure and Apple will refund any price paid (none), and Apple has no other warranty obligation; you confirm you are not in a country subject to a U.S. Government embargo or on a U.S. Government list of prohibited or restricted parties; and Apple and its subsidiaries are third-party beneficiaries of this agreement and may enforce it against you.
+
+11. Governing law. This agreement is governed by the laws of India. The courts at Ahmedabad, Gujarat, India have exclusive jurisdiction.
+
+12. Contact. Sthraas Intelligence Pvt Ltd, [registered address - to be confirmed]. [legal contact e-mail - to be confirmed]
