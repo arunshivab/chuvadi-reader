@@ -71,7 +71,7 @@
                         @foreach (var ch in ChaptersAt(pi))
                         {
                             var chh = ch;
-                            <button class="chap" @onclick="() => GoTo(chh.PageIndex + 1)">§ @(string.IsNullOrWhiteSpace(chh.Title) ? "(untitled)" : chh.Title)</button>
+                            <button class="chap" @onclick="() => GoTo(chh.PageIndex + 1, chh.TopFraction)">§ @(string.IsNullOrWhiteSpace(chh.Title) ? "(untitled)" : chh.Title)</button>
                         }
                         <button class="thumb @(pi + 1 == CurPage ? "on" : null)" @onclick="() => GoTo(pi + 1)" title="Page @(pi + 1)">
                             <span class="thumb-pg" style="aspect-ratio:@ThumbAspect">
@@ -811,7 +811,7 @@
                         {
                             <div class="fc-note">@_certSummary</div>
                         }
-                        <p class="fc-note">An invisible digital signature is added; the signed copy is checked before it is saved. A visible signature box is waiting on the PDF library.</p>
+                        <p class="fc-note">An invisible digital signature is added; the signed copy is checked before it is saved. It is listed under Signatures, not drawn on the page.</p>
                         <div class="fc-foot">
                             <button class="fc-btn primary fc-grow" disabled="@(_certPath is null || _certBusy)" @onclick="SignWithCertificate">@(_certBusy ? "Signing…" : "Save signed copy")</button>
                         </div>
@@ -1162,7 +1162,7 @@
                     <RailButton Icon="watermark" Label="Watermark" Active='_card == "stamp" && _stampFocus == "watermark"' OnClick='() => OpenStamp("watermark")' />
                     <RailButton Icon="compress" Label="Flatten" Disabled="_flattening" OnClick="FlattenNow" />
                     <RailButton Icon="doc-lock" Label="Password" Active='_card == "password"' OnClick='() => ToggleCard("password")' />
-                    <RailButton Icon="certification" Label="Sign with certificate" DisabledReason="@(ChuvadiReader.Core.Documents.CertificateSignService.IsAvailable ? null : ChuvadiReader.Core.Documents.CertificateSignService.WaitingReason)" Active='_card == "cert"' OnClick='() => ToggleCard("cert")' />
+                    <RailButton Icon="certification" Label="Sign with certificate" Active='_card == "cert"' OnClick='() => ToggleCard("cert")' />
                     <RailButton Icon="sliders" Label="View" Class="rb-viewfold" Active='_card == "view"' OnClick='() => ToggleCard("view")' />
                     <RailSpacer />
                     <RailButton Icon="download" Label="Save redacted copy" Primary="true" OnClick="() => GoRedact(false)" />
@@ -2212,7 +2212,7 @@
     private async Task BmGo(BookmarkNode n)
     {
         _bmSel = n;
-        await GoTo(n.PageIndex + 1);
+        await GoTo(n.PageIndex + 1, n.TopFraction);
     }
 
     private void BmBeginRename(BookmarkNode n) { _bmSel = n; _bmRenaming = n; }
@@ -3703,7 +3703,9 @@
         StateHasChanged();
     }
 
-    private async Task GoTo(int page)
+    /// <param name="topFraction">How far down the page to land (0..1), from a bookmark's
+    /// destination; null or 0 goes to the top of the page.</param>
+    private async Task GoTo(int page, double? topFraction = null)
     {
         var tab = Tabs.Active;
         if (tab?.Session is null)
@@ -3717,7 +3719,7 @@
 
         if (_js is not null)
         {
-            try { await _js.InvokeVoidAsync("scrollToPage", _desk, page - 1); }
+            try { await _js.InvokeVoidAsync("scrollToPage", _desk, page - 1, topFraction ?? 0); }
             catch { }
         }
     }

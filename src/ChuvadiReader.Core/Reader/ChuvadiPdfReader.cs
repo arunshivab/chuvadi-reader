@@ -187,10 +187,15 @@ public sealed class ChuvadiPdfSession : IPdfSession
     /// <summary>Tests only: runs on the render's thread, inside the gate, before the page is drawn.</summary>
     internal Action<int>? BeforeRenderForTests { get; set; }
 
-    // Layers: the file's groups (read once, lazily) and this view's overrides (name → visible).
+    // Layers: the file's groups (read once, lazily) and this view's overrides (layer key → visible).
     // Overrides only ever reach the renderers — the document itself is never modified.
     private List<LayerEntry>? _layerEntries;
     private readonly Dictionary<string, bool> _layerOverrides = new(StringComparer.Ordinal);
+
+    /// <summary>This view's layer overrides as the renderers take them: by the group's id (its
+    /// object number, so same-named layers stay apart) and, for the rare group written without
+    /// one, by name.</summary>
+    private sealed record LayerOverrides(IReadOnlyDictionary<int, bool>? ById, IReadOnlyDictionary<string, bool>? ByName);
     private int _renderGeneration;
 
     public ChuvadiPdfSession(PdfDocument document, PdfDocumentVm vm, bool transparentBackground = false)
@@ -241,12 +246,12 @@ public sealed class ChuvadiPdfSession : IPdfSession
 
     public IReadOnlyList<PdfLayerInfo> Layers =>
         LayerEntries.Select(e => new PdfLayerInfo(
-                e.Name, e.Name, e.DefaultVisible, IsLayerShown(e), e.Locked, e.Intents, e.Count))
+                e.Key, e.Name, e.DefaultVisible, IsLayerShown(e), e.Locked, e.Intents, e.Count))
             .ToList();
 
     public void SetLayerVisible(string layerId, bool visible)
     {
-        var entry = LayerEntries.FirstOrDefault(e => string.Equals(e.Name, layerId, StringComparison.Ordinal));
+        var entry = LayerEntries.FirstOrDefault(e => string.Equals(e.Key, layerId, StringComparison.Ordinal));
         if (entry is null || entry.Locked || IsLayerShown(entry) == visible)
         {
             return;
@@ -255,11 +260,11 @@ public sealed class ChuvadiPdfSession : IPdfSession
         // Store only real deviations from the file's default, so "back to default" leaves no override.
         if (visible == entry.DefaultVisible)
         {
-            _layerOverrides.Remove(entry.Name);
+            _layerOverrides.Remove(entry.Key);
         }
         else
         {
-            _layerOverrides[entry.Name] = visible;
+            _layerOverrides[entry.Key] = visible;
         }
 
         InvalidateRender();
@@ -277,7 +282,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
     }
 
     private bool IsLayerShown(LayerEntry e) =>
-        _layerOverrides.TryGetValue(e.Name, out var v) ? v : e.DefaultVisible;
+        _layerOverrides.TryGetValue(e.Key, out var v) ? v : e.DefaultVisible;
 
     private void InvalidateRender()
     {
@@ -292,8 +297,37 @@ public sealed class ChuvadiPdfSession : IPdfSession
         RenderInvalidated?.Invoke(this, EventArgs.Empty);
     }
 
-    private IReadOnlyDictionary<string, bool>? CurrentOverrides =>
-        _layerOverrides.Count == 0 ? null : new Dictionary<string, bool>(_layerOverrides, StringComparer.Ordinal);
+    private LayerOverrides? CurrentOverrides
+    {
+        get
+        {
+            if (_layerOverrides.Count == 0)
+            {
+                return null;
+            }
+
+            Dictionary<int, bool>? byId = null;
+            Dictionary<string, bool>? byName = null;
+            foreach (var e in LayerEntries)
+            {
+                if (!_layerOverrides.TryGetValue(e.Key, out var visible))
+                {
+                    continue;
+                }
+
+                if (e.Id >= 0)
+                {
+                    (byId ??= new Dictionary<int, bool>())[e.Id] = visible;
+                }
+                else
+                {
+                    (byName ??= new Dictionary<string, bool>(StringComparer.Ordinal))[e.Name] = visible;
+                }
+            }
+
+            return byId is null && byName is null ? null : new LayerOverrides(byId, byName);
+        }
+    }
 
     private SvgRenderer CreateSvgRenderer() =>
         // The library now defaults the SVG page background to opaque white. The reader
@@ -302,17 +336,19 @@ public sealed class ChuvadiPdfSession : IPdfSession
         {
             TextStrategy = SvgTextStrategy.Selectable,
             Background = _transparentBackground ? (ColorF?)null : ColorF.White,
-            LayerVisibility = CurrentOverrides,
+            LayerVisibility = CurrentOverrides?.ByName,
+            LayerVisibilityById = CurrentOverrides?.ById,
         });
 
     private List<LayerEntry> LayerEntries => _layerEntries ?? [];
 
-    private sealed record LayerEntry(string Name, bool DefaultVisible, bool Locked, IReadOnlyList<string> Intents, int Count);
+    /// <param name="Key">What the Layers card toggles by: "#{id}" for a group with an id, "n:{name}" otherwise.</param>
+    /// <param name="Id">The library's layer id (the group's object number), or -1.</param>
+    private sealed record LayerEntry(string Key, int Id, string Name, bool DefaultVisible, bool Locked, IReadOnlyList<string> Intents, int Count);
 
-    /// <summary>Reads the layers once: names/default state/intents from the library's
-    /// <see cref="OptionalContentReader"/>, plus the /D /Locked array (which the library
-    /// doesn't surface) straight from /OCProperties. Never throws — a damaged
-    /// /OCProperties just yields no layers.</summary>
+    /// <summary>Reads the layers once, all from the library's <see cref="OptionalContentReader"/>:
+    /// name, default state, intents, the lock (<c>/D /Locked</c>) and the id that tells same-named
+    /// layers apart (chuvadi-pdf 3.32.0). Never throws — a damaged /OCProperties just yields no layers.</summary>
     private static List<LayerEntry> ReadLayers(PdfDocument? document)
     {
         var result = new List<LayerEntry>();
@@ -324,19 +360,34 @@ public sealed class ChuvadiPdfSession : IPdfSession
         try
         {
             var groups = OptionalContentReader.GetGroups(document);
-            if (groups.Count == 0)
+            var seenIds = new HashSet<int>();
+            foreach (var g in groups.Where(g => g.Id >= 0))
             {
-                return result;
+                if (!seenIds.Add(g.Id))
+                {
+                    continue; // the same group listed twice in /OCGs
+                }
+
+                result.Add(new LayerEntry(
+                    "#" + g.Id.ToString(CultureInfo.InvariantCulture),
+                    g.Id,
+                    g.Name ?? string.Empty,
+                    g.IsVisibleByDefault,
+                    g.IsLocked,
+                    g.Intents ?? Array.Empty<string>(),
+                    1));
             }
 
-            var locked = ReadLockedLayerNames(document);
-            foreach (var g in groups.GroupBy(g => g.Name ?? string.Empty, StringComparer.Ordinal))
+            // Groups written directly in /OCGs have no id; the library can only override those by name.
+            foreach (var g in groups.Where(g => g.Id < 0).GroupBy(g => g.Name ?? string.Empty, StringComparer.Ordinal))
             {
                 var first = g.First();
                 result.Add(new LayerEntry(
+                    "n:" + g.Key,
+                    -1,
                     g.Key,
                     first.IsVisibleByDefault,
-                    locked.Contains(g.Key),
+                    g.Any(x => x.IsLocked),
                     first.Intents ?? Array.Empty<string>(),
                     g.Count()));
             }
@@ -347,37 +398,6 @@ public sealed class ChuvadiPdfSession : IPdfSession
         }
 
         return result;
-    }
-
-    private static HashSet<string> ReadLockedLayerNames(PdfDocument document)
-    {
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        try
-        {
-            var objects = document.Objects;
-            var ocProps = objects.ResolveDictionaryEntry<PdfDictionary>(document.Catalog, PdfName.Intern("OCProperties"));
-            var d = ocProps is null ? null : objects.ResolveDictionaryEntry<PdfDictionary>(ocProps, PdfName.Intern("D"));
-            var lockedArr = d is null ? null : objects.ResolveDictionaryEntry<PdfArray>(d, PdfName.Intern("Locked"));
-            if (lockedArr is null)
-            {
-                return names;
-            }
-
-            foreach (var item in lockedArr)
-            {
-                if (objects.Resolve(item) is PdfDictionary ocg
-                    && objects.ResolveDictionaryEntry<PdfString>(ocg, PdfName.Intern("Name")) is { } name)
-                {
-                    names.Add(name.ToTextString());
-                }
-            }
-        }
-        catch
-        {
-            // Locked is advisory; failing to read it just means nothing is locked.
-        }
-
-        return names;
     }
 
     public bool TryGetRenderedSvg(int pageNumber, out string svg)
@@ -591,7 +611,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
         // Taken now, on one side of any layer change: a render for the old layers is never kept.
         int generation;
         SvgRenderer renderer;
-        IReadOnlyDictionary<string, bool>? overrides;
+        LayerOverrides? overrides;
         lock (_svgCache)
         {
             generation = _renderGeneration;
@@ -639,7 +659,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
         _imageTokens.Clear();
     }
 
-    private string RenderPage(PdfDocument document, SvgRenderer renderer, IReadOnlyDictionary<string, bool>? overrides, int pageNumber, CancellationToken cancellationToken, Func<byte[], string> keepImage)
+    private string RenderPage(PdfDocument document, SvgRenderer renderer, LayerOverrides? overrides, int pageNumber, CancellationToken cancellationToken, Func<byte[], string> keepImage)
     {
         BeforeRenderForTests?.Invoke(pageNumber);
         var page = document.Pages[pageNumber];
@@ -669,7 +689,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
     /// and wraps it in a minimal SVG carrying a single &lt;image&gt;, so the UI's SVG display
     /// path is unchanged while the WebView only has to hold one image node instead of
     /// hundreds of thousands of vector paths.</summary>
-    private static string RenderPageAsRasterSvg(PdfDocument document, PdfPage page, IReadOnlyDictionary<string, bool>? overrides, CancellationToken cancellationToken, Func<byte[], string>? keepImage)
+    private static string RenderPageAsRasterSvg(PdfDocument document, PdfPage page, LayerOverrides? overrides, CancellationToken cancellationToken, Func<byte[], string>? keepImage)
     {
         var buffer = new PageRasterizer(
                 document.Objects,
@@ -678,7 +698,8 @@ public sealed class ChuvadiPdfSession : IPdfSession
                     Dpi = RasterDpi,
                     Background = ColorF.White,
                     AntiAlias = true,
-                    LayerVisibility = overrides,
+                    LayerVisibility = overrides?.ByName,
+                    LayerVisibilityById = overrides?.ById,
                 })
             .Rasterize(page, cancellationToken);
 

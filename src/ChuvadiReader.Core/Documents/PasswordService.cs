@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.IO;
+using Chuvadi.Pdf.Primitives;
 
 namespace ChuvadiReader.Core.Documents;
 
@@ -40,6 +41,10 @@ public sealed record PdfProtectionInfo(
     bool AllowAnnotate,
     bool AllowFillForms);
 
+/// <summary>Removing the password was refused: the file forbids changes and the password given
+/// was not the owner password. The card then asks for the owner password.</summary>
+public sealed class PasswordRemovalRefusedException(string message) : InvalidOperationException(message);
+
 /// <summary>Strength hint for the password meter (0 = empty … 4 = strong).</summary>
 public sealed record PasswordStrength(int Score, string Label);
 
@@ -52,16 +57,14 @@ public sealed record PasswordStrength(int Score, string Label);
 /// </summary>
 public sealed class PasswordService
 {
-    /// <summary>Shown on the greyed-out permission controls.</summary>
-    public const string PermissionsWaitingReason = "Waiting on the PDF library — permissions can't be set on a protected copy in chuvadi-pdf 3.30.1";
-
-    /// <summary>Shown when removal is refused because the file forbids changes.</summary>
+    /// <summary>Shown when removal is refused: the file forbids changes and the password given
+    /// is the open (user) password, not the owner password.</summary>
     public const string RemoveRefusedMessage =
-        "This file's permissions don't allow changes, so its password can't be removed here. "
-        + "If you're the owner, you'll be able to remove it once the PDF library can tell which password opened the file.";
+        "This file's permissions don't allow changes, so the password that opens it can't remove its protection. "
+        + "Enter the permissions password to remove it.";
 
-    /// <summary>False until the library lets callers set permissions.</summary>
-    public static bool PermissionsAvailable => false;
+    /// <summary>True since chuvadi-pdf 3.32.0: a protected copy can limit printing, copying and changes.</summary>
+    public static bool PermissionsAvailable => true;
 
     // PDF 32000-1 §7.6.3.2 Table 22 — /P bits (1-based bit n = 1 << (n-1)).
     public const int BitPrint = 1 << 2;          // bit 3
@@ -105,26 +108,20 @@ public sealed class PasswordService
         {
             ct.ThrowIfCancellationRequested();
             using var doc = Open(sourcePath, sourcePassword);
-            if (BuildPermissionMask(options) != EncryptionOptions.AllPermissionsAllowed)
-            {
-                // EncryptionOptions.Permissions can't be set through the library's public API in
-                // 3.30.1, and the app doesn't work around library gaps.
-                throw new NotSupportedException(PermissionsWaitingReason);
-            }
-
             string owner = string.IsNullOrEmpty(options.PermissionsPassword) ? RandomPassword() : options.PermissionsPassword!;
-            var enc = EncryptionOptions.Aes256(options.OpenPassword, owner);
+            var enc = EncryptionOptions.Aes256(options.OpenPassword, owner).WithPermissions(BuildPermissions(options));
             WriteAtomically(outputPath, s => doc.Save(s, enc), ct);
         }, ct);
     }
 
     /// <summary>Writes a decrypted copy. <paramref name="password"/> must open the file.
-    /// Refused when the file forbids changes (see remarks): removing protection is a change.</summary>
-    /// <remarks>chuvadi-pdf 3.30 opens with either password but doesn't say which one matched,
-    /// so the app can't tell the owner (who may lift restrictions) from a user who only holds
-    /// the open password. Until it can, a file whose permissions forbid modification is refused
-    /// (decision 2026-11-06, option C — kept as is; the "which password opened it" flag is on the
-    /// library ask list, and the refusal tells the person so).</remarks>
+    /// Removing protection is a change, so it needs the right to change the file.</summary>
+    /// <remarks>The library decides what the opener may do (chuvadi-pdf 3.32.0
+    /// <c>EncryptionInfo.EffectiveFlags</c>): everything for the owner password; for the open
+    /// (user) password, what the file's permissions allow. So the owner can always remove the
+    /// protection, and someone holding only the open password can when the file allows changes —
+    /// otherwise it is refused with <see cref="RemoveRefusedMessage"/> (decision 2026-11-06,
+    /// option C, completed now that the library says which password opened the file).</remarks>
     public Task RemovePasswordAsync(string sourcePath, string password, string outputPath, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(password);
@@ -134,28 +131,31 @@ public sealed class PasswordService
             ct.ThrowIfCancellationRequested();
             using var doc = Open(sourcePath, password);
             var e = doc.Encryption ?? throw new InvalidOperationException("This file isn't password-protected.");
-            if (!e.AllowModify)
+            if (!e.EffectiveFlags.HasFlag(PdfPermissions.ModifyContents))
             {
-                throw new InvalidOperationException(
-                    RemoveRefusedMessage);
+                throw new PasswordRemovalRefusedException(RemoveRefusedMessage);
             }
 
             WriteAtomically(outputPath, s => doc.Save(s, null), ct);
         }, ct);
     }
 
-    /// <summary>Builds the /P mask: every bit set (as <see cref="EncryptionOptions.AllPermissionsAllowed"/>),
-    /// then the denied actions cleared.</summary>
-    public static int BuildPermissionMask(PasswordProtectOptions o)
+    /// <summary>What someone who opens the copy with the open password may do. Reading for
+    /// accessibility (screen readers) always stays allowed.</summary>
+    public static PdfPermissions BuildPermissions(PasswordProtectOptions o)
     {
-        int p = EncryptionOptions.AllPermissionsAllowed;
-        if (!o.AllowPrint) p &= ~(BitPrint | BitPrintHighQuality);
-        if (!o.AllowCopy) p &= ~BitCopy;
-        if (!o.AllowModify) p &= ~(BitModify | BitAssemble);
-        if (!o.AllowAnnotate) p &= ~BitAnnotate;
-        if (!o.AllowFillForms) p &= ~BitFillForms;
+        var p = PdfPermissions.All;
+        if (!o.AllowPrint) p &= ~(PdfPermissions.Print | PdfPermissions.PrintHighQuality);
+        if (!o.AllowCopy) p &= ~PdfPermissions.CopyContents;
+        if (!o.AllowModify) p &= ~(PdfPermissions.ModifyContents | PdfPermissions.Assemble);
+        if (!o.AllowAnnotate) p &= ~PdfPermissions.ModifyAnnotations;
+        if (!o.AllowFillForms) p &= ~PdfPermissions.FillForms;
         return p;
     }
+
+    /// <summary>The /P value the library writes for <paramref name="o"/>.</summary>
+    public static int BuildPermissionMask(PasswordProtectOptions o) =>
+        EncryptionOptions.PermissionMask(BuildPermissions(o));
 
     /// <summary>A simple strength hint: length plus character variety.</summary>
     public static PasswordStrength RatePassword(string? password)

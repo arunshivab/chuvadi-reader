@@ -140,7 +140,7 @@ public sealed class RenderOffUiThreadTests
 
         var render = session.RenderPageSvgAsync(0);
         Assert.True(started.Wait(Guard));
-        session.SetLayerVisible("Green layer", true); // hidden by default; shown while the old view renders
+        session.SetLayerVisible(LayersMeasureSignatureTests.LayerId(session, "Green layer"), true); // hidden by default; shown while the old view renders
         release.Set();
         await render.WaitAsync(Guard);
 
@@ -213,7 +213,7 @@ public sealed class RenderOffUiThreadTests
                 Assert.True(await Task.Run(() => started.Wait(Guard)));  // the worker has the page (the Ui thread awaits, never blocks)
                 Assert.Null(measure.Measure(session, 0, new PagePoint(0, 0), new PagePoint(72, 0)));
                 Assert.False(session.TryGetRenderedSvg(0, out _));
-                session.SetLayerVisible("Green layer", true);
+                session.SetLayerVisible(LayersMeasureSignatureTests.LayerId(session, "Green layer"), true);
                 session.DropRenderCache();
                 await Task.Yield();                                 // the Ui thread goes back to its queue
             }).WaitAsync(Guard);

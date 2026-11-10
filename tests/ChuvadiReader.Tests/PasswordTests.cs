@@ -42,23 +42,42 @@ public class PasswordTests
     }
 
     [Fact]
-    public async Task Permissions_wait_on_the_library_but_a_permissions_password_still_opens()
+    public async Task A_protected_copy_carries_the_chosen_limits_and_the_permissions_password_lifts_them()
     {
         var src = TestPdf.TextPage("Restricted");
         var svc = new PasswordService();
-        Assert.False(PasswordService.PermissionsAvailable);
-
-        await Assert.ThrowsAsync<NotSupportedException>(() => svc.ProtectAsync(src, TestPdf.TempOutput(), new PasswordProtectOptions
-        {
-            OpenPassword = "user-pw",
-            AllowPrint = false,
-        }));
+        Assert.True(PasswordService.PermissionsAvailable);
 
         var output = TestPdf.TempOutput();
-        await svc.ProtectAsync(src, output, new PasswordProtectOptions { OpenPassword = "user-pw", PermissionsPassword = "owner-pw" });
+        await svc.ProtectAsync(src, output, new PasswordProtectOptions
+        {
+            OpenPassword = "user-pw",
+            PermissionsPassword = "owner-pw",
+            AllowPrint = false,
+            AllowModify = false,
+        });
+
+        var seen = svc.GetProtection(output, "user-pw");
+        Assert.False(seen.AllowPrint);
+        Assert.False(seen.AllowModify);
+        Assert.True(seen.AllowCopy);
+        Assert.True(seen.AllowAnnotate);
+        Assert.True(seen.AllowFillForms);
+
+        using (var user = PdfDocument.Open(output, "user-pw"))
+        {
+            Assert.False(user.Encryption!.EffectiveFlags.HasFlag(PdfPermissions.Print));
+            Assert.True(user.Encryption.EffectiveFlags.HasFlag(PdfPermissions.CopyContents));
+            Assert.True(user.Encryption.AllowAccessibilityExtract); // screen readers always allowed
+        }
+
         using var owner = PdfDocument.Open(output, "owner-pw");
-        Assert.Equal(1, owner.PageCount);
-        Assert.True(svc.GetProtection(output, "user-pw").AllowPrint);
+        Assert.Equal(PdfPermissions.All, owner.Encryption!.EffectiveFlags);
+
+        // No limits chosen: everything allowed, as before.
+        var open = TestPdf.TempOutput();
+        await svc.ProtectAsync(src, open, new PasswordProtectOptions { OpenPassword = "user-pw" });
+        Assert.True(svc.GetProtection(open, "user-pw").AllowPrint);
     }
 
     [Fact]
@@ -94,16 +113,29 @@ public class PasswordTests
     }
 
     [Fact]
-    public async Task Remove_password_is_refused_when_changes_are_forbidden_or_the_password_is_wrong()
+    public async Task Remove_password_needs_the_owner_when_changes_are_forbidden()
     {
         var src = TestPdf.TextPage("No changes");
         var locked = TestPdf.TempOutput();
         var svc = new PasswordService();
-        TestSigning.ProtectRestricted(src, locked, "pw", PasswordService.BuildPermissionMask(new PasswordProtectOptions { OpenPassword = "pw", AllowModify = false }));
+        await svc.ProtectAsync(src, locked, new PasswordProtectOptions { OpenPassword = "pw", PermissionsPassword = "owner-pw", AllowModify = false });
 
-        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemovePasswordAsync(locked, "pw", TestPdf.TempOutput()));
+        // The open password can't remove protection from a file that forbids changes…
+        var refused = await Assert.ThrowsAsync<PasswordRemovalRefusedException>(() => svc.RemovePasswordAsync(locked, "pw", TestPdf.TempOutput()));
         Assert.Equal(PasswordService.RemoveRefusedMessage, refused.Message);
-        Assert.Contains("owner", refused.Message);
+        Assert.Contains("permissions password", refused.Message);
+
+        // …the owner (permissions) password can.
+        var plain = TestPdf.TempOutput();
+        await svc.RemovePasswordAsync(locked, "owner-pw", plain);
+        Assert.False(svc.RequiresPassword(plain));
+        using (var doc = PdfDocument.Open(plain))
+        {
+            Assert.Null(doc.Encryption);
+            Assert.Contains("No changes", Text(doc));
+        }
+
+        Assert.True(svc.RequiresPassword(locked)); // the locked file stays locked
         await Assert.ThrowsAsync<PdfPasswordRequiredException>(() => svc.RemovePasswordAsync(locked, "bad", TestPdf.TempOutput()));
         await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemovePasswordAsync(src, "pw", TestPdf.TempOutput()));
     }

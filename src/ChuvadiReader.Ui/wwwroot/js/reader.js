@@ -777,15 +777,23 @@ export function configLoupe(radius, mag) {
     if (loupeEl) loupeEl.style.width = loupeEl.style.height = (loupeR * 2) + 'px';
 }
 
-export function scrollToPage(deskEl, index) {
+// frac (0..1, optional): how far down the page to land — a bookmark that points at a heading
+// part-way down a page goes to that heading, with a little room above it, not to the page top
+// (continuous scrolling and zoomed pages; the page-at-a-time layout shows the whole page).
+export function scrollToPage(deskEl, index, frac) {
     const el = deskEl && deskEl.querySelector('[data-page="' + index + '"]');
     if (!el) return;
+    // In the page-at-a-time layout the desk snaps to whole pages, so the page is the target there.
+    const snaps = /^(y|both|block)/.test(getComputedStyle(deskEl).scrollSnapType || '');
+    const f = !snaps && typeof frac === 'number' && frac > 0 ? Math.min(frac, 1) : 0;
+    const r = el.getBoundingClientRect();
+    const lead = f > 0 && r.height ? Math.min(f, 12 / r.height) : 0;   // 12px above the target
     suppressUntil = performance.now() + 1400;
-    anchor = { page: index, frac: 0 }; // stays the target while heights change under the jump
+    anchor = { page: index, frac: f - lead }; // stays the target while heights change under the jump
     anchorStale = false;
     // Scroll the desk itself — NOT scrollIntoView, which also scrolls every
     // scrollable ancestor and would drag the toolbar/page up with it.
-    const top = deskEl.scrollTop + (el.getBoundingClientRect().top - deskEl.getBoundingClientRect().top);
+    const top = deskEl.scrollTop + (r.top - deskEl.getBoundingClientRect().top) + (f - lead) * r.height;
     deskEl.scrollTo({ top, behavior: 'smooth' });
 }
 

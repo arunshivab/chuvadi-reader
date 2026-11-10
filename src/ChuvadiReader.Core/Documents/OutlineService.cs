@@ -13,6 +13,13 @@ public sealed class BookmarkNode
 {
     public string Title { get; set; } = "";
     public int PageIndex { get; set; }
+
+    /// <summary>How far down the displayed page the bookmark points, 0 (top) to 1 (bottom), from the
+    /// file's destination (chuvadi-pdf 3.32.0 <c>OutlineItem.Destination</c>); null when the file
+    /// gives no position, so the jump goes to the top of the page. Read-only information for
+    /// navigation: it is not written back (the library's outline writer takes a page only).</summary>
+    public double? TopFraction { get; set; }
+
     public List<BookmarkNode> Children { get; set; } = new();
 
     public BookmarkNode() { }
@@ -25,6 +32,7 @@ public sealed class BookmarkNode
 
     public BookmarkNode Clone() => new(Title, PageIndex)
     {
+        TopFraction = TopFraction,
         Children = Children.Select(c => c.Clone()).ToList(),
     };
 }
@@ -34,7 +42,7 @@ public sealed class BookmarkNode
 public sealed class OutlineService
 {
     /// <summary>Reads the outline of an open document into an editable tree.</summary>
-    public IReadOnlyList<BookmarkNode> Read(PdfDocument doc) => FromItems(OutlineReader.GetOutlines(doc));
+    public IReadOnlyList<BookmarkNode> Read(PdfDocument doc) => FromItems(OutlineReader.GetOutlines(doc), doc);
 
     /// <summary>Reads the outline of a file into an editable tree.</summary>
     public IReadOnlyList<BookmarkNode> Read(string path)
@@ -138,14 +146,59 @@ public sealed class OutlineService
         return list;
     }
 
-    private static List<BookmarkNode> FromItems(IReadOnlyList<OutlineItem> items)
+    private static List<BookmarkNode> FromItems(IReadOnlyList<OutlineItem> items, PdfDocument doc)
     {
         var list = new List<BookmarkNode>();
         foreach (var it in items)
         {
-            list.Add(new BookmarkNode(it.Title ?? "", it.DestinationPageIndex) { Children = FromItems(it.Children) });
+            list.Add(new BookmarkNode(it.Title ?? "", it.DestinationPageIndex)
+            {
+                TopFraction = TopFractionOf(it.Destination, doc),
+                Children = FromItems(it.Children, doc),
+            });
         }
         return list;
+    }
+
+    /// <summary>Where on the displayed page a destination points, as a fraction from the top: the
+    /// destination's page-space position measured inside the page's CropBox (the box the Reader
+    /// shows), turned with the page's /Rotate. Null when the destination names no position along
+    /// the displayed vertical (/Fit, /FitB, or a missing coordinate).</summary>
+    internal static double? TopFractionOf(PdfDestination? destination, PdfDocument doc)
+    {
+        if (destination is null || destination.PageIndex < 0 || destination.PageIndex >= doc.PageCount)
+        {
+            return null;
+        }
+
+        try
+        {
+            var page = doc.Pages[destination.PageIndex];
+            var crop = page.CropBox;
+            var box = (Left: Math.Min(crop.X1, crop.X2), Right: Math.Max(crop.X1, crop.X2),
+                       Bottom: Math.Min(crop.Y1, crop.Y2), Top: Math.Max(crop.Y1, crop.Y2));
+            double width = box.Right - box.Left, height = box.Top - box.Bottom;
+            if (width <= 0 || height <= 0)
+            {
+                return null;
+            }
+
+            // The displayed top edge is the box's top at /Rotate 0, its left at 90, bottom at 180, right at 270.
+            double? fraction = (((page.Rotate % 360) + 360) % 360) switch
+            {
+                0 => destination.Top is { } t ? (box.Top - t) / height : null,
+                90 => destination.Left is { } l ? (l - box.Left) / width : null,
+                180 => destination.Top is { } t ? (t - box.Bottom) / height : null,
+                270 => destination.Left is { } l ? (box.Right - l) / width : null,
+                _ => null,
+            };
+
+            return fraction is { } f && !double.IsNaN(f) ? Math.Clamp(f, 0, 1) : null;
+        }
+        catch
+        {
+            return null; // a damaged page: fall back to the top of the page
+        }
     }
 
     private static IReadOnlyList<OutlineEntry> ToEntries(IReadOnlyList<BookmarkNode> nodes, int pageCount)

@@ -37,6 +37,9 @@ public class LayersMeasureSignatureTests
 
     /// <summary>200×200 page: red square (no layer) bottom-left, blue square in "Blue layer"
     /// (on, locked) bottom-right, green square in "Green layer" (off by default) top-left.</summary>
+    /// <summary>The id the Layers card toggles by, for the layer with this name.</summary>
+    internal static string LayerId(IPdfSession session, string name) => session.Layers.Single(l => l.Name == name).Id;
+
     internal static string LayeredPdf()
     {
         const string content =
@@ -147,7 +150,7 @@ public class LayersMeasureSignatureTests
         int events = 0;
         session.RenderInvalidated += (_, _) => events++;
 
-        session.SetLayerVisible("Green layer", true);
+        session.SetLayerVisible(LayersMeasureSignatureTests.LayerId(session, "Green layer"), true);
 
         Assert.Equal(gen + 1, session.RenderGeneration);
         Assert.Equal(1, events);
@@ -169,9 +172,9 @@ public class LayersMeasureSignatureTests
         using var session = await Open(LayeredPdf());
         int gen = session.RenderGeneration;
 
-        session.SetLayerVisible("Blue layer", false); // locked
+        session.SetLayerVisible(LayersMeasureSignatureTests.LayerId(session, "Blue layer"), false); // locked
         session.SetLayerVisible("No such layer", false);
-        session.SetLayerVisible("Green layer", false); // already hidden: no-op
+        session.SetLayerVisible(LayersMeasureSignatureTests.LayerId(session, "Green layer"), false); // already hidden: no-op
 
         Assert.Equal(gen, session.RenderGeneration);
         Assert.Contains("rgb(0,0,255)", await session.RenderPageSvgAsync(0));
@@ -394,15 +397,28 @@ public class LayersMeasureSignatureTests
     }
 
     [Fact]
-    public async Task App_signing_waits_on_the_library_but_reads_the_certificate()
+    public async Task App_signs_an_unsigned_file_and_reads_the_certificate()
     {
         var src = AuthoredPdf();
+        var before = File.ReadAllBytes(src);
         var (pfx, _) = SelfSignedPfx("A. Shiva", "pw");
         var svc = new CertificateSignService();
+        var output = TestPdf.TempOutput();
 
-        Assert.False(CertificateSignService.IsAvailable);
-        await Assert.ThrowsAsync<NotSupportedException>(() => svc.SignWithPfxAsync(src, TestPdf.TempOutput(), pfx, "pw"));
+        Assert.True(CertificateSignService.IsAvailable);
+        await svc.SignWithPfxAsync(src, output, pfx, "pw", new CertificateSignOptions { Reason = "Approved", Location = "Pune" });
+
+        Assert.Equal(before, File.ReadAllBytes(src)); // the source is never written to
+        var report = await new SignatureCheckService().CheckAsync(output, options: new SignatureCheckOptions { UseSystemTrustStore = false });
+        var sig = Assert.Single(report.Signatures);
+        Assert.True(sig.IntegrityVerified);
+        Assert.True(sig.CoversWholeDocument);
+        Assert.Equal("A. Shiva", sig.SignerName);
+        Assert.Equal("Approved", sig.Reason);
+
         Assert.ThrowsAny<CryptographicException>(() => svc.InspectPfx(pfx, "wrong"));
+        await Assert.ThrowsAnyAsync<CryptographicException>(() => svc.SignWithPfxAsync(src, TestPdf.TempOutput(), pfx, "wrong"));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.SignWithPfxAsync(src, src, pfx, "pw")); // never over the source
 
         var info = svc.InspectPfx(pfx, "pw");
         Assert.Equal("A. Shiva", info.SubjectName);

@@ -228,7 +228,7 @@
             <RailButton Icon="watermark" Label="Watermark" OnClick='() => BackToProtect("watermark")' />
             <RailButton Icon="compress" Label="Flatten" OnClick='() => BackToProtect("flatten")' />
             <RailButton Icon="doc-lock" Label="Password" OnClick='() => BackToProtect("password")' />
-            <RailButton Icon="certification" Label="Sign with certificate" DisabledReason="@(ChuvadiReader.Core.Documents.CertificateSignService.IsAvailable ? null : ChuvadiReader.Core.Documents.CertificateSignService.WaitingReason)" OnClick='() => BackToProtect("cert")' />
+            <RailButton Icon="certification" Label="Sign with certificate" OnClick='() => BackToProtect("cert")' />
             <RailSep />
             <RailButton Icon="folder" Label="Redact another file…" OnClick="Fetch" />
             <RailButton Icon="close" Label="Clear all boxes" Disabled="@(!HasAnythingToRedact || _saving)" OnClick="ClearAll" />

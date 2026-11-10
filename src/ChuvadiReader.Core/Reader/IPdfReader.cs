@@ -74,14 +74,14 @@ public interface IPdfSession : IDisposable
 }
 
 /// <summary>One layer (PDF optional-content group) as the Layers card shows it.</summary>
-/// <param name="Id">Stable key for <see cref="IPdfSession.SetLayerVisible"/> (the layer name —
-/// the library keys visibility overrides by name).</param>
+/// <param name="Id">Stable key for <see cref="IPdfSession.SetLayerVisible"/>: the library's layer id
+/// (the group's object number), so layers that share a name are listed and toggled separately.</param>
 /// <param name="Name">Human-readable layer name (/Name).</param>
 /// <param name="IsVisibleByDefault">Visible in the file's default configuration (/D /ON /OFF).</param>
 /// <param name="IsVisible">Visible in this view right now (default state + any override).</param>
 /// <param name="IsLocked">Listed in /D /Locked — the file asks viewers not to let users toggle it.</param>
 /// <param name="Intents">The layer's intents, e.g. "View", "Design". Empty when unspecified.</param>
-/// <param name="GroupCount">How many groups in the file carry this name (usually 1).</param>
+/// <param name="GroupCount">1, except for groups the file writes without an id: how many of those share this name.</param>
 public sealed record PdfLayerInfo(
     string Id,
     string Name,

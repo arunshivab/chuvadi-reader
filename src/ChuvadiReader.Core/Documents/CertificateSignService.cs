@@ -43,22 +43,21 @@ public sealed record CertificateSummary(
 }
 
 /// <summary>
-/// Certificate signing (Protect › Sign with certificate). Reading a .pfx/.p12 works; signing
-/// itself is disabled until chuvadi-pdf's <c>PdfSigner.Sign</c> works (it fails in 3.30.1 with
-/// "Could not locate /Contents value in the signed PDF output"). The app does not work around
-/// the library, so the button is greyed out with <see cref="WaitingReason"/>.
+/// Certificate signing (Protect › Sign with certificate): signs a copy of a PDF with the
+/// certificate and private key in a .pfx/.p12, through chuvadi-pdf's <c>PdfSigner.Sign</c>
+/// (working since 3.31.2) for a file with no signature yet and <c>PdfCounterSigner.AddSignature</c>
+/// for a file that is already signed (the library's own rule: an added signature is appended, so
+/// the earlier ones stay valid). The source is never written to. The .pfx is read with .NET's
+/// own PKCS#12 loader, and the key signs through .NET's RSA / ECDSA.
 /// </summary>
 public sealed class CertificateSignService
 {
-    /// <summary>Shown on the greyed-out Sign with certificate button.</summary>
-    public const string WaitingReason = "Waiting on the PDF library — certificate signing fails in chuvadi-pdf 3.30.1";
+    /// <summary>True since chuvadi-pdf 3.31.2.</summary>
+    public static bool IsAvailable => true;
 
-    /// <summary>False until the library's signing call works.</summary>
-    public static bool IsAvailable => false;
-
-    /// <summary>False in 3.30: the incremental signing path ignores
-    /// <see cref="PdfSigningOptions.Appearance"/>, so signatures are invisible (shown in the
-    /// Signatures card, not on the page).</summary>
+    /// <summary>Signatures made here are invisible for now (listed in the Signatures card, not
+    /// drawn on the page). The library can draw one since 3.32.0; the app's placement design is
+    /// with Arun before it is built.</summary>
     public bool SupportsVisibleAppearance => false;
 
     /// <summary>Opens a .pfx/.p12 and describes its signing certificate. Throws
@@ -99,9 +98,9 @@ public sealed class CertificateSignService
         }
     }
 
-    /// <summary>Signing is waiting on the PDF library (chuvadi-pdf 3.30.1): <c>PdfSigner.Sign</c>
-    /// fails with "Could not locate /Contents value in the signed PDF output". The app does not
-    /// work around a library gap, so this throws until the library is fixed.</summary>
+    /// <summary>Signs <paramref name="sourcePath"/> with <paramref name="certificate"/> (which must
+    /// hold its private key) and writes the signed copy to <paramref name="outputPath"/>. The copy
+    /// is verified before it is kept; a copy that fails verification is not written.</summary>
     public Task SignAsync(
         string sourcePath,
         string outputPath,
@@ -109,7 +108,84 @@ public sealed class CertificateSignService
         CertificateSignOptions? options = null,
         IEnumerable<X509Certificate2>? chain = null,
         CancellationToken ct = default)
-        => throw new NotSupportedException(WaitingReason);
+    {
+        ArgumentNullException.ThrowIfNull(certificate);
+        PasswordService.GuardPaths(sourcePath, outputPath);
+        if (!certificate.HasPrivateKey)
+        {
+            throw new InvalidOperationException("This certificate has no private key, so it can't sign.");
+        }
+
+        options ??= new CertificateSignOptions();
+        var chainDer = (chain ?? Array.Empty<X509Certificate2>())
+            .Where(c => !string.Equals(c.Thumbprint, certificate.Thumbprint, StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.RawData)
+            .ToList();
+
+        return Task.Run(() =>
+        {
+            ct.ThrowIfCancellationRequested();
+            if (PdfDocument.RequiresPassword(sourcePath))
+            {
+                throw new InvalidOperationException("Remove the file's password before signing it.");
+            }
+
+            byte[] source = File.ReadAllBytes(sourcePath);
+            using var signer = new BclCmsSigner(certificate);
+            byte[] signed;
+            string fieldName;
+            using (var doc = PdfDocument.Open(new MemoryStream(source, writable: false), leaveOpen: false))
+            {
+                var existing = SignatureReader.Read(doc.Catalog, doc.Objects);
+                fieldName = string.IsNullOrWhiteSpace(options.FieldName) ? NextFieldName(existing) : options.FieldName!.Trim();
+                var signOptions = new PdfSigningOptions
+                {
+                    SignatureFieldName = fieldName,
+                    Reason = Blank(options.Reason),
+                    Location = Blank(options.Location),
+                    ContactInfo = Blank(options.ContactInfo),
+                    SigningTime = options.SigningTime ?? DateTimeOffset.UtcNow,
+                    ExtraCertificates = chainDer.Select(ChuvadiX509.Decode).ToList(),
+                };
+
+                ct.ThrowIfCancellationRequested();
+
+                // The library's rule: the first signature goes through PdfSigner; a file that is
+                // already signed gets its next signature appended, so the earlier ones stay valid.
+                signed = existing.Count == 0
+                    ? PdfSigner.Sign(doc, signer, signOptions)
+                    : PdfCounterSigner.AddSignature(source, signer, signOptions);
+            }
+
+            VerifyNewSignature(signed, fieldName);
+
+            ct.ThrowIfCancellationRequested();
+            PasswordService.WriteAtomically(outputPath, s => s.Write(signed, 0, signed.Length), ct);
+        }, ct);
+    }
+
+    private static void VerifyNewSignature(byte[] signed, string fieldName)
+    {
+        using var doc = PdfDocument.Open(new MemoryStream(signed, writable: false), leaveOpen: false);
+        var sig = SignatureReader.Read(doc.Catalog, doc.Objects)
+            .LastOrDefault(s => string.Equals(s.FieldName, fieldName, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException("Signing didn't produce a signature field.");
+        var r = sig.Verify(doc, SignatureVerifyOptions.Default);
+        if (!r.IntegrityVerified)
+        {
+            throw new InvalidOperationException("The signed copy failed verification (" + r.Status + "): " + r.Message);
+        }
+    }
+
+    internal static string NextFieldName(IReadOnlyList<PdfSignature> existing)
+    {
+        var used = new HashSet<string>(existing.Select(s => s.FieldName ?? string.Empty), StringComparer.Ordinal);
+        int n = 1;
+        while (used.Contains("Signature" + n)) n++;
+        return "Signature" + n;
+    }
+
+    private static string? Blank(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
 
     private static (X509Certificate2 Leaf, List<X509Certificate2> Others) LoadPfx(string pfxPath, string pfxPassword)
@@ -142,4 +218,46 @@ public sealed class CertificateSignService
             c.Thumbprint);
     }
 
+    /// <summary>A chuvadi <see cref="ISigner"/> backed by the .NET key of an
+    /// <see cref="X509Certificate2"/> (SHA-256; RSA PKCS#1 v1.5 or ECDSA with a DER signature,
+    /// as CMS expects).</summary>
+    internal sealed class BclCmsSigner : ISigner, IDisposable
+    {
+        private const string Sha256WithRsa = "1.2.840.113549.1.1.11";
+        private const string EcdsaWithSha256 = "1.2.840.10045.4.3.2";
+
+        private readonly RSA? _rsa;
+        private readonly ECDsa? _ecdsa;
+
+        public BclCmsSigner(X509Certificate2 certificate)
+        {
+            _rsa = certificate.GetRSAPrivateKey();
+            _ecdsa = _rsa is null ? certificate.GetECDsaPrivateKey() : null;
+            if (_rsa is null && _ecdsa is null)
+            {
+                throw new NotSupportedException("Only RSA and ECDSA certificates can sign.");
+            }
+
+            Certificate = ChuvadiX509.Decode(certificate.RawData);
+            // Parameters absent, matching the library's own RsaPkcs1V15Signer / EcdsaCmsSigner.
+            SignatureAlgorithm = new AlgorithmIdentifier(new ObjectIdentifier(_rsa is not null ? Sha256WithRsa : EcdsaWithSha256), null!);
+        }
+
+        public ChuvadiX509 Certificate { get; }
+
+        public ChuvadiHash HashAlgorithm => ChuvadiHash.Sha256;
+
+        public AlgorithmIdentifier SignatureAlgorithm { get; }
+
+        public byte[] Sign(byte[] dataToSign) =>
+            _rsa is not null
+                ? _rsa.SignData(dataToSign, BclHash.SHA256, RSASignaturePadding.Pkcs1)
+                : _ecdsa!.SignData(dataToSign, BclHash.SHA256, DSASignatureFormat.Rfc3279DerSequence);
+
+        public void Dispose()
+        {
+            _rsa?.Dispose();
+            _ecdsa?.Dispose();
+        }
+    }
 }

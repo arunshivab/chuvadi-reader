@@ -76,11 +76,18 @@ Captured during the deep architecture review on 2026-10-14.
 - **XFA geometry completeness (PDF-10, minor).** `XfaDataField.Geometry` was populated for
   15 of 19 fields on the test certificate; 4 null. Low priority.
 
-- **WHICH PASSWORD OPENED THE FILE (PDF-13).** `PdfDocument.Open(path, password)` accepts
-  the owner or the open (user) password but doesn't say which matched. Until it does, Protect ›
-  Password refuses to remove protection from a file whose permissions forbid changes, even for
-  the owner (decision 2026-11-06, option C; the refusal message says so). Ask: an
-  `EncryptionInfo.OpenedWithOwnerPassword` (or similar) flag.
+- **DONE in 3.32.0 — which password opened the file** (listed here on 6 Nov as "PDF-13"; that
+  number is the library's signature verification, so read it as PDF-16). `EncryptionInfo.OpenedWith`
+  / `EffectiveFlags`; the app uses them for Remove password and printing.
+- **OUTLINE WRITER KEEPS ONLY THE PAGE (PDF-17).** `OutlineEntry` carries a title and a page
+  index, so `OutlineWriter.Apply` writes a page-top destination for every bookmark. When someone
+  edits one bookmark and saves, every other bookmark loses the position the file held (`/XYZ`
+  left/top/zoom, `/FitH` top, …). Ask: let `OutlineEntry` carry a `PdfDestination` (as
+  `OutlineItem.Destination` now reads it), and write it back unchanged.
+- **INVISIBLE SIGNATURE HAS NO WIDGET (note).** A signature made by `PdfSigner.Sign` without an
+  `Appearance` verifies (poppler: valid, whole document signed), but poppler warns that the field
+  has no widget annotation. Most writers give an invisible signature a zero-size widget on a
+  page. Ask: confirm whether that is intended.
 
 ### Chuvadi.Sheets
 - **SHEETS-FMT** (above) — formatted cell display string.

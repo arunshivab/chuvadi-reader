@@ -288,8 +288,8 @@ public sealed class MeasureService
     /// or null when they fall under different viewports or none.</summary>
     private static PdfViewport? GoverningViewport(PdfPage page, (double X, double Y) p, (double X, double Y) q)
     {
-        // Read the list once and compare by position: the library builds viewport objects on
-        // each access, so two FindViewport results for the same region aren't the same instance.
+        // The spec's rule is "the last viewport containing the point", so compare by position in
+        // the page's list (the library reads it once per page since chuvadi-pdf 3.32.0).
         var vps = page.Viewports;
         int ip = LastContaining(vps, p), iq = LastContaining(vps, q);
         return ip >= 0 && ip == iq ? vps[ip] : null;

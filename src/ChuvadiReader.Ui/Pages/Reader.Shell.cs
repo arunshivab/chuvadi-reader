@@ -513,7 +513,7 @@ public partial class Reader
         yield return new("p.find", "Find & redact", "Protect", "find-in-page", null, () => GoRedact(true), Entitlements.CanRedact ? null : "Not in this edition");
         yield return new("p.stamp", "Stamp (header & footer)", "Protect", "stamp", null, T(() => OpenProtectCard("stamp")));
         yield return new("p.watermark", "Watermark", "Protect", "watermark", null, T(() => OpenProtectCard("watermark")));
-        yield return new("p.cert", "Sign with certificate", "Protect", "certification", null, T(() => OpenProtectCard("cert")), CertificateSignService.IsAvailable ? null : CertificateSignService.WaitingReason, "digital signature pfx");
+        yield return new("p.cert", "Sign with certificate", "Protect", "certification", null, T(() => OpenProtectCard("cert")), null, "digital signature pfx");
 
         // View
         yield return new("v.zoomin", "Zoom in", "View", "zoom-in", null, T(ZoomIn));

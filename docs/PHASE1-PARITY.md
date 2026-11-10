@@ -120,6 +120,33 @@ Re-checked library asks — **none fixed in 3.31.1**: `PdfSigner.Sign` still fai
 
 ---
 
+## chuvadi-pdf 3.32.0 — greyed-out features switched on (2026-11-10)
+
+The library now supplies everything that was greyed out for it, so each feature below uses the library call directly (no app-side workaround anywhere):
+
+| Feature | What changed | Library call |
+|---|---|---|
+| **Protect › Sign with certificate** | On. Signs a copy with a .pfx / .p12 (RSA or ECDSA); the copy is verified before it is kept; an already-signed file gets its next signature appended so earlier ones stay valid. Invisible for now — the visible signature box needs Arun's design first. | `PdfSigner.Sign`, `PdfCounterSigner.AddSignature` |
+| **Protect › Password › Once opened, allow** | The Printing / Copying text / Changing the document switches work, and the optional permissions password is back. Reading for accessibility always stays allowed. | `EncryptionOptions.WithPermissions(PdfPermissions…)` |
+| **Remove password** | The owner (permissions) password can always remove protection. The open password can when the file allows changes; otherwise the card says so and asks for the permissions password. | `EncryptionInfo.EffectiveFlags` |
+| **Outline** | A bookmark lands on the position the file gives (its heading), not the top of the page — in continuous scrolling and when zoomed; the page-at-a-time layout shows the whole page as before. Turned pages and cropped pages are handled. | `OutlineItem.Destination` |
+| **Layers** | Lock state and layer identity come from the library; layers that share a name are listed and switched separately. The app's own reading of `/Locked` is removed. | `OptionalContentGroup.IsLocked` / `.Id`, `LayerVisibilityById` |
+| **Measure** | No change in behaviour; the note about viewports being rebuilt is gone (the library reads them once per page). | `PdfPage.Viewports` |
+
+Checked with outside tools (testing only, never shipped): poppler `pdfsig` reports the app's signature valid and covering the whole document; `pypdf` opens a protected copy with the open password as *user* and the permissions password as *owner*, with exactly the chosen limits.
+
+Also confirmed while here: comments and form fields that have no stored appearance are drawn (squares, highlights, free text, field values); `.xlsx` files with absolute part paths open on Chuvadi.Sheets 2.0.4; "Try recovery" already uses `PdfRepairer.Repair`.
+
+Not in this change (each needs a decision or the library):
+- **Visible signature box** — the library can draw it; placement design goes to Arun first.
+- **Links inside a PDF page** — the Reader has never followed them (a click on a link does nothing). The library now gives every link's target (`LinkAnnotation.Destination`), so this can be built; it is a new feature and needs its own design.
+- **Saving edited bookmarks keeps the page but not the position** — the library's outline writer takes a page only (`OutlineEntry`), so "Save bookmarks" writes page-top destinations for every bookmark, including ones the person didn't touch. Library ask PDF-17.
+- **Text files without a byte-order mark** — shown as UTF-8 when valid, otherwise Latin-1. A file in another legacy encoding (most commonly Windows-1252: curly quotes, dashes, €) shows some characters wrong. Options are with Arun.
+
+Tests: bookmark positions and same-named layers are new; the signing, permissions and remove-password tests now exercise the real feature.
+
+---
+
 ## Roadmap (revised)
 - **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
   window controls), fixed left bar (modes + Open/Find/Library/Home + Settings), Tools rail and
