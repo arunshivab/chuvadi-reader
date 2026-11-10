@@ -148,24 +148,48 @@ public sealed class SingleInstanceTests : IDisposable
     }
 
     [Fact]
-    public void Router_waits_for_the_first_render_then_opens_each_file_in_order()
+    public void Router_asks_for_each_file_at_once_in_order_without_waiting_for_the_first_render()
     {
+        // D-164: the open is requested as the file arrives; the shell starts on the Reader and it loads meanwhile.
         var ready = new AppReadySignal();
         var open = new OpenDocumentService();
         var instance = new Instance();
         var router = new IncomingFiles(new BenchDropService(), open, ready, instance);
+        var delivered = 0;
+        router.Delivered += () => delivered++;
         var a = Pdf("a.pdf");
         var b = Pdf("b.docx");
 
         router.Receive([a, Path.Combine(_dir, "missing.pdf"), Pdf("notes.exe")]);
         instance.Raise(b);
-        Assert.False(open.TryTake(out _)); // nothing before the first render
+        Assert.Equal(a, open.PendingPath);   // waiting already, before the first render
+        Assert.Equal(0, delivered);          // the window comes forward once there is one
 
         ready.SignalReady();
+        Assert.Equal(1, delivered);
         Assert.True(open.TryTake(out var first));
         Assert.True(open.TryTake(out var second));
-        Assert.False(open.TryTake(out _));
+        Assert.False(open.TryTake(out _));   // asked for once each, not again at the first render
         Assert.Equal((a, b), (first.Path, second.Path));
+    }
+
+    [Fact]
+    public void A_launch_without_a_file_brings_nothing_forward_at_the_first_render()
+    {
+        var ready = new AppReadySignal();
+        var router = new IncomingFiles(new BenchDropService(), new OpenDocumentService(), ready, new Instance());
+        var delivered = 0;
+        router.Delivered += () => delivered++;
+        router.Receive([]);
+        ready.SignalReady();
+        Assert.Equal(0, delivered);
+    }
+
+    [Fact]
+    public void The_shell_starts_on_the_Reader_when_a_file_is_waiting()
+    {
+        var layout = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "UiSources", "Layout", "MainLayout.razor"));
+        Assert.Matches(@"OpenDoc\.Requested \+= OnOpenRequested;[\s\S]{0,600}if \(OpenDoc\.PendingPath is not null\)\s*\{\s*OnOpenRequested\(\);", layout);
     }
 
     [Fact]

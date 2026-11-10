@@ -28,6 +28,18 @@ const port = process.argv[2] || 5106;
   const t0 = await count('.mk-text');
   await touch([at(0.3, 0.3)]);
   check('finger tap with Text places a text box', await count('.mk-text') === t0 + 1, `${t0} → ${await count('.mk-text')}`);
+  // 1b. AT-17: the new box has the caret, and typing goes into it — not to one-key commands ("i" opened a picker).
+  const active = () => p.evaluate(() => document.activeElement.tagName + '.' + document.activeElement.className);
+  check('the new text box takes the caret', (await active()) === 'TEXTAREA.mk-ta', await active());
+  await p.keyboard.type('chuvadimark 123', { delay: 30 }); await p.waitForTimeout(400);
+  const typed = await p.evaluate(() => { const t = document.querySelector('.mk-text .mk-ta'); return t ? t.value : null; });
+  check('typing goes into the box', typed === 'chuvadimark 123', JSON.stringify(typed));
+  check('still on the page, in Mark', await count('.mk-layer.textmode') > 0 && await count('.mk-text') === t0 + 1, '');
+  // 1c. The box selected but the caret elsewhere (a tap on its edge): a plain key still goes into the box.
+  await p.evaluate(() => document.activeElement.blur());
+  await p.keyboard.type('ix', { delay: 30 }); await p.waitForTimeout(400);
+  const typed2 = await p.evaluate(() => { const t = document.querySelector('.mk-text .mk-ta'); return t ? t.value : null; });
+  check('a plain key with the box selected goes into the box', typed2 === 'chuvadimark 123ix', JSON.stringify(typed2));
   // 2. Rectangle: a finger drag draws one.
   await p.click('button[aria-label="Rectangle"]'); await p.waitForTimeout(300);
   const s0 = await count('.mk-shape');

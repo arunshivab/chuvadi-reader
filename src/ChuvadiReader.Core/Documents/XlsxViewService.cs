@@ -10,7 +10,12 @@ namespace ChuvadiReader.Core.Documents;
 // its stored value underneath.
 // ─────────────────────────────────────────────────────────────────────────────
 
-public sealed record WorkbookView(IReadOnlyList<SheetView> Sheets);
+public sealed record WorkbookView(IReadOnlyList<SheetView> Sheets)
+{
+    /// <summary>What reading the workbook allocated (WT-19). The viewer hands it to <see cref="ViewMemory.Released"/>
+    /// when the workbook is closed, so a heavy one gives its memory back as a heavy PDF does.</summary>
+    public long LoadedBytes { get; init; }
+}
 
 public sealed record SheetView(
     string Name,
@@ -64,6 +69,21 @@ public sealed class XlsxViewService
 
     /// <param name="cancellationToken">Stops the read (B-08b): "Stop opening", a closed tab, or the viewer's time limit.</param>
     public WorkbookView Load(string path, string? password = null, CancellationToken cancellationToken = default)
+    {
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        try
+        {
+            return LoadCore(path, password, cancellationToken) with { LoadedBytes = GC.GetAllocatedBytesForCurrentThread() - before };
+        }
+        catch
+        {
+            // WT-19: a stopped or refused open of a heavy workbook gives back what it had read so far.
+            ViewMemory.Released(GC.GetAllocatedBytesForCurrentThread() - before);
+            throw;
+        }
+    }
+
+    private WorkbookView LoadCore(string path, string? password, CancellationToken cancellationToken)
     {
         Workbook wb;
         try

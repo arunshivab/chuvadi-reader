@@ -10,22 +10,26 @@ namespace ChuvadiReader.Hosting;
 /// handed over to the running copy (<see cref="IAppInstance"/>), a drop on the window, macOS open-file,
 /// an Android intent. HANDOFF §2: to the Bench shelf when the Bench is open, otherwise each file in
 /// its own Reader tab, in order. Only existing files of a type the Open dialog accepts get through.
-/// Files that arrive before the Ui's first render wait until it, then go in arrival order.
+/// D-164: a file that arrives before the Ui is ready is not held back — its open is requested at once
+/// (<see cref="OpenDocumentService"/> keeps requests in arrival order), so the Ui starts on the Reader and the
+/// document loads while the rest of the shell does. Only <see cref="Delivered"/> (bring the window to the
+/// front) waits for the Ui's first render, when there is a window to bring.
 /// </summary>
 public sealed class IncomingFiles
 {
     private readonly BenchDropService _bench;
     private readonly OpenDocumentService _open;
     private readonly object _gate = new();
-    private List<string>? _waiting;
+    private bool _ready;
+    private bool _deliveredBeforeReady;
 
     public IncomingFiles(BenchDropService bench, OpenDocumentService open, IAppReadySignal ready, IAppInstance instance)
     {
         _bench = bench;
         _open = open;
-        if (!ready.IsReady)
+        _ready = ready.IsReady;
+        if (!_ready)
         {
-            _waiting = new List<string>();
             ready.Ready += Release;
         }
 
@@ -46,13 +50,26 @@ public sealed class IncomingFiles
     public int Receive(IEnumerable<string> paths)
     {
         var files = Supported(paths);
+        bool early;
         lock (_gate)
         {
-            if (_waiting is not null)
+            early = !_ready;
+            if (early && files.Count > 0)
             {
-                _waiting.AddRange(files);
-                return files.Count;
+                _deliveredBeforeReady = true;   // as before: a launch without a file brings nothing forward
             }
+        }
+
+        if (early)
+        {
+            // Before the Ui exists nothing is on the Bench, so each file is a Reader tab. The shell starts on the
+            // Reader when a request is waiting (MainLayout), and the Reader takes them in order.
+            foreach (var f in files)
+            {
+                _open.Request(f);
+            }
+
+            return files.Count;
         }
 
         Deliver(files);
@@ -61,16 +78,17 @@ public sealed class IncomingFiles
 
     private void Release()
     {
-        List<string> pending;
+        bool raise;
         lock (_gate)
         {
-            pending = _waiting ?? new List<string>();
-            _waiting = null;
+            _ready = true;
+            raise = _deliveredBeforeReady;
+            _deliveredBeforeReady = false;
         }
 
-        if (pending.Count > 0)
+        if (raise)
         {
-            Deliver(pending);
+            Delivered?.Invoke();
         }
     }
 

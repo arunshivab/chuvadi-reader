@@ -23,6 +23,7 @@ public sealed class MemoryAfterCloseTests
     public MemoryAfterCloseTests()
     {
         // No waiting in tests: the relief runs at once, back to back, and its one-minute second pass is off.
+        // The tests that measure memory after a close put the settle back (MeasuredAsShipped).
         MemoryRelief.Settle = TimeSpan.Zero;
         MemoryRelief.FollowUp = TimeSpan.Zero;
         MemoryRelief.MinGap = TimeSpan.Zero;
@@ -56,6 +57,15 @@ public sealed class MemoryAfterCloseTests
         return TestPdf.WriteTemp(b.ToByteArray());
     }
 
+    /// <summary>
+    /// For a test that measures memory after a close: the relief settles as shipped before it collects. With no
+    /// settle, the relief's collections and this test's own ran back to back from the instant of the close, and on the
+    /// 4-core Windows runner they kept suspending a thread that still had the page on its stack for a moment (the
+    /// drawn page alive at the measure, the document already gone, the page gone 3 to 13 ms later; found with
+    /// platform/diag-b, 8 of 10 full-suite runs). The app always waits; so does the measurement.
+    /// </summary>
+    private static void MeasuredAsShipped() => MemoryRelief.Settle = MemoryRelief.ShippedSettle;
+
     private static (long Live, long Committed) Measure()
     {
         GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
@@ -66,17 +76,106 @@ public sealed class MemoryAfterCloseTests
     }
 
     [Fact]
+    public async Task Letting_go_of_a_heavy_Excel_or_Word_view_asks_for_the_same_relief()
+    {
+        // WT-19: the viewers report what their view cost when they let it go.
+        var relieved = 0;
+        void Count() => Interlocked.Increment(ref relieved);
+        MemoryReliefNotice.Relieved += Count;
+        try
+        {
+            var last = MemoryRelief.Last;
+            ChuvadiReader.Core.Documents.ViewMemory.Released(8L * 1024 * 1024);   // an ordinary file: nothing
+            await Task.Delay(200);
+            Assert.Same(last, MemoryRelief.Last);
+            Assert.Equal(0, relieved);
+
+            ChuvadiReader.Core.Documents.ViewMemory.Released(MemoryRelief.HeavyBytes);
+            Assert.NotNull(MemoryRelief.Last);
+            await MemoryRelief.Last!.WaitAsync(TimeSpan.FromSeconds(30));
+            Assert.True(relieved >= 1);
+        }
+        finally
+        {
+            MemoryReliefNotice.Relieved -= Count;
+        }
+    }
+
+    [Fact]
+    public async Task Closing_a_heavy_workbook_brings_memory_back_near_where_it_was()
+    {
+        // WT-19, measured: 120,000 rows × 6 columns, written with Chuvadi.Sheets, read as the viewer reads it.
+        var path = Path.Combine(Path.GetTempPath(), "chvd-heavy-" + Guid.NewGuid().ToString("N") + ".xlsx");
+        WriteHeavyWorkbook(path);
+        MeasuredAsShipped();
+        try
+        {
+            var before = Measure();
+            var held = await Task.Run(() => LoadAndRelease(path));
+            await Task.Yield();   // off the helper's frame (it held the view)
+            Assert.True(held >= MemoryRelief.HeavyBytes, $"the workbook should count as heavy: read {held / (1024 * 1024)} MB");
+            Assert.NotNull(MemoryRelief.Last);
+            await MemoryRelief.Last!.WaitAsync(TimeSpan.FromSeconds(60));
+            await Task.Yield();
+            var after = Measure();
+            Assert.True(after.Live - before.Live < 24L * 1024 * 1024,
+                $"live memory grew by {(after.Live - before.Live) / (1024 * 1024)} MB after the workbook was let go");
+            Assert.True(after.Committed - before.Committed < held / 2,
+                $"committed memory grew by {(after.Committed - before.Committed) / (1024 * 1024)} MB; reading took {held / (1024 * 1024)} MB");
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    private static void WriteHeavyWorkbook(string path)
+    {
+        var wb = new Chuvadi.Sheets.Model.Workbook();
+        var sheet = wb.AddSheet("Rows");
+        for (var r = 1; r <= 120_000; r++)
+        {
+            for (var c = 1; c <= 6; c++)
+            {
+                sheet.Cell(r, c).Value = c % 2 == 0 ? r * 1.5 + c : $"row {r} column {c}";
+            }
+        }
+
+        wb.SaveTo(path);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static long LoadAndRelease(string path)
+    {
+        var view = new ChuvadiReader.Core.Documents.XlsxViewService().Load(path);
+        var bytes = view.LoadedBytes;
+        view = null;
+        ChuvadiReader.Core.Documents.ViewMemory.Released(bytes);   // what the viewer does when the tab closes
+        return bytes;
+    }
+
+    [Fact]
+    public void Reading_a_workbook_or_a_document_reports_what_it_cost()
+    {
+        var office = Path.Combine(AppContext.BaseDirectory, "Fixtures", "Office");
+        Assert.True(new ChuvadiReader.Core.Documents.XlsxViewService().Load(Path.Combine(office, "realistic.xlsx")).LoadedBytes > 100_000);
+        var docx = Directory.GetFiles(office, "*.docx").First();
+        Assert.True(new ChuvadiReader.Core.Documents.DocxViewService().Load(docx).LoadedBytes > 10_000);
+    }
+
+    [Fact]
     public async Task Closing_a_heavy_document_brings_memory_back_near_where_it_was()
     {
         var path = HeavyLargeFormatPage();
         MemoryRelief.ResetForTests();
+        MeasuredAsShipped();
         var before = Measure();
 
         var drawnChars = await OpenDrawClose(path);
 
         // PR #13's first Windows run measured 72 MB still live, once: this method had carried on inline, on top of
         // OpenDrawClose's own frame, which still held the drawn page (gcroot: a stack slot of that frame). Leave
-        // the helper's frame before measuring.
+        // the helper's frame before measuring. (That alone was not enough on 4 cores: see MeasuredAsShipped.)
         await Task.Yield();
         await (MemoryRelief.Last ?? Task.CompletedTask).WaitAsync(TimeSpan.FromSeconds(30));
         await Task.Yield();
@@ -181,6 +280,7 @@ public sealed class MemoryAfterCloseTests
         // A vector CAD sheet keeps a small SVG but costs hundreds of MB to draw (Linux step 47: the relief never ran).
         var path = BlankA1Sheets(2);
         MemoryRelief.ResetForTests();
+        MeasuredAsShipped();
         var before = Measure();
         var last = MemoryRelief.Last;
 

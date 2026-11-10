@@ -52,7 +52,7 @@ COMPONENTS
     Chuvadi.Pdf.Xfa 3.32.0
 
 * MIT  -  Arun  -  https://github.com/arunshivab/chuvadi
-    Chuvadi.Docs 2.0.0
+    Chuvadi.Docs 2.1.0
     Chuvadi.Print 1.0.0-rc.2
     Chuvadi.Print.Ipp 1.0.0-rc.2
     Chuvadi.Sheets 2.0.4

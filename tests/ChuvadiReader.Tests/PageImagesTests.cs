@@ -43,6 +43,21 @@ public sealed class PageImagesTests
     }
 
     [Fact]
+    public void A_session_that_ends_frees_every_image_it_drew_and_no_one_elses()
+    {
+        // WT-21: the portal calls RemoveOwner when a session expires or signs out.
+        var images = new PageImages();
+        var mine = new[] { images.Add("user-1|session-a", [1, 2, 3]), images.Add("user-1|session-a", [4, 5]) };
+        var theirs = images.Add("user-2|session-b", [6]);
+
+        Assert.Equal(2, images.RemoveOwner("user-1|session-a"));
+        Assert.All(mine, t => Assert.False(images.TryGet(t, "user-1|session-a", out _)));
+        Assert.True(images.TryGet(theirs, "user-2|session-b", out _));
+        Assert.Equal(1, images.Count);
+        Assert.Equal(0, images.RemoveOwner("user-1|session-a"));   // nothing left, nothing thrown
+    }
+
+    [Fact]
     public void An_image_is_served_only_to_its_owner_and_never_after_it_is_freed()
     {
         var store = new PageImages();

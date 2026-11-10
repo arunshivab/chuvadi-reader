@@ -11,7 +11,16 @@ namespace ChuvadiReader.Core.Documents;
 public sealed record WordView(
     string Title, string PageSize, bool Landscape,
     IReadOnlyList<WordBlock> Blocks,
-    IReadOnlyList<WordBlock> Header, IReadOnlyList<WordBlock> Footer);
+    IReadOnlyList<WordBlock> Header, IReadOnlyList<WordBlock> Footer)
+{
+    /// <summary>What reading the document allocated (WT-19); see <see cref="ViewMemory.Released"/>.</summary>
+    public long LoadedBytes { get; init; }
+
+    /// <summary>D-168: what the file refers to but the library could not read and left out, in plain words
+    /// ("a header", "2 pictures"), from <c>Document.SkippedParts</c>. Empty for a sound file. The viewer says so
+    /// instead of showing a document that silently lacks something.</summary>
+    public IReadOnlyList<string> LeftOut { get; init; } = [];
+}
 
 public abstract record WordBlock;
 
@@ -45,20 +54,44 @@ public sealed class DocxViewService(IPlatformInfo? platform = null)
     /// scanned documents with one large picture still open (D-137).</summary>
     public const long LocalPartBytes = 100L * 1024 * 1024, LocalTotalBytes = 400L * 1024 * 1024;
 
-    /// <summary>B-08: the library's own limits, checked against the sizes the zip declares and the bytes actually
-    /// inflated (declared sizes can lie), so zip bombs never reach memory. Tighter where many people share one
-    /// server (<see cref="PlatformCapabilities.ServerSide"/>), roomier where people open their own files.</summary>
-    public static DocxReaderOptions ReadOptions(bool serverSide) => new()
+    /// <summary>B-08, D-168: the library's limits for a file somebody was sent (<c>ForUntrustedInput</c>, Docs 2.1.0:
+    /// compression ratio 200:1, 10,000 entries, XML depth 128, spin count 500,000, 1,000,000 elements a read), with
+    /// the agreed sizes on top. They are checked against the sizes the zip declares and the bytes actually inflated
+    /// (declared sizes can lie), so zip bombs never reach memory. Tighter where many people share one server
+    /// (<see cref="PlatformCapabilities.ServerSide"/>, where the library's 50 MB file size also applies), roomier where
+    /// people open their own files: there the file itself may be as large as its contents may unpack to.</summary>
+    public static DocxReaderOptions ReadOptions(bool serverSide)
     {
-        MaxPartBytes = serverSide ? ServerPartBytes : LocalPartBytes,
-        MaxTotalUncompressedBytes = serverSide ? ServerTotalBytes : LocalTotalBytes,
-    };
+        var o = DocxReaderOptions.ForUntrustedInput();
+        o.MaxPartBytes = serverSide ? ServerPartBytes : LocalPartBytes;
+        o.MaxTotalUncompressedBytes = serverSide ? ServerTotalBytes : LocalTotalBytes;
+        if (!serverSide)
+        {
+            o.MaxPackageBytes = LocalTotalBytes;
+        }
+
+        return o;
+    }
 
     private readonly bool _serverSide = platform?.Capabilities.ServerSide ?? false;
 
     /// <param name="cancellationToken">Stops the read (B-08b): "Stop opening", a closed tab, or the viewer's
     /// time limit. The library checks it on every XML node, so it takes effect within a moment.</param>
     public WordView Load(string path, string? password = null, CancellationToken cancellationToken = default)
+    {
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        try
+        {
+            return LoadCore(path, password, cancellationToken) with { LoadedBytes = GC.GetAllocatedBytesForCurrentThread() - before };
+        }
+        catch
+        {
+            ViewMemory.Released(GC.GetAllocatedBytesForCurrentThread() - before);   // WT-19: a stopped heavy open
+            throw;
+        }
+    }
+
+    private WordView LoadCore(string path, string? password, CancellationToken cancellationToken)
     {
         Document doc;
         try
@@ -99,7 +132,38 @@ public sealed class DocxViewService(IPlatformInfo? platform = null)
         bool landscape = doc.Page.Orientation == PageOrientation.Landscape;
         var header = MapHeaderFooter(doc.Header, doc.FirstPageHeader, labels);
         var footer = MapHeaderFooter(doc.Footer, doc.FirstPageFooter, labels);
-        return new WordView(title, doc.Page.Size.ToString(), landscape, blocks, header, footer);
+        return new WordView(title, doc.Page.Size.ToString(), landscape, blocks, header, footer) { LeftOut = LeftOut(doc.SkippedParts) };
+    }
+
+    /// <summary>The skipped parts in plain words, grouped by kind and counted: "a header", "2 pictures".</summary>
+    internal static IReadOnlyList<string> LeftOut(IReadOnlyList<DocxSkippedPart> skipped)
+    {
+        if (skipped.Count == 0)
+        {
+            return [];
+        }
+
+        return [.. skipped.GroupBy(s => Kind(s.PartName)).Select(g => g.Count() == 1 ? g.Key.One : $"{g.Count()} {g.Key.Many}")];
+    }
+
+    private static (string One, string Many) Kind(string partName)
+    {
+        string name = partName[(partName.LastIndexOf('/') + 1)..];
+        bool Is(string start) => name.StartsWith(start, StringComparison.OrdinalIgnoreCase);
+        if (partName.Contains("/media/", StringComparison.OrdinalIgnoreCase)) return ("a picture", "pictures");
+        if (partName.Contains("/fonts/", StringComparison.OrdinalIgnoreCase)) return ("an embedded font", "embedded fonts");
+        if (Is("header")) return ("a header", "headers");
+        if (Is("footer")) return ("a footer", "footers");
+        if (Is("footnotes")) return ("the footnotes", "footnotes");
+        if (Is("endnotes")) return ("the endnotes", "endnotes");
+        if (Is("comments")) return ("the comments", "comments");
+        if (Is("styles")) return ("the styles", "styles");
+        if (Is("numbering")) return ("the list numbering", "list numbering");
+        if (Is("theme")) return ("the theme", "themes");
+        if (Is("settings")) return ("the settings", "settings");
+        if (Is("fontTable")) return ("the font list", "font lists");
+        if (partName.Contains("docProps", StringComparison.OrdinalIgnoreCase)) return ("the document properties", "document properties");
+        return ("a part", "parts");
     }
 
     private static IReadOnlyList<WordBlock> MapHeaderFooter(HeaderFooterContent? primary, HeaderFooterContent? fallback, IReadOnlyDictionary<Paragraph, ListLabel> labels)

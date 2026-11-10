@@ -3,7 +3,7 @@
 // brought into view and the page box says its page (AT-09). Tablet preview (ASPNETCORE_ENVIRONMENT=Development
 // CHVD_FF=tablet) with CHVD_OPEN="doc-4p.pdf;doc-12p.pdf" (Android Test's fixtures.py: "zephyrine" at the foot of
 // page 3 of 12). Before :5105, after :5106. The preview's tabs live in the server, so restart it before each case.
-// Usage: node page-box.js port case   (case: open-after-9 | open-after-3 | open-after-12 | find | find-width)
+// Usage: node page-box.js port case   (case: open-after-9 | open-after-3 | open-after-12 | find | find-width | find-keyboard)
 const { chromium } = require('playwright');
 const port = process.argv[2] || 5106;
 const which = process.argv[3] || 'open-after-9';
@@ -54,6 +54,21 @@ const which = process.argv[3] || 'open-after-9';
     await p.waitForTimeout(3000);
     const s = await state(p);
     check(`${which}: Find brings the match into view and the page box says 3`, s.match === 'in view' && s.box === '3', JSON.stringify(s));
+    await p.close();
+  }
+  // 3. AT-16: Find with the on-screen keyboard — the view shrinks while typing and grows back after Enter. The page
+  //    box must name the page that fills the screen.
+  if (which === 'find-keyboard') {
+    const p = await open();
+    await p.click('.rdesk', { position: { x: 20, y: 200 } });
+    await p.keyboard.press('Control+f'); await p.waitForTimeout(400);
+    await p.setViewportSize({ width: 1180, height: 470 }); await p.waitForTimeout(500);   // the keyboard is up
+    await p.keyboard.type('zephyrine', { delay: 40 }); await p.keyboard.press('Enter');
+    await p.waitForTimeout(700);
+    await p.setViewportSize({ width: 1180, height: 820 });                               // and down again
+    await p.waitForTimeout(3500);
+    const s = await state(p);
+    check('find-keyboard: the page box names the page on screen', s.box === String(s.most) && s.most === 3, JSON.stringify(s));
     await p.close();
   }
   await b.close();

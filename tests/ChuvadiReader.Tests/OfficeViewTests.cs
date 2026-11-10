@@ -8,7 +8,7 @@ using Xunit;
 namespace ChuvadiReader.Tests;
 
 /// <summary>
-/// D-136: Word and Excel viewing on Chuvadi.Docs 2.0.0 and Chuvadi.Sheets 2.0.2 (now 2.0.4, seventeenth patch). Every value comes through as
+/// D-136: Word and Excel viewing on Chuvadi.Docs 2.0.0 (now 2.1.0, D-168) and Chuvadi.Sheets 2.0.2 (now 2.0.4, seventeenth patch). Every value comes through as
 /// the file holds it. The truth is <c>Fixtures/Office/expected.json</c>, written by
 /// <c>tools/OfficeCorpus/make.py</c> from the files' own XML and openpyxl, never from Chuvadi. Plus the
 /// libraries' limits (B-08) and cancellation (B-08b).
@@ -268,6 +268,112 @@ public sealed class OfficeViewTests
         var o = DocxViewService.ReadOptions(serverSide);
         Assert.Equal(partMb * 1024 * 1024, o.MaxPartBytes);
         Assert.Equal(totalMb * 1024 * 1024, o.MaxTotalUncompressedBytes);
+    }
+
+    // ── D-168: Docs 2.1.0 ──
+
+    [Theory]
+    [InlineData(true, 50)]    // the library's own size for a file somebody was sent
+    [InlineData(false, 400)]  // a person's own file may be as large as its contents may unpack to (D-137)
+    public void Word_files_open_with_the_librarys_limits_for_files_somebody_was_sent(bool serverSide, long packageMb)
+    {
+        var o = DocxViewService.ReadOptions(serverSide);
+        var library = Chuvadi.Docs.Model.DocxReaderOptions.ForUntrustedInput();
+        Assert.Equal(1_000_000, o.MaxElements);
+        Assert.Equal(library.MaxElements, o.MaxElements);
+        Assert.Equal(library.MaxCompressionRatio, o.MaxCompressionRatio);
+        Assert.Equal(library.MaxEntries, o.MaxEntries);
+        Assert.Equal(library.MaxXmlDepth, o.MaxXmlDepth);
+        Assert.Equal(library.MaxSpinCount, o.MaxSpinCount);
+        Assert.Equal(packageMb * 1024 * 1024, o.MaxPackageBytes);
+    }
+
+    [Fact]
+    public void A_60_MB_scan_still_opens_on_a_persons_own_device()
+    {
+        // Larger than the library's 50 MB file size for a shared server; D-137 keeps such files opening locally.
+        var path = Path.Combine(Path.GetTempPath(), $"scan-{Guid.NewGuid():N}.docx");
+        File.Copy(Path.Combine(Dir, "landscape.docx"), path);
+        try
+        {
+            using (var zip = ZipFile.Open(path, ZipArchiveMode.Update))
+            {
+                zip.GetEntry("word/media/image1.png")!.Delete();
+                using var s = zip.CreateEntry("word/media/image1.png", CompressionLevel.NoCompression).Open();
+                var chunk = new byte[1 << 20];
+                var random = new Random(11);
+                for (var i = 0; i < 60; i++)
+                {
+                    random.NextBytes(chunk);
+                    s.Write(chunk);
+                }
+            }
+
+            Assert.True(new FileInfo(path).Length > 50L * 1024 * 1024);
+            Assert.NotEmpty(new DocxViewService().Load(path).Blocks);
+            var server = Assert.Throws<DocumentViewException>(() => new DocxViewService(new Host(serverSide: true)).Load(path));
+            Assert.Equal(ViewErrorReason.TooLarge, server.Reason);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void A_sound_document_has_nothing_left_out() =>
+        Assert.Empty(new DocxViewService().Load(Path.Combine(Dir, "discharge.docx")).LeftOut);
+
+    [Fact]
+    public void A_document_with_a_damaged_header_and_a_missing_picture_says_what_is_left_out()
+    {
+        var header = Path.Combine(Path.GetTempPath(), $"bad-header-{Guid.NewGuid():N}.docx");
+        var picture = Path.Combine(Path.GetTempPath(), $"no-picture-{Guid.NewGuid():N}.docx");
+        File.Copy(Path.Combine(Dir, "discharge.docx"), header);
+        File.Copy(Path.Combine(Dir, "landscape.docx"), picture);
+        try
+        {
+            using (var zip = ZipFile.Open(header, ZipArchiveMode.Update))
+            {
+                zip.GetEntry("word/header1.xml")!.Delete();
+                using var w = new StreamWriter(zip.CreateEntry("word/header1.xml").Open());
+                w.Write("<w:hdr xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:p>");
+            }
+
+            using (var zip = ZipFile.Open(picture, ZipArchiveMode.Update))
+            {
+                zip.GetEntry("word/media/image1.png")!.Delete();
+            }
+
+            var view = new DocxViewService().Load(header);
+            Assert.Equal(["a header"], view.LeftOut);
+            Assert.NotEmpty(view.Blocks);   // the rest of the document is all there
+            Assert.Equal(["a picture"], new DocxViewService().Load(picture).LeftOut);
+        }
+        finally
+        {
+            File.Delete(header);
+            File.Delete(picture);
+        }
+    }
+
+    [Fact]
+    public void A_damaged_protected_file_is_damaged_not_a_wrong_password()
+    {
+        // The start of a protected Office file (a compound file), then nothing usable.
+        var path = Path.Combine(Path.GetTempPath(), $"damaged-protected-{Guid.NewGuid():N}.docx");
+        var bytes = new byte[4096];
+        new byte[] { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 }.CopyTo(bytes, 0);
+        File.WriteAllBytes(path, bytes);
+        try
+        {
+            var ex = Assert.Throws<DocumentViewException>(() => new DocxViewService().Load(path, "secret"));
+            Assert.Equal(ViewErrorReason.BadFormat, ex.Reason);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     // ── D-137: list markers as Word shows them (numbering through paragraph styles included) ──

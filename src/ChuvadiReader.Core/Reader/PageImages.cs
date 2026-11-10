@@ -97,4 +97,21 @@ public sealed class PageImages
 
     /// <summary>Frees one image. Its address answers nothing from now on.</summary>
     public void Remove(string token) => _images.TryRemove(token, out _);
+
+    /// <summary>WT-21: frees every image <paramref name="owner"/> holds — a portal session that ended (expiry or
+    /// sign-out) keeps no page pixels in its worker. Returns how many were freed. Other owners' images stay.</summary>
+    public int RemoveOwner(string owner)
+    {
+        ArgumentNullException.ThrowIfNull(owner);
+        var freed = 0;
+        foreach (var pair in _images)
+        {
+            if (string.Equals(pair.Value.Owner, owner, StringComparison.Ordinal) && _images.TryRemove(pair))
+            {
+                freed++;
+            }
+        }
+
+        return freed;
+    }
 }

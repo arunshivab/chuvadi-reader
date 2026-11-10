@@ -34,7 +34,7 @@
     <PackageReference Include="Chuvadi.Pdf.Redaction" Version="$(ChuvadiPdfVersion)" />
     <PackageReference Include="Chuvadi.Pdf.Watermark" Version="$(ChuvadiPdfVersion)" />
     <PackageReference Include="Chuvadi.Pdf.Signatures" Version="$(ChuvadiPdfVersion)" />
-    <PackageReference Include="Chuvadi.Docs" Version="2.0.0" />
+    <PackageReference Include="Chuvadi.Docs" Version="2.1.0" />
     <PackageReference Include="Chuvadi.Sheets" Version="2.0.4" />
   </ItemGroup>
 

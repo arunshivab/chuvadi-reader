@@ -1508,6 +1508,7 @@
     private bool _initNewDocument;
     private int _observedGen;   // last generation the JS observers were attached to
     private int _deskGen;       // the generation the last render drew the desk for
+    private bool _focusNewText; // AT-17: a text box was just made; it takes the caret after the render that draws it
 
     private bool _curl = true;
     private string _pageInput = "1";
@@ -2592,6 +2593,7 @@
                     tlist.Add(tb);
                     _selText = tb;
                     _selTextPage = _textDraftPage;
+                    _focusNewText = true;   // AT-17: the new box takes the caret (OnAfterRenderAsync)
                 }
                 break;
             case MkMode.ShapeDraw:
@@ -3427,6 +3429,13 @@
             {
                 return;
             }
+        }
+
+        if (_focusNewText)
+        {
+            _focusNewText = false;
+            try { await _js.InvokeVoidAsync("focusNewText", _desk); }
+            catch { }
         }
 
         // Linux fresh-open stall: a document that finishes loading between a render and its OnAfterRender was armed

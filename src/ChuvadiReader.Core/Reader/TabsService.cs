@@ -105,6 +105,19 @@ public sealed class TabsService
     private readonly IPdfReader _reader;
     private readonly IAppStorage _storage;
     private readonly List<ReaderTab> _tabs = new();
+
+    // Opens overlap and continue on the thread pool (ConfigureAwait(false)), so the tab list is read off the Ui
+    // thread (DropOtherCaches, PersistAsync) while another open adds to it. Every change to the list holds this
+    // lock, and those readers walk a copy taken under it (Mac smoke, 10 Nov: "Collection was modified").
+    private readonly object _tabsGate = new();
+
+    private ReaderTab[] TabsSnapshot()
+    {
+        lock (_tabsGate)
+        {
+            return _tabs.ToArray();
+        }
+    }
     private bool _restored;
 
     public TabsService(IPdfReader reader, IAppStorage storage)
@@ -137,7 +150,10 @@ public sealed class TabsService
             FileName = fileName,
             Format = format,
         };
-        _tabs.Add(tab);
+        lock (_tabsGate)
+        {
+            _tabs.Add(tab);
+        }
         Active = tab;
         Changed?.Invoke();
 
@@ -215,7 +231,10 @@ public sealed class TabsService
 
         var tab = _tabs[idx];
         Release(tab);
-        _tabs.RemoveAt(idx);
+        lock (_tabsGate)
+        {
+            _tabs.RemoveAt(idx);
+        }
 
         if (ReferenceEquals(Active, tab))
         {
@@ -250,7 +269,10 @@ public sealed class TabsService
             }
         }
 
-        _tabs.RemoveAll(t => !ReferenceEquals(t, keep));
+        lock (_tabsGate)
+        {
+            _tabs.RemoveAll(t => !ReferenceEquals(t, keep));
+        }
         Changed?.Invoke();
         await PersistAsync(ct).ConfigureAwait(false);
     }
@@ -263,7 +285,10 @@ public sealed class TabsService
             Release(tab);
         }
 
-        _tabs.Clear();
+        lock (_tabsGate)
+        {
+            _tabs.Clear();
+        }
         Active = null;
         Changed?.Invoke();
         await PersistAsync(ct).ConfigureAwait(false);
@@ -298,8 +323,11 @@ public sealed class TabsService
         }
 
         var tab = _tabs[from];
-        _tabs.RemoveAt(from);
-        _tabs.Insert(toIndex, tab);
+        lock (_tabsGate)
+        {
+            _tabs.RemoveAt(from);
+            _tabs.Insert(toIndex, tab);
+        }
 
         Changed?.Invoke();
         await PersistAsync(ct).ConfigureAwait(false);
@@ -330,8 +358,11 @@ public sealed class TabsService
         }
 
         var tab = _tabs[from];
-        _tabs.RemoveAt(from);
-        _tabs.Insert(to, tab);
+        lock (_tabsGate)
+        {
+            _tabs.RemoveAt(from);
+            _tabs.Insert(to, tab);
+        }
 
         Changed?.Invoke();
         await PersistAsync(ct).ConfigureAwait(false);
@@ -396,7 +427,7 @@ public sealed class TabsService
                 continue;
             }
 
-            _tabs.Add(new ReaderTab
+            var restored = new ReaderTab
             {
                 Id = Guid.NewGuid().ToString("N"),
                 Path = d.Path,
@@ -405,7 +436,11 @@ public sealed class TabsService
                 CurrentPage = d.Page < 1 ? 1 : d.Page,
                 Scale = d.Scale <= 0 ? 1.0 : d.Scale,
                 ScrollTop = d.ScrollTop,
-            });
+            };
+            lock (_tabsGate)
+            {
+                _tabs.Add(restored);
+            }
         }
 
         Active = _tabs.FirstOrDefault(t => string.Equals(t.Path, activePath, StringComparison.OrdinalIgnoreCase))
@@ -574,7 +609,7 @@ public sealed class TabsService
 
     private void DropOtherCaches(ReaderTab keep)
     {
-        foreach (var t in _tabs)
+        foreach (var t in TabsSnapshot())
         {
             if (!ReferenceEquals(t, keep))
             {
@@ -583,20 +618,33 @@ public sealed class TabsService
         }
     }
 
+    // Saves go one at a time, each with the tab list as it is when its turn comes. Overlapping opens each save from
+    // their own thread; side by side, an older list could be written after a newer one (a tab missing at the next
+    // start), and a store that isn't built for two writers at once is never given two (Windows runner, 11 Nov).
+    private readonly SemaphoreSlim _persistGate = new(1, 1);
+
     private async Task PersistAsync(CancellationToken ct)
     {
-        var dto = _tabs.Select(t => new TabDto
+        await _persistGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            Path = t.Path,
-            FileName = t.FileName,
-            Format = t.Format,
-            Page = t.CurrentPage,
-            Scale = t.Scale,
-            ScrollTop = t.ScrollTop,
-        }).ToList();
+            var dto = TabsSnapshot().Select(t => new TabDto
+            {
+                Path = t.Path,
+                FileName = t.FileName,
+                Format = t.Format,
+                Page = t.CurrentPage,
+                Scale = t.Scale,
+                ScrollTop = t.ScrollTop,
+            }).ToList();
 
-        await _storage.SetAsync(TabsKey, JsonSerializer.Serialize(dto), ct).ConfigureAwait(false);
-        await _storage.SetAsync(ActiveKey, Active?.Path ?? string.Empty, ct).ConfigureAwait(false);
+            await _storage.SetAsync(TabsKey, JsonSerializer.Serialize(dto), ct).ConfigureAwait(false);
+            await _storage.SetAsync(ActiveKey, Active?.Path ?? string.Empty, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _persistGate.Release();
+        }
     }
 
     private sealed class TabDto

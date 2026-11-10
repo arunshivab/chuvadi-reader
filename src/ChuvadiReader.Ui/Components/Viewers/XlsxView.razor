@@ -95,6 +95,20 @@
     private string? _query;
     private bool _scrollToHit;
     private ElementReference _scroll;
+
+    // WT-19: the workbook is let go (closed tab, another file, a reload); a heavy one gives its memory back.
+    private void Release()
+    {
+        var bytes = _wb?.LoadedBytes ?? 0;
+        _wb = null;
+        ChuvadiReader.Core.Documents.ViewMemory.Released(bytes);
+    }
+
+    protected override ValueTask DisposeCoreAsync()
+    {
+        Release();
+        return ValueTask.CompletedTask;
+    }
     private bool _valueBarOn;      // the grid's click listener is on (the grid element lives while a workbook is shown)
 
     protected override async Task OnParametersSetAsync()
@@ -124,7 +138,7 @@
     private async Task LoadAsync()
     {
         var v = ++_version;
-        _wb = null;
+        Release();
         _valueBarOn = false;
         _error = null; _errorDetail = null;
         _index = new();

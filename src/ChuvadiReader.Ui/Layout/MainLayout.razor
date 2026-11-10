@@ -312,6 +312,13 @@
         Shell.CommandBarRequested += OpenCommandBarFromService;
         OpenDoc.Requested += OnOpenRequested;
         Nav.LocationChanged += OnLocationChanged;
+        // D-164: a file was waiting before the Ui came up (Open with, a launch with a file): start on the Reader,
+        // which opens it at once, instead of drawing Home first and leaving it when the shell is ready.
+        if (OpenDoc.PendingPath is not null)
+        {
+            OnOpenRequested();
+        }
+
         if (Platform.Kind != ChuvadiReader.Platform.PlatformKind.Windows)
         {
             Platform.FormFactorChanged += OnFormFactorChanged;

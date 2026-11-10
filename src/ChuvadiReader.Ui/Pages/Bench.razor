@@ -287,6 +287,17 @@
                                 <button @onclick="() => DeskMenuDo(() => LiftDesk(deskId))" disabled="@(_busy || sel == 0)"><Icon Name="upload" Size="13" /> Lift@(sel > 0 ? $" ({sel})" : " selected")</button>
                                 @if (sel > 0)
                                 {
+                                    @* Touch (D-163): a page tile's hover actions, labelled, for the selected pages. The
+                                       single-page ones (split, crop, margins) show when exactly one page is selected. *@
+                                    <button @onclick="() => DeskMenuDo(() => BenchSvc.DuplicateSelected(deskId))"><Icon Name="copy" Size="13" /> Duplicate selected (@sel)</button>
+                                    <button @onclick="() => DeskMenuDo(() => BenchSvc.RotateSelected(deskId, clockwise: true))"><Icon Name="refresh" Size="13" /> Rotate selected (@sel)</button>
+                                    @if (sel == 1 && desk.Pages.FirstOrDefault(p => BenchSvc.IsSelected(p.Id)) is { } one)
+                                    {
+                                        var oneId = one.Id;
+                                        <button @onclick="() => DeskMenuDo(() => SplitHere(oneId))"><Icon Name="split" Size="13" /> Split desk at this page</button>
+                                        <button @onclick="() => DeskMenuDo(() => OpenCrop(oneId))" disabled="@one.IsBlank"><Icon Name="square" Size="13" /> @(one.Crop != null ? "Crop: edit or clear" : "Crop this page")</button>
+                                        <button @onclick="() => DeskMenuDo(() => OpenMargins(oneId))"><Icon Name="compress" Size="13" /> @(one.Margins != null ? "Margins: edit or clear" : "Add margins")</button>
+                                    }
                                     <button @onclick="() => DeskMenuDo(() => DeleteSelected(deskId))"><Icon Name="trash" Size="13" /> Delete selected (@sel)</button>
                                 }
                                 <button @onclick="() => DeskMenuDo(() => BindDesk(deskId))" disabled="@(_busy || desk.IsEmpty)"><Icon Name="save" Size="13" /> Bind desk</button>

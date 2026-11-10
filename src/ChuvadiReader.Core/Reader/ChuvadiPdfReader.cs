@@ -828,7 +828,15 @@ internal static class MemoryRelief
     /// <summary>A document whose drawing allocated this much is heavy too, whatever its pages keep.</summary>
     internal const long HeavyDrawingBytes = 64L * 1024 * 1024;
     internal static TimeSpan MinGap { get; set; } = TimeSpan.FromSeconds(30);
-    internal static TimeSpan Settle { get; set; } = TimeSpan.FromMilliseconds(500);
+    /// <summary>
+    /// How long after a heavy close the relief waits before it collects. The wait is part of the design, not only a
+    /// courtesy to the Ui: for a few milliseconds after a close, a thread that has just handed a page over or received
+    /// it (the render worker, the continuation that took the answer) still has it on its stack, and a collection in
+    /// that moment cannot free it. Windows, 4 cores: with no wait, five collections back to back from the instant of
+    /// the close kept suspending such a thread before it could finish, and 72 MB stayed until a few ms later.
+    /// </summary>
+    internal static readonly TimeSpan ShippedSettle = TimeSpan.FromMilliseconds(500);
+    internal static TimeSpan Settle { get; set; } = ShippedSettle;
 
     /// <summary>
     /// The second pass. Showing a heavy page sends its text through the Ui's transport, which grows buffers in .NET's

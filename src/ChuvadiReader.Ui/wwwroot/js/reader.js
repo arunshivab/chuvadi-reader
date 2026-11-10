@@ -71,17 +71,72 @@ let dblZoomedIn = false, dblBaseZoom = 1;
 // ratio of a page long gone: Android round 3, double-tap on page 2 showed "1 / 6".)
 function reportVisiblePage() {
     if (!scrollTarget) return;
-    const dr = scrollTarget.getBoundingClientRect();
-    let best = -1, bestPx = 0;
-    for (const k in ratios) {
-        if (!(ratios[k] > 0)) continue;
-        const w = scrollTarget.querySelector('.rpage-wrap[data-page="' + k + '"]');
-        if (!w) continue;
-        const r = w.getBoundingClientRect();
-        const px = Math.min(r.bottom, dr.bottom) - Math.max(r.top, dr.top);
-        if (px > bestPx) { bestPx = px; best = parseInt(k, 10); }
-    }
+    const best = mostVisiblePage(scrollTarget);
     if (best >= 0) invoke('OnPageVisible', best + 1);
+}
+
+// AT-16: measured from where the pages are now, not from the observer's table. The table is filled a moment after a
+// scroll or a resize, so right after a jump the page filling the view could still be missing from it, and a sliver of
+// the page before won the count (tablet after Find: page 3 on screen, "2 / 12" in the box). Pages run top to bottom,
+// so the first one reaching into the view is found by halving, and only the ones in view are measured.
+// AT-17: the unseen field that holds the caret (and a touch keyboard) between a Text tap and its box.
+let caretHold = null;
+let caretHoldTimer = 0;
+let textTapHandler = null;
+
+function dropCaretHold() {
+    if (caretHoldTimer) { clearTimeout(caretHoldTimer); caretHoldTimer = 0; }
+    if (caretHold) { caretHold.remove(); caretHold = null; }
+}
+
+function holdCaret(x, y) {
+    dropCaretHold();
+    const ta = document.createElement('textarea');
+    ta.className = 'mk-caret-hold';
+    ta.setAttribute('aria-hidden', 'true');
+    ta.tabIndex = -1;
+    // 16 px text: a smaller field makes mobile browsers zoom the page to it.
+    ta.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;width:1px;height:1px;opacity:0;border:0;padding:0;margin:0;resize:none;font-size:16px;pointer-events:none;';
+    document.body.appendChild(ta);
+    caretHold = ta;
+    try { ta.focus({ preventScroll: true }); } catch { }
+    caretHoldTimer = setTimeout(dropCaretHold, 2000);   // no box came of the tap
+}
+
+// The text box just made (the selected one) takes the caret, and what was typed while it was on its way.
+export function focusNewText(deskEl) {
+    const ta = deskEl && deskEl.querySelector('.mk-text.sel .mk-ta');
+    const typed = caretHold ? caretHold.value : '';
+    if (ta) {
+        try { ta.focus({ preventScroll: true }); } catch { }
+        if (typed) { ta.value += typed; ta.dispatchEvent(new Event('input', { bubbles: true })); }
+    }
+    dropCaretHold();
+}
+
+// After a jump's quiet time, say which page is on screen: a jump that ends before its quiet time is over sends no
+// scroll event after it, so nothing else would (AT-16).
+function reportAfterQuiet() {
+    if (reportTimer) clearTimeout(reportTimer);
+    reportTimer = setTimeout(() => { reportTimer = 0; reportVisiblePage(); }, Math.max(0, suppressUntil - performance.now()) + 60);
+}
+
+function mostVisiblePage(deskEl) {
+    const wraps = deskEl.querySelectorAll('.rpage-wrap');
+    const dr = deskEl.getBoundingClientRect();
+    let lo = 0, hi = wraps.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (wraps[mid].getBoundingClientRect().bottom > dr.top) hi = mid; else lo = mid + 1;
+    }
+    let best = -1, bestPx = 0;
+    for (let i = lo; i < wraps.length; i++) {
+        const r = wraps[i].getBoundingClientRect();
+        if (r.top >= dr.bottom) break;
+        const px = Math.min(r.bottom, dr.bottom) - Math.max(r.top, dr.top);
+        if (px > bestPx) { bestPx = px; best = pageOf(wraps[i]); }
+    }
+    return best;
 }
 
 export function init(deskEl, dotnetRef, newDocument) {
@@ -151,12 +206,26 @@ export function init(deskEl, dotnetRef, newDocument) {
         deskEl.addEventListener(type, inputHandler, { passive: true, capture: true });
     }
 
+    // AT-17: a tap with the Text tool makes a text box a moment later (through .NET). The caret has to be taken
+    // inside the tap itself for a touch keyboard to open, so the tap puts it in an unseen field at once, and the new
+    // box takes it over when it is drawn (focusNewText), with anything typed in between.
+    if (textTapHandler) deskEl.removeEventListener('pointerup', textTapHandler, true);
+    textTapHandler = (e) => {
+        const t = e.target;
+        if (!t || !t.closest || !t.closest('.mk-layer.textmode') || t.closest('.mk-text')) return;
+        holdCaret(e.clientX, e.clientY);
+    };
+    deskEl.addEventListener('pointerup', textTapHandler, true);
+
     // Reader keyboard shortcuts (registered once; re-bound to the current ref).
     if (keyHandler) document.removeEventListener('keydown', keyHandler);
     keyHandler = (e) => {
-        // Don't hijack typing in fields (page-jump box, future find box).
+        // Don't hijack typing in fields (page-jump box, future find box) — nor a key the shell just handed to a
+        // selected text box (AT-17: the event's target is still the page, the caret is in the box).
         const tag = e.target && e.target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target && e.target.isContentEditable)) return;
+        const at = document.activeElement && document.activeElement.tagName;
+        if (at === 'INPUT' || at === 'TEXTAREA') return;
 
         if (e.key === 'Escape') { invoke('OnEscape'); return; }
 
@@ -795,6 +864,7 @@ export function scrollToPage(deskEl, index, frac) {
     // scrollable ancestor and would drag the toolbar/page up with it.
     const top = deskEl.scrollTop + (r.top - deskEl.getBoundingClientRect().top) + (f - lead) * r.height;
     deskEl.scrollTo({ top, behavior: 'smooth' });
+    reportAfterQuiet();
 }
 
 // Find: bring the current match itself into view, not only the top of its page — on a zoomed or tall
@@ -825,7 +895,11 @@ export async function scrollToMatch(deskEl, index) {
                 // during the scroll put the view back on the page's top, the match below it off screen).
                 if (r.height) { anchor = { page: index, frac: Math.max(0, (top - wTop) / r.height) }; anchorStale = false; }
             }
+            // The highlight can arrive late (its page had to be drawn): this second scroll gets its own quiet time,
+            // and the page on screen is reported when it ends (AT-16).
+            suppressUntil = Math.max(suppressUntil, performance.now() + 900);
             deskEl.scrollTo({ top, left, behavior: 'smooth' });
+            reportAfterQuiet();
             return;
         }
         await new Promise(r => setTimeout(r, 50));
@@ -986,8 +1060,7 @@ function reanchor() {
     const d = scrollTarget.getBoundingClientRect(), r = w.getBoundingClientRect();
     const delta = (r.top + anchor.frac * r.height) - d.top;
     if (Math.abs(delta) > 1) scrollTarget.scrollTop += delta;
-    if (reportTimer) clearTimeout(reportTimer);
-    reportTimer = setTimeout(() => { reportTimer = 0; reportVisiblePage(); }, Math.max(0, suppressUntil - performance.now()) + 60);
+    reportAfterQuiet();
 }
 
 // Markup: report a page's redaction layer rect (viewport pixels) so the C# side

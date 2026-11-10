@@ -32,6 +32,12 @@ export function init(dotnetRef) {
         if (!c) return;
         if (c === 'Ctrl K') { e.preventDefault(); e.stopPropagation(); ref.invokeMethodAsync('OnShellKey', c); return; }
         if (editing) return;
+        // AT-17: a selected text box takes plain typing — the key goes into the box (the caret is moved there before
+        // the key is applied), not to a one-key command ("i" opened the image picker while typing a note).
+        if (e.key.length === 1 && !(e.ctrlKey || e.metaKey || e.altKey)) {
+            const box = document.querySelector('.mk-text.sel .mk-ta');
+            if (box) { try { box.focus({ preventScroll: true }); } catch { } return; }
+        }
         if (READER_OWNED.has(c)) return;
         if (c === 'Ctrl O' || c === 'Ctrl P' || c === 'Ctrl S' || c === 'Ctrl Shift S' || c === 'Ctrl B' || c === 'F11' || c === 'Ctrl Y') {
             e.preventDefault();
