@@ -345,7 +345,7 @@
     }
     else if (viewOnly)
     {
-        <div class="rviewer">
+        <div class="rviewer" @ref="_viewerHost" data-zoom="@_textSize">
             @switch (tab.Format)
             {
                 case DocumentFormat.Docx:
@@ -3408,6 +3408,20 @@
 
         PublishShell();
         var tab = Tabs.Active;
+
+        // Pinch and Ctrl + wheel on the Word, Excel, Markdown and text viewers (asked for until the script says it is
+        // on; the viewers' element is new whenever one replaces the PDF desk).
+        if (tab is not null && tab.Format != DocumentFormat.Pdf && _viewerHost.Id is { } hostId && hostId != _viewerPinchOn)
+        {
+            try
+            {
+                _js ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/ChuvadiReader.Ui/js/reader.js");
+                _ref ??= DotNetObjectReference.Create(this);
+                if (await _js.InvokeAsync<bool>("viewerPinch", _viewerHost, _ref)) _viewerPinchOn = hostId;
+            }
+            catch { }
+        }
+
         if (tab?.Session is null)
         {
             return;
@@ -4156,6 +4170,19 @@
         {
             t.ScrollLocked = !t.ScrollLocked;
         }
+    }
+
+    private ElementReference _viewerHost;
+    private string? _viewerPinchOn;
+
+    /// <summary>A pinch or Ctrl + wheel on a viewer asks for a text size (its zoom), in percent.</summary>
+    [JSInvokable]
+    public void OnViewerPinch(int percent)
+    {
+        int next = Math.Clamp(percent, 60, 200);
+        if (next == _textSize) return;
+        _textSize = next;
+        StateHasChanged();
     }
 
     [JSInvokable]

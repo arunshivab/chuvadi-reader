@@ -383,6 +383,111 @@ export function init(deskEl, dotnetRef, newDocument) {
     setupViewTools(deskEl);
 }
 
+// ── pinch from a trackpad, on every host ─────────────────────────────────────────────────────────────
+// A trackpad pinch reaches the page in three different ways:
+//   - WebView2 and Chromium (Windows, Android, the Web portal in Chrome or Edge): a wheel event with ctrlKey;
+//   - WebKit on Apple systems (the Mac host, Safari): gesturestart / gesturechange / gestureend, with a scale;
+//   - WebKitGTK (the Linux host): not at all. GTK keeps the gesture, so the host passes it on by calling
+//     window.chuvadiPinch(phase, scale, x, y): phase 'begin' | 'change' | 'end', scale since 'begin' (1 = none),
+//     x, y the pointer in the page's CSS pixels (leave out for the middle of the view).
+// Each zoomable view (the PDF desk, the other viewers) registers itself; the pinch goes to the one under the pointer.
+function pinchTargets() {
+    if (!window.__chvdPinchTargets) {
+        window.__chvdPinchTargets = [];
+        let live = null;   // the target and its zoom when the host's gesture began
+        window.chuvadiPinch = (phase, scale, x, y) => {
+            const targets = window.__chvdPinchTargets.filter(t => t.el.isConnected && t.el.offsetParent !== null);
+            if (phase === 'begin' || !live || !live.target.el.isConnected) {
+                const hit = (typeof x === 'number' && typeof y === 'number') ? document.elementFromPoint(x, y) : null;
+                const target = (hit && targets.find(t => t.el.contains(hit))) || targets[0];
+                live = target ? { target, start: target.get() } : null;
+            }
+            if (!live) return false;
+            if (phase === 'end') { live.target.end(); live = null; return true; }
+            const r = live.target.el.getBoundingClientRect();
+            const px = typeof x === 'number' ? x : r.left + r.width / 2, py = typeof y === 'number' ? y : r.top + r.height / 2;
+            if (phase === 'change' && isFinite(scale) && scale > 0) live.target.set(live.start * scale, px, py);
+            return true;
+        };
+    }
+    return window.__chvdPinchTargets;
+}
+
+// Makes el zoom by a trackpad pinch however the host delivers it. api: get() the zoom now, set(zoom, x, y) asks for a
+// zoom keeping the point at (x, y) in place, end() when a gesture finishes, busy() true while a finger pinch is on
+// (iOS and iPadOS send gesture events for fingers too; those are the touch handlers' to handle).
+function attachTrackpadPinch(el, api) {
+    if (el._chvdPinch) return;
+    let start = 0;
+    const onStart = (e) => { if (api.busy && api.busy()) return; start = api.get(); e.preventDefault(); };
+    const onChange = (e) => {
+        if (!start || (api.busy && api.busy())) return;
+        e.preventDefault();   // or WebKit magnifies the whole page, chrome and all
+        if (isFinite(e.scale) && e.scale > 0) api.set(start * e.scale, e.clientX, e.clientY);
+    };
+    const onEnd = (e) => { if (!start) return; start = 0; e.preventDefault(); api.end(); };
+    el.addEventListener('gesturestart', onStart, { passive: false });
+    el.addEventListener('gesturechange', onChange, { passive: false });
+    el.addEventListener('gestureend', onEnd, { passive: false });
+    const targets = pinchTargets();
+    for (let i = targets.length - 1; i >= 0; i--) if (!targets[i].el.isConnected) targets.splice(i, 1);
+    targets.push({ el, get: api.get, set: api.set, end: api.end });
+    el._chvdPinch = true;
+}
+
+// The Word, Excel, Markdown, text and HTML-source viewers: pinch (trackpad on every host, and two fingers on a
+// touchscreen) and Ctrl + wheel change their text size, which is their zoom. The size lives in the Reader
+// (data-zoom on the host element, 60 to 200 %); each step is sent there and the place under the pointer is kept.
+export function viewerPinch(el, dotnetRef) {
+    if (!el || !el.isConnected) return false;
+    if (el._chvdViewerPinch) { el._chvdViewerPinch.ref = dotnetRef; return true; }
+    const state = { ref: dotnetRef, asked: 0, touch: null };
+    const now = () => state.asked || parseFloat(el.getAttribute('data-zoom')) || 100;
+    const scroller = () => el.querySelector('.dv-stage, .xv-gridwrap, .mdv-scroll, .sl-scroll');
+    const set = (pct, x, y) => {
+        const next = Math.round(Math.max(60, Math.min(200, pct)));
+        if (next === Math.round(now())) return;
+        state.asked = next;
+        const sc = scroller();
+        let keep = null;
+        if (sc && sc.scrollHeight > 0) {
+            const r = sc.getBoundingClientRect();
+            keep = { px: x - r.left, py: y - r.top, fx: (Math.abs(sc.scrollLeft) + x - r.left) / sc.scrollWidth, fy: (sc.scrollTop + y - r.top) / sc.scrollHeight };
+        }
+        Promise.resolve(state.ref.invokeMethodAsync('OnViewerPinch', next)).then(() => requestAnimationFrame(() => {
+            if (!keep || !sc.isConnected) return;
+            sc.scrollTop = Math.max(0, keep.fy * sc.scrollHeight - keep.py);
+            const left = Math.max(0, keep.fx * sc.scrollWidth - keep.px);
+            sc.scrollLeft = getComputedStyle(sc).direction === 'rtl' ? -left : left;
+        })).catch(() => { });
+    };
+    const end = () => { state.asked = 0; };
+    el.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        set(now() * Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+        clearTimeout(state.wheelEnd);
+        state.wheelEnd = setTimeout(end, 300);
+    }, { passive: false });
+    el.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) { state.touch = { d: touchDist(e.touches[0], e.touches[1]), z: now() }; e.preventDefault(); }
+    }, { passive: false });
+    el.addEventListener('touchmove', (e) => {
+        if (!state.touch || e.touches.length !== 2) return;
+        e.preventDefault();
+        if (state.touch.d > 0) {
+            const mid = touchMid(e.touches[0], e.touches[1]);
+            set(state.touch.z * touchDist(e.touches[0], e.touches[1]) / state.touch.d, mid.x, mid.y);
+        }
+    }, { passive: false });
+    const touchEnd = (e) => { if (state.touch && e.touches.length < 2) { state.touch = null; end(); } };
+    el.addEventListener('touchend', touchEnd);
+    el.addEventListener('touchcancel', touchEnd);
+    attachTrackpadPinch(el, { get: now, set, end, busy: () => !!state.touch });
+    el._chvdViewerPinch = state;
+    return true;
+}
+
 // ── zoom / pinch / tools ─────────────────────────────────────────────────────
 function setupViewTools(deskEl) {
     deskRef = deskEl;
@@ -399,6 +504,20 @@ function setupViewTools(deskEl) {
         notifyZoom(next);
     };
     deskEl.addEventListener('wheel', wheelHandler, { passive: false });
+
+    // The same zoom from a WebKit trackpad pinch (gesture events) and from a host that passes its own pinch on
+    // (window.chuvadiPinch): see attachTrackpadPinch.
+    attachTrackpadPinch(deskEl, {
+        get: readZoom,
+        set: (zoom, x, y) => {
+            const old = readZoom(), next = clampZoom(zoom);
+            if (next === old) return;
+            anchorZoom(x, y, old, next);
+            notifyZoom(next);
+        },
+        end: () => notifyZoom(readZoom()),
+        busy: () => pinchActive,
+    });
 
     // Hand (pan), Marquee (area zoom) and Loupe pointer handling on the desk.
     if (deskPointer) {
