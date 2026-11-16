@@ -27,6 +27,7 @@
     private string? _error;
     private string? _errorDetail;
     private string? _loaded;
+    private int? _loadedCodePage;
     private int _version;
     private SourceLines? _lines;
 
@@ -35,8 +36,9 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Path == _loaded) return;
+        if (Path == _loaded && CodePage == _loadedCodePage) return;
         _loaded = Path;
+        _loadedCodePage = CodePage;
         var v = ++_version;
         _doc = null;
         _error = null; _errorDetail = null;
@@ -46,16 +48,20 @@
         {
             var path = Path;
             var svc = Service;
-            var doc = await Task.Run(() => svc.Load(path));
+            var codePage = CodePage;
+            var doc = await Task.Run(() => svc.Load(path, codePage));
             if (v != _version || Disposed) return;
             _doc = doc;
-            await ReportStatusAsync($"Text · {doc.Lines.Count:N0} line{(doc.Lines.Count == 1 ? "" : "s")} · {doc.EncodingName}");
+            // The encoding's name is the status bar's encoding button (D-191), so it is not repeated in the text.
+            await ReportStatusAsync($"Text · {doc.Lines.Count:N0} line{(doc.Lines.Count == 1 ? "" : "s")}");
+            await ReportEncodingAsync(doc);
         }
         catch (Exception ex)
         {
             if (v != _version) return;
             (_error, _errorDetail) = Describe(ex, "a text file");
             await ReportStatusAsync("Text · couldn't open");
+            await ReportEncodingFailedAsync(Path);
         }
         await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
     }

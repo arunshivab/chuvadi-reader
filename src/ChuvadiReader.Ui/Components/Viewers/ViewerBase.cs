@@ -4,6 +4,10 @@ using Microsoft.JSInterop;
 
 namespace ChuvadiReader.Ui.Components.Viewers;
 
+/// <summary>How a text-type file was read: the encoding's name and code page, whether the person chose it, and how
+/// many bytes do not fit it (D-191). An empty <see cref="Name"/> means the file could not be read that way.</summary>
+public sealed record ViewerEncoding(string Path, string Name, int CodePage, bool Chosen, int BytesNotFitting);
+
 /// <summary>
 /// Common contract of the view-only viewers (D-07, D-09): DocxView, XlsxView, MarkdownView,
 /// TextView and HtmlView. The Reader hosts one per non-PDF tab and drives it through these
@@ -42,6 +46,14 @@ public abstract class ViewerBase : ComponentBase, IAsyncDisposable
 
     /// <summary>One-line description for the status bar, e.g. "Markdown · rendered · 186 words".</summary>
     [Parameter] public EventCallback<string> OnStatus { get; set; }
+
+    /// <summary>Text, Markdown and HTML: read the file as this code page (one of
+    /// <see cref="TextEncodings.All"/>); null works the encoding out from the file. Changing it reads the same
+    /// bytes again; the file is never changed (D-191).</summary>
+    [Parameter] public int? CodePage { get; set; }
+
+    /// <summary>Text, Markdown and HTML: how the file was read, fired after each load.</summary>
+    [Parameter] public EventCallback<ViewerEncoding> OnEncoding { get; set; }
 
     /// <summary>"Stop opening" on a slow open (B-08b): the Reader closes the tab.</summary>
     [Parameter] public EventCallback OnStopOpening { get; set; }
@@ -134,6 +146,18 @@ public abstract class ViewerBase : ComponentBase, IAsyncDisposable
 
     protected Task ReportStatusAsync(string status) =>
         OnStatus.HasDelegate ? OnStatus.InvokeAsync(status) : Task.CompletedTask;
+
+    protected Task ReportEncodingAsync(TextDocument doc) =>
+        OnEncoding.HasDelegate
+            ? OnEncoding.InvokeAsync(new ViewerEncoding(doc.Path, doc.EncodingName, doc.CodePage, doc.EncodingChosen, doc.BytesNotFitting))
+            : Task.CompletedTask;
+
+    /// <summary>The file could not be read as text (for one, a UTF-16 file with no mark looks like binary data).
+    /// The Reader still offers the encodings, since choosing the right one is the way to open it.</summary>
+    protected Task ReportEncodingFailedAsync(string path) =>
+        OnEncoding.HasDelegate
+            ? OnEncoding.InvokeAsync(new ViewerEncoding(path, "", 0, CodePage is not null, 0))
+            : Task.CompletedTask;
 
     /// <summary>A load failure as WT-10 words it (B-25): a plain sentence, and the system's own text as the detail
     /// shown under a collapsed Details. <paramref name="what"/> is "a Word document", "an Excel workbook", ….</summary>

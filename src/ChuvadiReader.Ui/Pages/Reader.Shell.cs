@@ -212,6 +212,7 @@ public partial class Reader
         _viewerFindOpen = false;
         _viewerFindCount = 0;
         _viewerStatus = null;
+        _viewerEncoding = null;
         _showSource = false;
         _bmLoadedFor = null;
         if (_pagesDrawer && tab is not null && !tab.Format.IsViewOnly())
@@ -352,6 +353,7 @@ public partial class Reader
         }
 
         var tab = Tab;
+        PublishEncoding(tab);
         if (tab is null)
         {
             Shell.ClearCounter();
@@ -437,6 +439,11 @@ public partial class Reader
         yield return new("doc.export", "Export pages as images", "Document", "download", null, T(DocExport), notPdf);
         yield return new("doc.press", "Reduce file size (Press)", "Document", "compress", null, T(DocPress), notPdf, "compress");
         yield return new("doc.print", "Print", "Document", "print", "Ctrl P", T(() => OpenCard("print")), notPdf);
+        if (HasEncoding(tab.Format))
+        {
+            yield return new("doc.encoding", "Text encoding…", "Document", "text-box", null, OpenEncodingCard, null, "charset code page read as");
+        }
+
         yield return Sep("1");
         yield return new("doc.flatten", "Flatten forms & marks", "Document", "compress", null, DocFlatten, notPdf ?? (_flattening ? "Flattening…" : null));
         yield return new("doc.password", "Password-protect a copy", "Document", "doc-lock", null, () => { OpenProtectCard("password"); return Task.CompletedTask; }, notPdf);
@@ -1156,6 +1163,93 @@ public partial class Reader
     {
         _viewerFindCount = n;
         return Task.CompletedTask;
+    }
+
+    // ── text encoding (D-191) ────────────────────────────────────────────
+    /// <summary>The status bar's button, drawn by the layout.</summary>
+    [CascadingParameter] public ChuvadiReader.Ui.Layout.StatusBarSlot? StatusSlot { get; set; }
+
+    private bool _encReady;                    // Recents (which holds the remembered choices) has been read
+    // A file that is open but not in Recents has nowhere to keep its choice; it holds for this session only.
+    private readonly Dictionary<string, int> _encSession = new(StringComparer.OrdinalIgnoreCase);
+    private ViewerEncoding? _viewerEncoding;   // how the file in view was read
+    private string? _encDetected;              // what Automatic reads the file as
+    private string? _encDetectedFor;
+
+    private static bool HasEncoding(DocumentFormat format) =>
+        format is DocumentFormat.Text or DocumentFormat.Markdown or DocumentFormat.Html;
+
+    private int? EncodingFor(ReaderTab tab) =>
+        Recents.TextEncodingFor(tab.Path) ?? (_encSession.TryGetValue(tab.Path, out var cp) ? cp : null);
+
+    private static string EncodingNote(ViewerEncoding e) =>
+        $"{e.BytesNotFitting:N0} byte{(e.BytesNotFitting == 1 ? " doesn't" : "s don't")} fit {e.Name}";
+
+    private Task OnViewerEncoding(ViewerEncoding e)
+    {
+        _viewerEncoding = e;
+        if (!e.Chosen)
+        {
+            (_encDetected, _encDetectedFor) = (e.Name.Length > 0 ? e.Name : null, e.Path);
+        }
+
+        PublishShell();
+        return Task.CompletedTask;
+    }
+
+    private async Task OpenEncodingCard()
+    {
+        if (Tab is not { } tab || !HasEncoding(tab.Format)) return;
+        _card = "encoding";
+        StateHasChanged();
+        if (_encDetectedFor == tab.Path) return;
+
+        // Opened with a remembered choice: what Automatic would read the file as isn't known yet. Work it out
+        // once for the list; a file that can't be read automatically (binary-looking) just shows no name.
+        var path = tab.Path;
+        try
+        {
+            var name = await Task.Run(() => new TextViewService().Load(path).EncodingName);
+            (_encDetected, _encDetectedFor) = (name, path);
+        }
+        catch (Exception ex) when (ex is DocumentViewException or IOException or UnauthorizedAccessException)
+        {
+            (_encDetected, _encDetectedFor) = (null, path);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ChooseEncoding(int? codePage)
+    {
+        if (Tab is not { } tab || EncodingFor(tab) == codePage) return;
+        // Kept with the file's Recents entry (D-191, Core); Automatic forgets it.
+        if (await Recents.SetTextEncodingAsync(tab.Path, codePage) || codePage is null)
+        {
+            _encSession.Remove(tab.Path);
+        }
+        else if (codePage is int chosen)
+        {
+            _encSession[tab.Path] = chosen;
+        }
+        StateHasChanged();   // the viewer reads the same bytes again with the new choice
+    }
+
+    /// <summary>Fills or empties the status bar's encoding button for the tab in view.</summary>
+    private void PublishEncoding(ReaderTab? tab)
+    {
+        if (StatusSlot is null) return;
+        if (tab is not null && HasEncoding(tab.Format) && _viewerEncoding is { } e && e.Path == tab.Path)
+        {
+            // A file that couldn't be read that way (no name) keeps the button: the right encoding may open it.
+            var label = e.Name.Length > 0 ? e.Name
+                : EncodingFor(tab) is int chosen ? TextEncodings.NameOf(chosen) : "Automatic";
+            StatusSlot.Set(label, e.BytesNotFitting > 0 ? EncodingNote(e) : null, "Read this file as…", OpenEncodingCard);
+        }
+        else
+        {
+            StatusSlot.Clear();
+        }
     }
 
     private Task OnViewerStatus(string status)

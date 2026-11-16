@@ -51,6 +51,7 @@
     private int _words;
     private ElementReference _scroll, _page;
     private SourceLines? _src;
+    private int? _loadedCodePage;
 
     private TextViewService Service =>
         Services.GetService(typeof(TextViewService)) as TextViewService ?? new TextViewService();
@@ -59,10 +60,11 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Path != _loaded)
+        if (Path != _loaded || CodePage != _loadedCodePage)
         {
+            if (Path != _loaded) _allowRemote = false;   // reading the same file again keeps its pictures choice
             _loaded = Path;
-            _allowRemote = false;
+            _loadedCodePage = CodePage;
             _wasSource = ShowSource;
             _query = FindQuery;
             await LoadAsync();
@@ -103,9 +105,10 @@
             var path = Path;
             var svc = Service;
             var allow = _allowRemote;
+            var codePage = CodePage;
             var (doc, render) = await Task.Run(() =>
             {
-                var d = svc.Load(path);
+                var d = svc.Load(path, codePage);
                 return (d, MarkdownRenderer.Render(d.Text, allow));
             });
             if (v != _version || Disposed) return;
@@ -114,6 +117,7 @@
             await ReportOutlineAsync(render.Outline);
             if (!ShowSource) await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
             await ReportStatusAsync(StatusText());
+            await ReportEncodingAsync(doc);
         }
         catch (Exception ex)
         {
@@ -121,6 +125,7 @@
             (_error, _errorDetail) = Describe(ex, "a Markdown file");
             await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
             await ReportStatusAsync("Markdown · couldn't open");
+            await ReportEncodingFailedAsync(Path);
         }
     }
 

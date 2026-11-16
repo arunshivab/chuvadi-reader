@@ -46,7 +46,7 @@
                                                                SwitchTab="SwitchTab" CloseTab="CloseTab"
                                                                OpenLabel="@(IsPortal ? "Upload" : "Open")" OpenIcon="@(IsPortal ? "upload" : "folder")"
                                                                MenuFooter="@(Platform.Chrome.AccountMenu ? PortalMenuFooter : null)">
-            @Body
+            <CascadingValue Value="_statusSlot" IsFixed="true">@Body</CascadingValue>
         </ChuvadiReader.Ui.Components.Platform.Phone.PhoneShell>
     }
     else
@@ -206,7 +206,7 @@
         </nav>
 
         <main class="content">
-            @Body
+            <CascadingValue Value="_statusSlot" IsFixed="true">@Body</CascadingValue>
         </main>
     </div>
 
@@ -225,6 +225,16 @@
         {
             <span class="sb-div"></span>
             <span class="sb-activity">@Shell.Activity</span>
+        }
+        @if (_statusSlot.Label is { } slotLabel)
+        {
+            @* D-191: the encoding a text file was read as; the button opens "Read this file as". *@
+            <span class="sb-div"></span>
+            <button type="button" class="sb-btn" title="@_statusSlot.Title" aria-label="@($"{_statusSlot.Title} Now {slotLabel}")" @onclick="RunStatusSlot">@slotLabel<Icon Name="chevron-down" Size="10" /></button>
+            @if (_statusSlot.Note is { } slotNote)
+            {
+                <span class="sb-note" role="status">@slotNote</span>
+            }
         }
         @if (Shell.Progress is { } p)
         {
@@ -437,8 +447,16 @@
         if (e.Key == "Escape" && !_closeAskBusy) AnswerClose(CloseAnswer.Cancel);
     }
 
+    // D-191: one status-bar button the page in view owns (the Reader's encoding button).
+    private readonly StatusBarSlot _statusSlot = new();
+
+    private void OnStatusSlotChanged() => InvokeAsync(StateHasChanged);
+
+    private Task RunStatusSlot() => _statusSlot.Run?.Invoke() ?? Task.CompletedTask;
+
     protected override void OnInitialized()
     {
+        _statusSlot.Changed += OnStatusSlotChanged;
         Tabs.CloseGuard = ConfirmCloseAsync;
         Theme.Changed += OnThemeChanged;
         Win.StateChanged += OnWinChanged;
@@ -966,6 +984,7 @@
         Theme.Changed -= OnThemeChanged;
         Win.StateChanged -= OnWinChanged;
         Tabs.Changed -= OnTabsChanged;
+        _statusSlot.Changed -= OnStatusSlotChanged;
         Shell.Changed -= OnShellChanged;
         Shell.CommandBarRequested -= OpenCommandBarFromService;
         OpenDoc.Requested -= OnOpenRequested;

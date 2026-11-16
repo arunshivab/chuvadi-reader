@@ -208,6 +208,29 @@ html[data-theme="dark"] .statusbar .status-dot.server { background: #8fa3e6; }
     display: flex; align-items: center; justify-content: center; font-size: 8px;
 }
 .sb-activity { color: var(--chvd-ink-muted); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* D-191: the status bar's one button (the encoding a text file was read as) and its note. */
+.sb-btn {
+    display: inline-flex; align-items: center; gap: 4px; flex: none; height: 18px; padding: 0 6px; margin: 0 -2px;
+    border: 0.5px solid var(--chvd-border); border-radius: 4px; background: transparent; color: var(--chvd-ink-soft);
+    font: inherit; letter-spacing: inherit; cursor: pointer;
+}
+.sb-btn:hover { background: var(--chvd-surface-lo); color: var(--chvd-ink); }
+.sb-btn:focus-visible { outline: 2px solid var(--chvd-binding); outline-offset: 1px; }
+.sb-note { color: var(--chvd-danger); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* "Read this file as": one row per encoding, the current one marked. */
+.enc-list { display: flex; flex-direction: column; gap: 2px; }
+.enc-row {
+    display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 5px 8px; text-align: left;
+    border: 0; border-radius: 6px; background: transparent; color: var(--chvd-ink); font: inherit; cursor: pointer;
+}
+.enc-row.on { background: var(--chvd-surface-lo); }
+@media (hover: hover) { .enc-row:hover { background: var(--chvd-surface-lo); } }
+.enc-row:focus-visible { outline: 2px solid var(--chvd-binding); outline-offset: -2px; }
+.enc-dot { width: 12px; height: 12px; flex: none; border-radius: 50%; border: 1.5px solid var(--chvd-ink-muted); box-sizing: border-box; }
+.enc-row.on .enc-dot { border: 4px solid var(--chvd-binding); }
+.enc-n { flex: 1; min-width: 0; }
+.enc-d { font-family: var(--chvd-mono); font-size: 11px; color: var(--chvd-ink-muted); }
+.enc-foot { font-size: 11.5px; line-height: 1.45; color: var(--chvd-ink-muted); }
 .sb-progress { width: 120px; height: 4px; border-radius: 2px; background: var(--chvd-surface-lo); overflow: hidden; flex: none; }
 .sb-progress > span { display: block; height: 100%; background: var(--chvd-binding); transition: width var(--chvd-base); }
 .sb-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }

@@ -81,6 +81,7 @@
     private string? _query;
     private double _scale = -1;
     private SourceLines? _src;
+    private int? _loadedCodePage;
 
     private TextViewService Service =>
         Services.GetService(typeof(TextViewService)) as TextViewService ?? new TextViewService();
@@ -89,10 +90,11 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (Path != _loaded)
+        if (Path != _loaded || CodePage != _loadedCodePage)
         {
+            if (Path != _loaded) _allowRemote = false;   // reading the same file again keeps its pictures choice
             _loaded = Path;
-            _allowRemote = false;
+            _loadedCodePage = CodePage;
             _wasSource = ShowSource;
             _query = Q(FindQuery);
             _scale = Scale;
@@ -132,7 +134,8 @@
         {
             var path = Path;
             var svc = Service;
-            var doc = await Task.Run(() => svc.Load(path));
+            var codePage = CodePage;
+            var doc = await Task.Run(() => svc.Load(path, codePage));
             if (v != _version || Disposed) return;
             _doc = doc;
             await SanitizeAsync(findChanged: _query is not null);
@@ -140,6 +143,7 @@
             await ReportOutlineAsync(_result.Outline);
             if (!ShowSource) await ReportCounterAsync(1, Sections, ViewerCounter.Section, force: true);
             await ReportStatusAsync(StatusText());
+            await ReportEncodingAsync(doc);
         }
         catch (Exception ex)
         {
@@ -147,6 +151,7 @@
             (_error, _errorDetail) = Describe(ex, "a web page");
             await ReportOutlineAsync(Array.Empty<ViewerOutlineEntry>());
             await ReportStatusAsync("HTML · couldn't open");
+            await ReportEncodingFailedAsync(Path);
         }
     }
 

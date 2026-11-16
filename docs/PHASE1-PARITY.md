@@ -141,11 +141,30 @@ Not in this change (each needs a decision or the library):
 - **Visible signature box** — the library can draw it; placement design goes to Arun first.
 - **Links inside a PDF page** — the Reader has never followed them (a click on a link does nothing). The library now gives every link's target (`LinkAnnotation.Destination`), so this can be built; it is a new feature and needs its own design.
 - **Saving edited bookmarks keeps the page but not the position** — the library's outline writer takes a page only (`OutlineEntry`), so "Save bookmarks" writes page-top destinations for every bookmark, including ones the person didn't touch. Library ask PDF-17.
-- **Text files without a byte-order mark** — shown as UTF-8 when valid, otherwise Latin-1. A file in another legacy encoding (most commonly Windows-1252: curly quotes, dashes, €) shows some characters wrong. Options are with Arun.
+- **Text files without a byte-order mark** — done: read as UTF-8 when valid, otherwise Windows-1252 (patch 26), and the encoding can be chosen by hand (the encoding picker section).
 
 Tests: bookmark positions and same-named layers are new; the signing, permissions and remove-password tests now exercise the real feature.
 
 ---
+
+## Encoding picker for text, Markdown and HTML files (2026-11-16, D-185, D-191)
+
+Core side is Foundation's (`TextEncodings`, `TextViewService.Load(path, codePage)`, the choice kept with the Recents entry; patch 30); this is the shared Ui on top of it.
+
+- **Where:** the status bar shows the encoding the file was read as, as a button; the Document menu (and so Ctrl K and the phone menu) has **Text encoding…** for text, Markdown and HTML files. Both open the card **Read this file as** (a bottom sheet on a phone).
+- **The list (first version):** Automatic (with what was detected), UTF-8, Windows-1252, UTF-16 LE, UTF-16 BE. "More encodings" stays out until decided.
+- **What choosing does:** the same bytes are read again in that encoding. The file is never changed. Bytes that do not fit are still shown and counted: the status bar and the card say "7 bytes don't fit UTF-8".
+- **Remembered:** the choice is kept with the file's Recents entry on the machine (Core: `RecentFilesService.SetTextEncodingAsync`); Automatic forgets it. A file that is open but not in Recents keeps its choice until the app closes.
+- **A file that can't be read automatically** (a UTF-16 file with no mark looks like binary data) keeps the button, so the right encoding can be chosen and the file opens.
+- **How it is built:** `ViewerBase.CodePage` / `OnEncoding`; the Reader takes the choice from Recents; `StatusBarSlot` (Ui) is one status-bar button a page owns, handed down by `MainLayout` as a cascading value. No Core, Hosting or host file changed.
+- **Proof:** `tools/PixelProof/encoding-picker.js` on the desktop preview; Core's `TextEncodingTests` cover the remembering.
+- **Open, for Foundation:** an HTML file's own `<meta charset>` is not read yet (Core).
+- **Ctrl F on view-only tabs:** already on main through Mac's patch (M-28, `2bd175e`); checked here on text and HTML tabs, nothing more needed.
+
+## Checked on Arun's Windows PC (2026-11-16, main at patch 27 then 28)
+
+- A rectangle drawn in Mark at a zoom lands exactly under the mouse (M-27 does not affect Windows).
+- Two-finger trackpad pinch on a PDF page zooms the page.
 
 ## Roadmap (revised)
 - **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
