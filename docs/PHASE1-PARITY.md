@@ -157,7 +157,8 @@ Core side is Foundation's (`TextEncodings`, `TextViewService.Load(path, codePage
 - **Remembered:** the choice is kept with the file's Recents entry on the machine (Core: `RecentFilesService.SetTextEncodingAsync`); Automatic forgets it. A file that is open but not in Recents keeps its choice until the app closes.
 - **A file that can't be read automatically** (a UTF-16 file with no mark looks like binary data) keeps the button, so the right encoding can be chosen and the file opens.
 - **How it is built:** `ViewerBase.CodePage` / `OnEncoding`; the Reader takes the choice from Recents; `StatusBarSlot` (Ui) is one status-bar button a page owns, handed down by `MainLayout` as a cascading value. No Core, Hosting or host file changed.
-- **Proof:** `tools/PixelProof/encoding-picker.js` on the desktop preview; Core's `TextEncodingTests` cover the remembering.
+- **Proof:** `tools/PixelProof/encoding-picker.js` on the desktop preview (22 checks); Core's `TextEncodingTests` cover the remembering.
+- **Follow-up after Foundation's review (2026-11-16):** the wait for Recents can no longer be left unset by a failed read; the card says "kept for this session only" for a file that is not in Recents; the list has one Tab stop and moves with the arrow keys, Home and End. The arrow keys are handled once in `shell.js` for every `role="radiogroup"`, so the segmented choices in Settings and Print's pages choice move the same way.
 - **Open, for Foundation:** an HTML file's own `<meta charset>` is not read yet (Core).
 - **Ctrl F on view-only tabs:** already on main through Mac's patch (M-28, `2bd175e`); checked here on text and HTML tabs, nothing more needed.
 

@@ -21,6 +21,28 @@ function combo(e) {
     return parts.join(' ');
 }
 
+// A radio group moves with the arrow keys, Home and End, and the row moved to is chosen (the usual radio
+// behaviour). Every role="radiogroup" in the app gets it: the encoding list, the segmented choices, Print's pages.
+function radioKey(e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false;
+    const step = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+    if (step === undefined && e.key !== 'Home' && e.key !== 'End') return false;
+    const radio = e.target && e.target.closest ? e.target.closest('[role="radio"]') : null;
+    const group = radio && radio.closest('[role="radiogroup"]');
+    if (!group) return false;
+    const rows = [...group.querySelectorAll('[role="radio"]')].filter(r => !r.disabled);
+    const at = rows.indexOf(radio);
+    if (at < 0 || rows.length < 2) return false;
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? rows.length - 1 : (at + step + rows.length) % rows.length;
+    e.preventDefault();
+    e.stopPropagation();
+    if (to !== at) {
+        try { rows[to].focus({ preventScroll: false }); } catch { }
+        rows[to].click();
+    }
+    return true;
+}
+
 export function init(dotnetRef) {
     ref = dotnetRef;
     if (handler) document.removeEventListener('keydown', handler, true);
@@ -30,6 +52,7 @@ export function init(dotnetRef) {
         const editing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable);
         const c = combo(e);
         if (!c) return;
+        if (radioKey(e)) return;
         if (c === 'Ctrl K') { e.preventDefault(); e.stopPropagation(); ref.invokeMethodAsync('OnShellKey', c); return; }
         if (editing) return;
         // AT-17: a selected text box takes plain typing — the key goes into the box (the caret is moved there before

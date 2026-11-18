@@ -924,13 +924,14 @@
             <FloatCard Title="Read this file as" Meta="@tab.Format.Label()" OnClose="CloseCard">
                 <div class="fc-card-scroll">
                     <div class="enc-list" role="radiogroup" aria-label="Text encoding">
-                        <button class="enc-row @(encChosen is null ? "on" : null)" role="radio" aria-checked="@(encChosen is null ? "true" : "false")" @onclick="() => ChooseEncoding(null)">
+                        @* One Tab stop (the marked row); the arrow keys, Home and End move and choose (shell.js). *@
+                        <button class="enc-row @(encChosen is null ? "on" : null)" role="radio" aria-checked="@(encChosen is null ? "true" : "false")" tabindex="@(encChosen is null ? 0 : -1)" @onclick="() => ChooseEncoding(null)">
                             <span class="enc-dot"></span><span class="enc-n">Automatic</span><span class="enc-d">@encAuto</span>
                         </button>
                         @foreach (var enc in TextEncodings.FirstChoices)
                         {
                             var e = enc;
-                            <button class="enc-row @(encChosen == e.CodePage ? "on" : null)" role="radio" aria-checked="@(encChosen == e.CodePage ? "true" : "false")" @onclick="() => ChooseEncoding(e.CodePage)">
+                            <button class="enc-row @(encChosen == e.CodePage ? "on" : null)" role="radio" aria-checked="@(encChosen == e.CodePage ? "true" : "false")" tabindex="@(encChosen == e.CodePage ? 0 : -1)" @onclick="() => ChooseEncoding(e.CodePage)">
                                 <span class="enc-dot"></span><span class="enc-n">@e.Name</span>
                             </button>
                         }
@@ -943,7 +944,7 @@
                     {
                         <div class="fc-status err" role="status">@EncodingNote(encRead)</div>
                     }
-                    <div class="enc-foot">The file itself is never changed. Your choice is remembered while the file is in Recents.</div>
+                    <div class="enc-foot">The file itself is never changed. @(InRecents(tab) ? "Your choice is remembered while the file is in Recents." : "This file isn't in Recents, so your choice is kept for this session only.")</div>
                 </div>
             </FloatCard>
         }
@@ -3568,8 +3569,15 @@
 
         // The encodings chosen by hand for text files live with Recents (D-191), which only Home reads so far;
         // read it here too, before any text file is read, so a file restored straight into a tab opens as chosen.
-        if (Recents.Items.Count == 0) await Recents.HydrateAsync();
-        _encReady = true;
+        // Whatever happens to that read, the text viewers must not be left waiting for it.
+        try
+        {
+            if (Recents.Items.Count == 0) await Recents.HydrateAsync();
+        }
+        finally
+        {
+            _encReady = true;
+        }
 
         // Rebuild the strip from the last session (no-op after the first time).
         await Tabs.RestoreAsync();

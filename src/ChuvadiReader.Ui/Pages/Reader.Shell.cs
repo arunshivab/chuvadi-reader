@@ -1210,6 +1210,10 @@ public partial class Reader
     private int? EncodingFor(ReaderTab tab) =>
         Recents.TextEncodingFor(tab.Path) ?? (_encSession.TryGetValue(tab.Path, out var cp) ? cp : null);
 
+    /// <summary>Whether the choice has somewhere to be kept (Core keeps it with the file's Recents entry).</summary>
+    private bool InRecents(ReaderTab tab) =>
+        Recents.Items.Any(i => string.Equals(i.Path, tab.Path, StringComparison.OrdinalIgnoreCase));
+
     private static string EncodingNote(ViewerEncoding e) =>
         $"{e.BytesNotFitting:N0} byte{(e.BytesNotFitting == 1 ? " doesn't" : "s don't")} fit {e.Name}";
 

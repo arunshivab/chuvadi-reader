@@ -36,6 +36,16 @@ const { chromium } = require('playwright');
   await p.click('.sb-btn'); await p.waitForTimeout(400);
   const rows2 = await p.$$eval('.enc-row', r => r.map(e => e.innerText.replace(/\s+/g, ' ').trim() + (e.classList.contains('on') ? ' *' : '')));
   check('list shows UTF-8 marked and what Automatic would be', rows2[0].startsWith('Automatic Windows-1252') && rows2.some(r => r === 'UTF-8 *'), rows2.join(' | '));
+  // arrow keys: one Tab stop, and the row moved to is chosen
+  check('one Tab stop in the list (the marked row)', await p.$$eval('.enc-row', r => r.filter(e => e.tabIndex === 0).map(e => e.innerText.trim()).join()) === 'UTF-8');
+  await p.focus('.enc-row.on'); await p.keyboard.press('ArrowDown'); await p.waitForTimeout(900);
+  check('Arrow Down moves to and chooses the next row', (await p.$eval('.enc-row.on', e => e.innerText.trim())) === 'Windows-1252' && await p.evaluate(() => document.activeElement.classList.contains('on')), await sb());
+  await p.keyboard.press('End'); await p.waitForTimeout(900);
+  check('End chooses the last row', (await p.$eval('.enc-row.on', e => e.innerText.trim())) === 'UTF-16 BE');
+  await p.keyboard.press('ArrowDown'); await p.waitForTimeout(900);
+  check('Arrow Down from the last row wraps to Automatic', (await p.$eval('.enc-row.on', e => e.innerText.replace(/\s+/g, ' ').trim())).startsWith('Automatic'));
+  check('a file not in Recents says the choice is for this session', (await p.$eval('.enc-foot', e => e.innerText)).includes('this session only'));
+  await p.keyboard.press('ArrowDown'); await p.waitForTimeout(900);
   await p.click('.enc-row:has-text("Automatic")'); await p.waitForTimeout(900);
   check('Automatic resets', (await p.$eval('.sb-btn', e => e.innerText.trim())) === 'Windows-1252' && !(await sb()).includes("don't fit"), await sb());
   // Document menu entry
