@@ -47,8 +47,17 @@ public partial class App : Application
         // Nothing fails silently any more.
         DispatcherUnhandledException += (_, args) =>
         {
-            Report(args.Exception);
             args.Handled = true;
+            if (IsPageGone(args.Exception))
+            {
+                // BUG-21, BUG-25: a call into a page after its browser process stopped. The window shows its own
+                // recovery panel; no error box (there would be one for every call that follows).
+                Log(args.Exception);
+                _main?.OnPageCallFailed();
+                return;
+            }
+
+            Report(args.Exception);
         };
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
@@ -96,6 +105,7 @@ public partial class App : Application
             services.AddSingleton<IWindowControls>(_windowControls);
 
             Services = services.BuildServiceProvider();
+            Services.GetRequiredService<IAppReadySignal>().Ready += () => _started = true;
 
             _main = new MainWindow(Services);
             _windowControls.Attach(_main);
@@ -226,28 +236,60 @@ public partial class App : Application
         base.OnExit(e);
     }
 
-    private static void Report(Exception ex)
+    /// <summary>True once the app has drawn its first screen: errors after that are not "during startup".</summary>
+    private static bool _started;
+
+    /// <summary>Adds the error to the log (kept to about 1 MB; the newest entries are at the end).</summary>
+    private static void Log(Exception ex)
     {
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(LogPath)!);
-            File.WriteAllText(LogPath, DateTimeOffset.Now + Environment.NewLine + ex);
+            if (File.Exists(LogPath) && new FileInfo(LogPath).Length > 1_000_000)
+            {
+                File.Delete(LogPath);
+            }
+
+            File.AppendAllText(LogPath, DateTimeOffset.Now + Environment.NewLine + ex + Environment.NewLine + Environment.NewLine);
         }
         catch
         {
             // logging must never throw
         }
+    }
 
-        var webview2 = IsWebView2Problem(ex);
+    /// <summary>The page's browser process has stopped: WebView2 says so on every call into it.</summary>
+    private static bool IsPageGone(Exception? ex)
+    {
+        while (ex is not null)
+        {
+            if (ex is InvalidOperationException
+                && (ex.TargetSite?.Name == "VerifyBrowserNotCrashed"
+                    || (ex.Message?.Contains("browser process crashed", StringComparison.OrdinalIgnoreCase) ?? false)))
+            {
+                return true;
+            }
+
+            ex = ex.InnerException;
+        }
+
+        return false;
+    }
+
+    private static void Report(Exception ex)
+    {
+        Log(ex);
+
+        var webview2 = !_started && IsWebView2Problem(ex);
         var message = webview2
             ? "Chuvadi needs the Microsoft Edge WebView2 Runtime, which doesn't seem to be installed.\n\n" +
               "Install the \"Evergreen Standalone Installer\" from:\n" +
               "https://developer.microsoft.com/microsoft-edge/webview2/\n\n" +
               "Then relaunch Chuvadi."
-            : "Chuvadi hit an error during startup:\n\n" + ex.Message +
+            : (_started ? "Chuvadi hit an error:\n\n" : "Chuvadi hit an error during startup:\n\n") + ex.Message +
               "\n\nFull details were written to:\n" + LogPath;
 
-        MessageBox.Show(message, "Chuvadi — startup", MessageBoxButton.OK,
+        MessageBox.Show(message, _started ? "Chuvadi" : "Chuvadi — startup", MessageBoxButton.OK,
             webview2 ? MessageBoxImage.Warning : MessageBoxImage.Error);
     }
 

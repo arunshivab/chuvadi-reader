@@ -72,13 +72,46 @@ export function init(dotnetRef) {
         ref.invokeMethodAsync('OnShellKey', c);
     };
     document.addEventListener('keydown', handler, true);
+    if (!wheel) { wheel = tabWheel; document.addEventListener('wheel', wheel, { passive: false }); }
+    watchTabs();
 }
 
 export function focusSelect(el) { try { el.focus(); el.select(); } catch { } }
 
 export function scrollIntoView(el) { try { el.scrollIntoView({ block: 'nearest' }); } catch { } }
 
+// The tab strip has no scroll bar: the active tab is kept in view, and the mouse wheel over the strip moves it
+// sideways.
+let wheel = null;
+function tabWheel(e) {
+    const strip = e.target && e.target.closest ? e.target.closest('.topbar .rtabs') : null;
+    if (!strip || strip.scrollWidth <= strip.clientWidth || e.ctrlKey) return;
+    const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if (!d) return;
+    strip.scrollLeft += d;
+    e.preventDefault();
+}
+
+let lastActive = null;
+function revealActiveTab() {
+    const tab = document.querySelector('.topbar .rtabs .rtab.active');
+    if (!tab || tab === lastActive) return;
+    lastActive = tab;
+    try { tab.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch { }
+}
+
+// Watches the page for a different active tab (a switch, an open, a close) and brings it into view.
+let tabWatch = null;
+function watchTabs() {
+    if (tabWatch) return;
+    tabWatch = new MutationObserver(() => revealActiveTab());
+    tabWatch.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] });
+    revealActiveTab();
+}
+
 export function dispose() {
     if (handler) document.removeEventListener('keydown', handler, true);
-    handler = null; ref = null;
+    if (wheel) document.removeEventListener('wheel', wheel, { passive: false });
+    if (tabWatch) tabWatch.disconnect();
+    handler = null; ref = null; wheel = null; tabWatch = null; lastActive = null;
 }

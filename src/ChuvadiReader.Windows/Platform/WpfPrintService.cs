@@ -22,7 +22,7 @@ namespace ChuvadiReader.Windows.Platform;
 /// <summary>
 /// Prints through the native Windows print dialog. Pages are rasterised by chuvadi-pdf's
 /// <see cref="PageRasterizer"/> at the printer's resolution (clamped to 150–300 dpi to bound
-/// memory) and laid out one <see cref="FixedPage"/> per PDF page, scaled to the printable area
+/// memory) and laid out one sheet (a drawing) per PDF page, scaled to the printable area
 /// (or at actual size), centred, and turned 90° when the page's orientation doesn't match the
 /// paper's. Pages are produced lazily by a <see cref="DocumentPaginator"/>, one rendered ahead
 /// on a background thread, so a long document never holds more than two page bitmaps, and the
@@ -227,7 +227,7 @@ public sealed class WpfPrintService : IPrintService
         return tcs.Task;
     }
 
-    /// <summary>Produces one <see cref="FixedPage"/> per requested PDF page on demand. The bitmap
+    /// <summary>Produces one sheet per requested PDF page on demand. The bitmap
     /// for page n+1 is rendered on a background thread while page n spools; rendering is
     /// serialised because one <see cref="PdfDocument"/> isn't safe for concurrent use.</summary>
     private sealed class RasterPaginator : DocumentPaginator
@@ -278,9 +278,9 @@ public sealed class WpfPrintService : IPrintService
             }
 
             var bitmap = bitmapTask.GetAwaiter().GetResult();
-            var fixedPage = BuildFixedPage(bitmap);
+            var sheet = BuildSheet(bitmap);
             var rect = new Rect(_paper);
-            return new DocumentPage(fixedPage, _paper, rect, rect);
+            return new DocumentPage(sheet, _paper, rect, rect);
         }
 
         private Task<BitmapSource> Request(int pageNumber)
@@ -330,7 +330,10 @@ public sealed class WpfPrintService : IPrintService
         }
 
         /// <summary>UI thread: one sheet with the page image placed in the printable area.</summary>
-        private FixedPage BuildFixedPage(BitmapSource bitmap)
+        /// <remarks>BUG-16: a drawing, not a <see cref="FixedPage"/>. The XPS writer puts each page it is given
+        /// into a FixedPage of its own, and a FixedPage inside another stops the job ("FixedPage cannot contain
+        /// another FixedPage"), leaving an empty file.</remarks>
+        private Visual BuildSheet(BitmapSource bitmap)
         {
             // The bitmap's natural size in DIPs (its dpi is the render dpi).
             double naturalW = bitmap.PixelWidth * 96.0 / _dpi;
@@ -346,24 +349,17 @@ public sealed class WpfPrintService : IPrintService
             double left = _imageable.X + ((_imageable.Width - drawW) / 2);
             double top = _imageable.Y + ((_imageable.Height - drawH) / 2);
 
-            var image = new Image { Source = bitmap, Width = drawW, Height = drawH, Stretch = Stretch.Fill };
-            System.Windows.Media.RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
-            FixedPage.SetLeft(image, left);
-            FixedPage.SetTop(image, top);
-
-            var fixedPage = new FixedPage
+            var sheet = new DrawingVisual();
+            System.Windows.Media.RenderOptions.SetBitmapScalingMode(sheet, BitmapScalingMode.HighQuality);
+            using (var dc = sheet.RenderOpen())
             {
-                Width = _paper.Width,
-                Height = _paper.Height,
-                Background = Brushes.White,
-                Clip = new RectangleGeometry(_imageable),
-            };
-            fixedPage.Children.Add(image);
-            var size = new Size(_paper.Width, _paper.Height);
-            fixedPage.Measure(size);
-            fixedPage.Arrange(new Rect(size));
-            fixedPage.UpdateLayout();
-            return fixedPage;
+                dc.DrawRectangle(Brushes.White, null, new Rect(_paper));
+                dc.PushClip(new RectangleGeometry(_imageable));
+                dc.DrawImage(bitmap, new Rect(left, top, drawW, drawH));
+                dc.Pop();
+            }
+
+            return sheet;
         }
 
         /// <summary>Completes when every started render has finished (successfully or not).</summary>

@@ -13,6 +13,24 @@
     <AssemblyName>ChuvadiReader.Windows</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>chuvadi.ico</ApplicationIcon>
+    <!-- BUG-22: Windows shows the file description (Task Manager, Alt Tab details) as the app's name. -->
+    <AssemblyTitle>Chuvadi</AssemblyTitle>
+  </PropertyGroup>
+
+  <!-- SC27: a Release build's version reads "1.0.0-preview", without the source commit after a "+". -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <!-- SC27: what is published for people to install carries no debugging symbols (.pdb) or code documentation
+       (.xml). Builds keep both, for debugging; publish leaves them out. -->
+  <PropertyGroup>
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    <PublishDocumentationFile>false</PublishDocumentationFile>
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <AllowedReferenceRelatedFileExtensions>.none</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
 
   <!--
@@ -33,7 +51,10 @@
 
   <ItemGroup>
     <!-- First-party Microsoft host control. The only host package. -->
-    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.0" />
+    <!-- SC20: kept on the latest servicing release. The second line lifts the Blazor WebView package it brings
+         to its own latest servicing release (the .NET runtime itself is the one installed on the PC). -->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Wpf" Version="10.0.130" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView" Version="10.0.15" />
   </ItemGroup>
 
   <ItemGroup>

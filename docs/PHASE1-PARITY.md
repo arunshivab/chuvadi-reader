@@ -167,6 +167,14 @@ Core side is Foundation's (`TextEncodings`, `TextViewService.Load(path, codePage
 - A rectangle drawn in Mark at a zoom lands exactly under the mouse (M-27 does not affect Windows).
 - Two-finger trackpad pinch on a PDF page zooms the page.
 
+## Windows test round of 23 Nov (main c160070): host fixes
+
+- **BUG-21, BUG-25 (page's browser process stops):** the browser's own keys are off (F5 and Ctrl R reload, Ctrl P, Ctrl F, F3, F12, Back, Forward; the page still gets every key), and so is swipe-to-go-back. When the page's browser or renderer process stops, the window shows a plain Windows panel: "Reopen the window" puts in a new page, which shows the same tabs and unsaved work (they live in the app's services, not the page; proved in the preview by reloading with a mark drawn: tabs and the mark came back). "Not responding" also offers "Keep waiting". A close while the page is gone, or while its question was on screen when it stopped, asks with a Windows message instead (reopen / close and lose / cancel), so the window always closes. Errors from a gone page no longer show "error during startup", and the log keeps every entry. Not run on Windows here.
+- **BUG-16 (printing failed, 0-byte file):** each sheet is a drawing, not a FixedPage (the XPS writer adds a FixedPage of its own per page; WPF throws "FixedPage cannot contain another FixedPage" in `XpsSerializationManager.RegisterPageStart`). Printing is still raster (open decision: vector rule).
+- **BUG-22:** the exe's description is "Chuvadi" (Task Manager). **SC27:** Release version reads "1.0.0" without the commit; publish ships no .pdb or .xml (78 files, was 88 with 10 of them). **SC20:** Microsoft.AspNetCore.Components.WebView.Wpf 10.0.130 and Microsoft.AspNetCore.Components.WebView 10.0.15 (WebView2 SDK 1.0.4314.35). The .NET runtime is the one installed (10.0.15 on Arun's PC).
+- **ST16:** each window button has a tooltip. The colours match their jobs in the code and in Arun's screenshots (yellow minimise, green maximise, red close); the test report's reversed mapping was not reproduced.
+- **Tab strip (Arun, 24 Nov):** no scroll bar; the active tab is always brought into view; the mouse wheel over the strip scrolls it.
+
 ## Roadmap (revised)
 - **P1 — shell:** 40 px top bar (wordmark · tabs · `‹ 2 / 13 ›` · Document ▾ · Ctrl K ·
   window controls), fixed left bar (modes + Open/Find/Library/Home + Settings), Tools rail and

@@ -166,9 +166,9 @@
                 else if (Platform.Chrome.Buttons == ChuvadiReader.Platform.WindowButtons.Right)
                 {
                     <div class="traffic">
-                        <button class="tl tl-min" @onclick="() => Win.Minimize()" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
-                        <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
-                        <button class="tl tl-close" @onclick="() => Win.Close()" aria-label="Close"><Icon Name="x" Size="10" /></button>
+                        <button class="tl tl-min" @onclick="() => Win.Minimize()" title="Minimize" aria-label="Minimize"><Icon Name="minus" Size="10" /></button>
+                        <button class="tl tl-max" @onclick="() => Win.ToggleMaximize()" title="@(Win.IsMaximized ? "Restore down" : "Maximize")" aria-label="@(Win.IsMaximized ? "Restore" : "Maximize")"><Icon Name="@(Win.IsMaximized ? "restore" : "square")" Size="9" /></button>
+                        <button class="tl tl-close" @onclick="() => Win.Close()" title="Close" aria-label="Close"><Icon Name="x" Size="10" /></button>
                     </div>
                 }
                 @if (Platform.Chrome.AccountMenu)

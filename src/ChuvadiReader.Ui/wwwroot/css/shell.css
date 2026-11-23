@@ -79,6 +79,9 @@
 .tb-ctl { display: contents; }
 
 .topbar .rtabs { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 4px; height: 100%; margin: 0; padding: 0; overflow-x: auto; overflow-y: hidden; }
+/* No scroll bar under the tabs: the active tab is kept in view and the wheel scrolls the strip (shell.js). */
+.topbar .rtabs { scrollbar-width: none; }
+.topbar .rtabs::-webkit-scrollbar { display: none; }
 .topbar .rtab { height: 26px; min-width: 84px; max-width: 190px; padding: 0 5px 0 9px; gap: 6px; border-radius: 7px; }
 .topbar .rtab-name { font-size: 11px; }
 .rtab-ic { display: flex; color: var(--chvd-binding); }
