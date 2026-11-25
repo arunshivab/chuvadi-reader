@@ -7,6 +7,10 @@
         {
             <details class="vm-detail"><summary>Details</summary>@Detail</details>
         }
+        @if (OnClose.HasDelegate)
+        {
+            <button class="vm-close" @onclick="OnClose">Close this tab</button>
+        }
     </span>
     @ChildContent
 </div>
@@ -18,4 +22,6 @@
     /// <summary>The system's own text for an error (WT-10), under a collapsed Details.</summary>
     [Parameter] public string? Detail { get; set; }
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>A file that failed to open can be closed from its message (it used to stay with no way out but the tab's ×).</summary>
+    [Parameter] public EventCallback OnClose { get; set; }
 }

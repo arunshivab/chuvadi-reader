@@ -153,6 +153,13 @@
 .shell-body { flex: 1; min-height: 0; display: flex; position: relative; }
 .shell-body > .content { flex: 1; min-width: 0; min-height: 0; overflow: auto; position: relative; margin-left: var(--sh-left); transition: margin-left var(--chvd-base); }
 .shell-body.lb-open > .content { margin-left: var(--sh-left-open); }
+/* ST15 (D-214): below 760 px an opened side bar floats over the page instead of taking room from it, so the
+   tool rail, the View rail and Save stay in the window; a pick closes it again. */
+@media (max-width: 759px) {
+    .shell-body.lb-open > .content { margin-left: var(--sh-left); }
+    .leftbar.open { box-shadow: 8px 0 28px rgba(26, 19, 16, .18); }
+    .topbar.lb-open .tb-brandbox { width: auto; }
+}
 
 /* ── Left bar: fixed, expands over the canvas on hover ─────────────────── */
 .leftbar {

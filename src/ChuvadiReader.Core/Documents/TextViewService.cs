@@ -65,7 +65,7 @@ public sealed class TextViewService
         byte[] bytes;
         try
         {
-            bytes = File.ReadAllBytes(path);
+            bytes = SharedRead.AllBytes(path);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -104,6 +104,39 @@ public sealed class TextViewService
     /// <summary>Decodes file bytes: a BOM (UTF-8, UTF-16 LE/BE, UTF-32 LE/BE) wins; otherwise
     /// strict UTF-8, falling back to Windows-1252. Throws <see cref="DocumentViewException"/>
     /// (<see cref="ViewErrorReason.BadFormat"/>) for BOM-less content that looks binary.</summary>
+    private static string? LooksUtf16(ReadOnlySpan<byte> bytes, bool bigEndian)
+    {
+        int n = Math.Min(bytes.Length, BinaryProbeBytes) & ~1;
+        if (n < 4 || (bytes.Length & 1) != 0) return null;
+        int zeroHigh = 0, zeroLow = 0;
+        for (int i = 0; i < n; i += 2)
+        {
+            byte hi = bigEndian ? bytes[i] : bytes[i + 1], lo = bigEndian ? bytes[i + 1] : bytes[i];
+            if (hi == 0) zeroHigh++;
+            if (lo == 0) zeroLow++;
+        }
+
+        int pairs = n / 2;
+        if (zeroHigh * 10 < pairs * 4 || zeroLow * 20 > pairs) return null;   // most high bytes zero, almost no low
+        string text;
+        try
+        {
+            text = new UnicodeEncoding(bigEndian, byteOrderMark: false, throwOnInvalidBytes: true).GetString(bytes);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+
+        int controls = 0;
+        foreach (char c in text.AsSpan(0, Math.Min(text.Length, BinaryProbeBytes / 2)))
+        {
+            if (char.IsControl(c) && c is not ('\n' or '\r' or '\t' or '\f')) controls++;
+        }
+
+        return controls * 50 > Math.Min(text.Length, BinaryProbeBytes / 2) ? null : text;
+    }
+
     public static string Decode(ReadOnlySpan<byte> bytes, out string encodingName)
     {
         if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xFE && bytes[2] == 0 && bytes[3] == 0)
@@ -130,6 +163,17 @@ public sealed class TextViewService
         {
             encodingName = "UTF-16 BE";
             return new UnicodeEncoding(bigEndian: true, byteOrderMark: false).GetString(bytes[2..]);
+        }
+
+        // VW25: UTF-16 with no byte-order mark (Western text then has a zero in every other byte). It is told
+        // from binary data by where the zeros fall and by decoding cleanly to text.
+        foreach (bool be in new[] { true, false })
+        {
+            if (LooksUtf16(bytes, be) is { } text)
+            {
+                encodingName = be ? "UTF-16 BE" : "UTF-16 LE";
+                return text;
+            }
         }
 
         if (bytes[..Math.Min(bytes.Length, BinaryProbeBytes)].IndexOf((byte)0) >= 0)

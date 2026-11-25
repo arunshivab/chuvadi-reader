@@ -43,8 +43,41 @@ function radioKey(e) {
     return true;
 }
 
+// BUG-02 / BUG-10: a key that opens a field (Ctrl K's command bar, Ctrl B's new bookmark name) goes through .NET,
+// and the field is drawn and focused a moment later. Keys typed in that moment went to the page: lost, or taken as
+// one-key commands ("layer" searched "ayer"). They are held here and put into the field when it takes the focus.
+let typeAhead = null;
+export function expectTyping(ms) { typeAhead = { buf: '', until: performance.now() + (ms || 1500) }; }
+function typeAheadKey(e) {
+    if (!typeAhead) return false;
+    if (performance.now() > typeAhead.until) { typeAhead = null; return false; }
+    if (e.ctrlKey || e.metaKey || e.altKey) return false;
+    if (e.key.length === 1) typeAhead.buf += e.key;
+    else if (e.key === 'Backspace') typeAhead.buf = typeAhead.buf.slice(0, -1);
+    else if (e.key === 'Escape') { typeAhead = null; return false; }
+    else return false;
+    e.preventDefault(); e.stopPropagation();
+    return true;
+}
+function typeAheadFocus(e) {
+    const t = e.target;
+    if (!typeAhead || !t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA') || t.classList.contains('mk-caret-hold')) return;
+    const held = typeAhead; typeAhead = null;
+    if (!held.buf || performance.now() > held.until) return;
+    // After the focus has settled (a field that selects its text on focus has done so): a field that opens with
+    // its text selected (a new bookmark's "Page 13") is typed over, as a person would.
+    setTimeout(() => {
+        const selectedAll = t.selectionStart === 0 && t.selectionEnd === t.value.length && t.value.length > 0;
+        t.value = selectedAll ? held.buf : t.value + held.buf;
+        try { t.setSelectionRange(t.value.length, t.value.length); } catch { }
+        t.dispatchEvent(new Event('input', { bubbles: true }));
+    }, 0);
+}
+
 export function init(dotnetRef) {
     ref = dotnetRef;
+    document.removeEventListener('focusin', typeAheadFocus, true);
+    document.addEventListener('focusin', typeAheadFocus, true);
     if (handler) document.removeEventListener('keydown', handler, true);
     handler = (e) => {
         const t = e.target;
@@ -53,8 +86,10 @@ export function init(dotnetRef) {
         const c = combo(e);
         if (!c) return;
         if (radioKey(e)) return;
-        if (c === 'Ctrl K') { e.preventDefault(); e.stopPropagation(); ref.invokeMethodAsync('OnShellKey', c); return; }
+        if (c === 'Ctrl K') { e.preventDefault(); e.stopPropagation(); expectTyping(); ref.invokeMethodAsync('OnShellKey', c); return; }
         if (editing) return;
+        if (typeAheadKey(e)) return;   // BUG-02 / BUG-10
+        if (c === 'Ctrl B') expectTyping();   // the new bookmark's name field is on its way
         // AT-17: a selected text box takes plain typing — the key goes into the box (the caret is moved there before
         // the key is applied), not to a one-key command ("i" opened the image picker while typing a note).
         if (e.key.length === 1 && !(e.ctrlKey || e.metaKey || e.altKey)) {
@@ -74,7 +109,16 @@ export function init(dotnetRef) {
     document.addEventListener('keydown', handler, true);
     if (!wheel) { wheel = tabWheel; document.addEventListener('wheel', wheel, { passive: false }); }
     watchTabs();
+    // ST15 (D-214): below 760 px the opened side bar floats over the page; the layout hears when the window is
+    // that narrow, so a pick can close it. Nothing is sent while the window is wider.
+    if (!narrow && window.matchMedia) {
+        narrow = window.matchMedia('(max-width: 759px)');
+        narrowChange = () => { if (ref) ref.invokeMethodAsync('OnNarrow', narrow.matches).catch(() => { }); };
+        narrow.addEventListener('change', narrowChange);
+        if (narrow.matches) narrowChange();
+    }
 }
+let narrow = null, narrowChange = null;
 
 export function focusSelect(el) { try { el.focus(); el.select(); } catch { } }
 
@@ -113,5 +157,8 @@ export function dispose() {
     if (handler) document.removeEventListener('keydown', handler, true);
     if (wheel) document.removeEventListener('wheel', wheel, { passive: false });
     if (tabWatch) tabWatch.disconnect();
-    handler = null; ref = null; wheel = null; tabWatch = null; lastActive = null;
+    if (narrow && narrowChange) narrow.removeEventListener('change', narrowChange);
+    document.removeEventListener('focusin', typeAheadFocus, true);
+    typeAhead = null;
+    handler = null; ref = null; wheel = null; tabWatch = null; lastActive = null; narrow = null; narrowChange = null;
 }

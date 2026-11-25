@@ -1,3 +1,4 @@
+using ChuvadiReader.Core.Documents;
 using Chuvadi.Pdf.Authoring;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Operations;
@@ -488,7 +489,7 @@ public sealed class BenchService
                                                     && string.Equals(s.Path, path, StringComparison.OrdinalIgnoreCase));
         if (existing is null)
         {
-            var session = await _reader.OpenAsync(path, fileName, null, ct).ConfigureAwait(false);
+            var session = await _reader.OpenAsync(path, fileName, PdfPasswords.For(path), ct).ConfigureAwait(false);   // BUG-19
             _sources.Add(new BenchSource
             {
                 Index = (_sources.Count == 0 ? 0 : _sources.Max(s => s.Index) + 1),
@@ -596,7 +597,7 @@ public sealed class BenchService
         if (s is null || string.IsNullOrWhiteSpace(query)) return System.Array.Empty<int>();
         var pages = new SortedSet<int>();
         var opts = new Chuvadi.Pdf.Rendering.DisplayList.SearchOptions { CaseSensitive = false, WholeWord = false };
-        using var doc = PdfDocument.Open(s.Path);
+        using var doc = PdfFiles.Open(s.Path);
         await foreach (var m in Chuvadi.Pdf.Rendering.DisplayList.DocumentSearch.SearchAsync(doc, query, opts, ct).WithCancellation(ct))
         {
             if (m.PageNumber >= 0 && m.PageNumber < s.PageCount) pages.Add(m.PageNumber);
@@ -844,6 +845,8 @@ public sealed class BenchService
 
     /// <summary>Drops a raw image straight into a desk as an image page. It is not
     /// converted to PDF until Bind.</summary>
+    /// <exception cref="InvalidOperationException">CR70 / CR71: the image is damaged, not one Chuvadi reads, or
+    /// too large; the message says which (<see cref="ImageCheck"/>). Nothing is added.</exception>
     public void AddImageToDesk(Guid deskId, string imagePath, int insertIndex = -1)
     {
         var desk = FindDesk(deskId);
@@ -851,6 +854,8 @@ public sealed class BenchService
         {
             return;
         }
+
+        if (ImageCheck.Refusal(imagePath) is { } why) throw new InvalidOperationException(why);
 
         var page = new BenchPage
         {
@@ -1266,6 +1271,7 @@ public sealed class BenchService
         }
         finally { try { File.Delete(flat); } catch { /* best effort */ } }
 
+        _madeHere.Add(nup);   // SC14
         var idx = await EnsureSourceAsync(nup, $"{SafeName(desk.Name)}-{cols}x{rows}up.pdf", ct).ConfigureAwait(false);
         if (idx < 0) return null;
         var newDesk = AddDesk();
@@ -1292,6 +1298,7 @@ public sealed class BenchService
         }
         finally { try { File.Delete(flat); } catch { /* best effort */ } }
 
+        _madeHere.Add(bk);   // SC14
         var idx = await EnsureSourceAsync(bk, $"{SafeName(desk.Name)}-booklet.pdf", ct).ConfigureAwait(false);
         if (idx < 0) return null;
         var newDesk = AddDesk();
@@ -1813,7 +1820,7 @@ public sealed class BenchService
                     throw new FileNotFoundException(sd.Path);
                 }
 
-                var pdfSession = await _reader.OpenAsync(sd.Path, sd.FileName, null, ct).ConfigureAwait(false);
+                var pdfSession = await _reader.OpenAsync(sd.Path, sd.FileName, PdfPasswords.For(sd.Path), ct).ConfigureAwait(false);   // BUG-19
                 var src = new BenchSource
                 {
                     Index = _sources.Count == 0 ? 0 : _sources.Max(s => s.Index) + 1,
@@ -1963,12 +1970,23 @@ public sealed class BenchService
         Raise();
     }
 
+    /// <summary>SC14: the N-up and booklet files Arrange made in the working folder this run. Reset deletes them
+    /// (desks kept for the next start may still use them, so closing the app doesn't).</summary>
+    private readonly List<string> _madeHere = new();
+
     public void Reset()
     {
         foreach (var source in _sources)
         {
             source.Session.Dispose();
         }
+
+        foreach (var made in _madeHere)
+        {
+            try { if (File.Exists(made)) File.Delete(made); } catch { /* best effort */ }
+        }
+
+        _madeHere.Clear();
 
         _sources.Clear();
         _desks.Clear();

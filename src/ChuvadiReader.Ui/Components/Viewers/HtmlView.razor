@@ -18,7 +18,7 @@
 <div class="htv" @ref="_root">
     @if (_error is not null)
     {
-        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" />
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" OnClose="OnStopOpening" />
     }
     else if (_doc is null || _result is null)
     {
@@ -280,36 +280,6 @@
             return;
         }
         if (FrameShown) await JsVoidAsync("frameScrollToAnchor", _root, anchor);
-    }
-
-    /// <summary>A web or mail link was clicked in the rendered page. Nothing opens until the
-    /// person confirms; then the system browser / mail app opens it (outside Chuvadi).</summary>
-    [JSInvokable]
-    public Task OnExternalLink(string url)
-    {
-        if (!IExternalLinks.IsAllowed(url)) return Task.CompletedTask;
-        var shell = Services.GetService(typeof(ShellService)) as ShellService;
-        var links = Services.GetService(typeof(IExternalLinks)) as IExternalLinks;
-        if (shell is null) return Task.CompletedTask;
-        var shown = DisplayUrl(url);
-        if (links is null || !links.IsAvailable)
-        {
-            shell.Notify($"This link goes outside Chuvadi: {shown}");
-            return Task.CompletedTask;
-        }
-        shell.Notify($"Open {shown} in your browser?", false, "Open", async () =>
-        {
-            if (!await links.OpenAsync(url)) shell.Notify($"Couldn't open {shown}.", isError: true);
-        });
-        return Task.CompletedTask;
-    }
-
-    private static string DisplayUrl(string url)
-    {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return url;
-        if (u.Scheme == Uri.UriSchemeMailto) return u.UserInfo.Length > 0 ? $"{u.UserInfo}@{u.Host}" : url;
-        var s = u.Host + (u.AbsolutePath == "/" ? "" : u.AbsolutePath);
-        return s.Length > 60 ? s[..57] + "…" : s;
     }
 
     protected override async ValueTask DisposeCoreAsync()

@@ -38,6 +38,19 @@ public sealed record PressResult(
     public long SavedBytes => Math.Max(0, BeforeBytes - AfterBytes);
 
     public double SavedPercent => BeforeBytes > 0 ? 100.0 * (BeforeBytes - AfterBytes) / BeforeBytes : 0;
+
+    /// <summary>PS09: a pressed file can come out no smaller; say so rather than "-0.3% smaller".</summary>
+    public string SavedLabel => AfterBytes < BeforeBytes
+        ? $"{SavedPercent.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)}% smaller"
+        : AfterBytes == BeforeBytes ? "no smaller"
+        : $"no smaller: {(-SavedPercent).ToString("0.#", System.Globalization.CultureInfo.CurrentCulture)}% bigger";
+
+    /// <summary>Set when a target size was asked for and even the strongest pressing could not reach it.</summary>
+    public bool TargetMissed { get; init; }
+
+    /// <summary>Set when the source was locked: the pressed copy keeps its open password and permissions with a new
+    /// permissions password (D-207, D-210).</summary>
+    public bool NewOwnerPassword { get; init; }
 }
 
 /// <summary>
@@ -65,81 +78,84 @@ public sealed class PressService
         {
             var folder = string.IsNullOrEmpty(outputFolder) ? DefaultFolder : outputFolder;
             Directory.CreateDirectory(folder);
-            var before = new FileInfo(pdfPath).Length;
-            var outPath = ExportService.UniquePath(folder, Path.GetFileNameWithoutExtension(pdfPath) + "-pressed", "pdf");
+            var (source, plain, saveLock) = ReadThroughLock(pdfPath);
+            var opts = new CompressionOptions
+            {
+                RecompressImages = options.RecompressImages,
+                JpegQuality = options.JpegQuality,
+                MinStreamLengthToCompress = options.MinStreamLength,
+                MinImagePixelsToRecompress = options.MinImagePixels,
+            };
 
-            var result = RunCompress(pdfPath, outPath, options, ct);
-            var after = new FileInfo(outPath).Length;
-            return new PressResult(outPath, before, after, result.ImagesRecompressed, result.StreamsCompressed, result.ObjectsRemoved);
+            ct.ThrowIfCancellationRequested();
+            using var doc = PdfDocument.Open(new MemoryStream(plain, writable: false));
+            using var ms = new MemoryStream();
+            var result = PdfCompressor.Compress(doc, ms, opts);
+            if (result.Skipped) throw new InvalidOperationException(SkippedText(result.SkipReason.ToString()));
+            var outPath = Write(folder, pdfPath, SourceLock.Lock(ms.ToArray(), saveLock));
+            return new PressResult(outPath, source.LongLength, new FileInfo(outPath).Length, result.ImagesRecompressed, result.StreamsCompressed, result.ObjectsRemoved)
+            {
+                NewOwnerPassword = saveLock.NewOwnerPassword,
+            };
         }, ct);
 
-    /// <summary>Presses repeatedly, lowering JPEG quality until the output is at or
-    /// below <paramref name="targetBytes"/> (or the quality floor is reached), keeping
-    /// only the best attempt.</summary>
+    /// <summary>Presses to a target size with the library's own search (PdfCompressor.CompressToTarget): the
+    /// highest JPEG quality whose output fits. When nothing fits, the smallest output is kept and
+    /// <see cref="PressResult.TargetMissed"/> says so.</summary>
     public Task<PressResult> PressToTargetAsync(string pdfPath, string? outputFolder, long targetBytes, CancellationToken ct = default)
         => Task.Run(() =>
         {
             var folder = string.IsNullOrEmpty(outputFolder) ? DefaultFolder : outputFolder;
             Directory.CreateDirectory(folder);
-            var before = new FileInfo(pdfPath).Length;
-
-            string? bestTmp = null;
-            CompressionResult? bestResult = null;
-            var bestSize = long.MaxValue;
-
-            foreach (var quality in new[] { 85, 70, 55, 45, 35, 25 })
+            var (source, plain, saveLock) = ReadThroughLock(pdfPath);
+            ct.ThrowIfCancellationRequested();
+            using var doc = PdfDocument.Open(new MemoryStream(plain, writable: false));
+            using var ms = new MemoryStream();
+            var result = PdfCompressor.CompressToTarget(doc, ms, targetBytes, null);
+            if (result.SkipReason != CompressionSkipReason.None) throw new InvalidOperationException(SkippedText(result.SkipReason.ToString()));
+            var outPath = Write(folder, pdfPath, SourceLock.Lock(ms.ToArray(), saveLock));
+            return new PressResult(outPath, source.LongLength, new FileInfo(outPath).Length, 0, 0, 0)
             {
-                ct.ThrowIfCancellationRequested();
-                var tmp = Path.Combine(ScratchFiles.Folder(_paths), $"press-{Guid.NewGuid():N}.pdf");
-                var result = RunCompress(pdfPath, tmp, new PressOptions(true, quality, 128, 2_000), ct);
-                var size = new FileInfo(tmp).Length;
-
-                if (size < bestSize)
-                {
-                    if (bestTmp is not null)
-                    {
-                        TryDelete(bestTmp);
-                    }
-
-                    bestTmp = tmp;
-                    bestResult = result;
-                    bestSize = size;
-                }
-                else
-                {
-                    TryDelete(tmp);
-                }
-
-                if (size <= targetBytes)
-                {
-                    break;
-                }
-            }
-
-            var outPath = ExportService.UniquePath(folder, Path.GetFileNameWithoutExtension(pdfPath) + "-pressed", "pdf");
-            File.Move(bestTmp!, outPath);
-            return new PressResult(outPath, before, bestSize, bestResult!.ImagesRecompressed, bestResult.StreamsCompressed, bestResult.ObjectsRemoved);
+                TargetMissed = !result.TargetMet,
+                NewOwnerPassword = saveLock.NewOwnerPassword,
+            };
         }, ct);
 
-    private static CompressionResult RunCompress(string pdfPath, string outPath, PressOptions options, CancellationToken ct)
+    /// <summary>The source, its pages with no lock (memory only), and the lock the pressed copy gets (D-207).</summary>
+    private static (byte[] Source, byte[] Plain, SaveLock Lock) ReadThroughLock(string pdfPath)
     {
-        ct.ThrowIfCancellationRequested();
-        var opts = new CompressionOptions
-        {
-            RecompressImages = options.RecompressImages,
-            JpegQuality = options.JpegQuality,
-            MinStreamLengthToCompress = options.MinStreamLength,
-            MinImagePixelsToRecompress = options.MinImagePixels,
-        };
-
-        using var doc = PdfDocument.Open(pdfPath);
-        using var fs = File.Create(outPath);
-        return PdfCompressor.Compress(doc, fs, opts);
+        var source = File.ReadAllBytes(pdfPath);
+        var (open, owner) = PdfPasswords.Both(pdfPath);
+        var saveLock = SourceLock.Plan(source, open, owner, intoSource: false);
+        return (source, SourceLock.Plain(source, saveLock.OpenPassword), saveLock);
     }
+
+    private static string Write(string folder, string pdfPath, byte[] bytes)
+    {
+        var outPath = ExportService.UniquePath(folder, Path.GetFileNameWithoutExtension(pdfPath) + "-pressed", "pdf");
+        var temp = outPath + ".chuvadi-tmp";
+        try
+        {
+            File.WriteAllBytes(temp, bytes);
+            File.Move(temp, outPath);
+        }
+        finally
+        {
+            TryDelete(temp);
+        }
+
+        return outPath;
+    }
+
+    private static string SkippedText(string reason) => reason switch
+    {
+        "Signed" => "This file is signed, so pressing it would break its signatures. It wasn't pressed.",
+        _ => $"This file wasn't pressed ({reason}).",
+    };
 
     private static void TryDelete(string path)
     {
-        try { File.Delete(path); }
+        try { if (File.Exists(path)) File.Delete(path); }
         catch { }
     }
 }

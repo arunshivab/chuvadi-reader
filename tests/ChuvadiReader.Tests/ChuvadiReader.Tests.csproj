@@ -25,5 +25,6 @@
     <None Include="Fixtures\Office\**" CopyToOutputDirectory="PreserveNewest" />
     <!-- D-139: PDFs made by other tools (tools/OfficeCorpus/make_pdf_fixtures.py). -->
     <None Include="Fixtures\Pdf\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\Signing\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

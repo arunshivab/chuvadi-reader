@@ -225,9 +225,11 @@ public sealed class TextEncodingTests
     [Fact]
     public void A_chosen_encoding_is_not_refused_as_binary()
     {
-        // UTF-16 without a mark is full of zero bytes; the automatic read calls that binary, a chosen read shows it.
+        // UTF-16 without a mark is full of zero bytes. VW25: the automatic read now tells it from binary data (where
+        // the zeros fall, and a clean decode); a chosen read shows it as before.
         var bytes = Encoding.Unicode.GetBytes("hello வணக்கம்");
-        Assert.Throws<DocumentViewException>(() => TextViewService.Decode(bytes, out _));
+        Assert.Equal("hello வணக்கம்", TextViewService.Decode(bytes, out var auto));
+        Assert.Equal("UTF-16 LE", auto);
         Assert.Equal("hello வணக்கம்", TextEncodings.Decode(bytes, TextEncodings.Utf16Le, out int bad));
         Assert.Equal(0, bad);
     }

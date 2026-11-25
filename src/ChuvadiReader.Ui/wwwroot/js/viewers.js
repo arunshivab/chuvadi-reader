@@ -24,10 +24,14 @@ export function attach(el, dotnet, mode) {
         st.raf = requestAnimationFrame(() => { st.raf = 0; report(el, st); });
     };
     st.onClick = (e) => {
-        const a = e.target && e.target.closest ? e.target.closest('a[data-anchor-link]') : null;
+        const a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
         if (!a || !el.contains(a)) return;
-        e.preventDefault(); // keeps Blazor's router from treating "#slug" as a navigation
-        scrollToAnchor(el, a.getAttribute('data-anchor-link'));
+        e.preventDefault(); // keeps Blazor's router from treating "#slug" as a navigation, and stops every link
+        const anchor = a.getAttribute('data-anchor-link');
+        if (anchor !== null) { scrollToAnchor(el, anchor); return; }
+        // BUG-01: a web or mail link asks first (as the HTML viewer does); nothing opens on its own.
+        const href = a.getAttribute('href') || '';
+        if (/^(https?:|mailto:)/i.test(href)) dotnet.invokeMethodAsync('OnExternalLink', href).catch(() => { });
     };
     el.addEventListener('scroll', st.onScroll, { passive: true });
     el.addEventListener('click', st.onClick);
@@ -293,7 +297,14 @@ export function gridResize(el, dotnetRef, touchCapable) {
             }
             return;
         }
-        if (e.pointerId !== d.id) return;
+        if (e.pointerId !== d.id) {
+            // M-29 (macOS 15 Intel): one mouse press gives a mouse pointerdown and a "touch" pointerdown, and every
+            // move comes on the touch pointer. Where the host has no touch screen every pointer is the mouse, so the
+            // drag follows whichever pointer moves.
+            if (st.touchCapable) return;
+            d.id = e.pointerId;
+            try { el.setPointerCapture(d.id); } catch { }
+        }
         const at = d.column ? e.clientX : e.clientY;
         if (!d.moved && Math.abs(at - d.start) < 3) return;   // a press, not a drag (it may become a double press)
         d.moved = true;
@@ -304,8 +315,10 @@ export function gridResize(el, dotnetRef, touchCapable) {
         guide(d, edgeNow);
     });
 
-    el.addEventListener('pointerup', (e) => { if (st.hold && e.pointerId === st.hold.id) dropHold(); if (st.drag && e.pointerId === st.drag.id) finish(true, e); });
-    el.addEventListener('pointercancel', (e) => { if (st.hold && e.pointerId === st.hold.id) dropHold(); if (st.drag && e.pointerId === st.drag.id) finish(false, e); });
+    // M-29: on a host with no touch screen the release may come on the other pointer of the pair, too.
+    const ours = (e) => st.drag && (e.pointerId === st.drag.id || !st.touchCapable);
+    el.addEventListener('pointerup', (e) => { if (st.hold && e.pointerId === st.hold.id) dropHold(); if (ours(e)) finish(true, e); });
+    el.addEventListener('pointercancel', (e) => { if (st.hold && e.pointerId === st.hold.id) dropHold(); if (ours(e) && e.pointerId === st.drag.id) finish(false, e); });
     el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && st.drag) finish(false, e); });
     // Once a finger has taken an edge its moves resize; they must not scroll the sheet as well. Until then they may.
     el.addEventListener('touchmove', (e) => { if (st.drag) e.preventDefault(); }, { passive: false });

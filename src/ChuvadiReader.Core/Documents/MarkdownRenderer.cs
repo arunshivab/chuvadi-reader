@@ -39,18 +39,62 @@ public sealed class MarkdownRenderer
 
     private MarkdownRenderer(bool allowRemoteImages) => _allowRemoteImages = allowRemoteImages;
 
+    /// <summary>BUG-14 / BUG-15: how deeply quotes and lists may nest before the file is refused. Real documents
+    /// stay under ten; files made to attack the reader nest hundreds of thousands deep, and parsing them took
+    /// 5-17 GB and crashed the app. Until Markdown is parsed in the engine (D-209), this is the guard.</summary>
+    public const int MaxNesting = 64;
+
+    public const string TooDeepText =
+        "This Markdown file is nested more deeply than Chuvadi allows, so it isn't drawn. It may be damaged, or made to attack the reader.";
+
     public static MarkdownRenderResult Render(string markdown, bool allowRemoteImages = false)
     {
         var r = new MarkdownRenderer(allowRemoteImages);
         var lines = TextViewService.SplitLines((markdown ?? "").Replace("\0", "�", StringComparison.Ordinal));
         var expanded = new List<string>(lines.Count);
         foreach (var l in lines) expanded.Add(ExpandLeadingTabs(l));
+        if (DeepestNesting(expanded) > MaxNesting)
+        {
+            throw new DocumentViewException(ViewErrorReason.TooLarge, TooDeepText);
+        }
 
         var blocks = r.ParseBlocks(expanded);
         var sb = new StringBuilder(markdown?.Length ?? 0);
         r.RenderBlocks(blocks, sb, tight: false);
         var html = sb.ToString();
         return new MarkdownRenderResult(html, r._outline, r._blockedImages, r._remoteImages, HtmlSanitizer.ToPlainText(html));
+    }
+
+    /// <summary>The deepest nesting on any line: quote markers, plus list levels counted from the indentation (two
+    /// spaces a level, the narrowest CommonMark allows) and the list markers themselves. Cheap: one pass, and it stops
+    /// counting a line once it is past the limit.</summary>
+    internal static int DeepestNesting(IReadOnlyList<string> lines)
+    {
+        int deepest = 0;
+        foreach (var line in lines)
+        {
+            int depth = 0, i = 0, spaces = 0;
+            while (i < line.Length && depth + spaces / 2 <= MaxNesting)
+            {
+                char c = line[i];
+                if (c == ' ') { spaces++; i++; continue; }
+                if (c == '>') { depth++; i++; continue; }
+                if ((c is '-' or '*' or '+') && i + 1 < line.Length && line[i + 1] == ' ') { depth++; i += 2; continue; }
+                if (char.IsAsciiDigit(c))
+                {
+                    int j = i;
+                    while (j < line.Length && j - i < 9 && char.IsAsciiDigit(line[j])) j++;
+                    if (j < line.Length - 1 && line[j] is '.' or ')' && line[j + 1] == ' ') { depth++; i = j + 2; continue; }
+                }
+
+                break;
+            }
+
+            deepest = Math.Max(deepest, depth + spaces / 2);
+            if (deepest > MaxNesting) return deepest;
+        }
+
+        return deepest;
     }
 
     // ══ block model ══════════════════════════════════════════════════════════════════════════

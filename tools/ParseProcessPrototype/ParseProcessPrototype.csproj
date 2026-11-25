@@ -3,7 +3,9 @@
     TESTING ONLY (never shipped). D-198 B2: a measured prototype for PARSE-PROCESS-DESIGN.md. One program in two
     roles: "engine" (the parse process: opens and draws documents with the Reader's own Core services) and "bench"
     (the app's side: measures the engine against the same work done in-process, and what happens when it dies).
-    Run on each host by its chat to get that host's numbers: dotnet run -c Release (args: bench, fixtures folder)
+    Run on each host by its chat to get that host's numbers: dotnet run -c Release (args: bench, fixtures folder).
+    Options: (heap-mb N) managed heap cap, (limit-s N) time limit, (job-mb N) Windows job-object memory cap,
+    (no-crash-watch) to measure without ending the engine on the runtime's own crash message.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

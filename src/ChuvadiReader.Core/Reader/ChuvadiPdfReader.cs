@@ -43,9 +43,19 @@ public sealed class ChuvadiPdfReader : IPdfReader
     {
         // Open straight from the path with the library's async open, so it can read
         // the file efficiently instead of us buffering the whole thing into memory.
-        var document = string.IsNullOrEmpty(password)
-            ? await PdfDocument.OpenAsync(path, cancellationToken).ConfigureAwait(false)
-            : await PdfDocument.OpenAsync(path, password!, cancellationToken).ConfigureAwait(false);
+        // Shared for reading, writing and deleting, so a PDF another program holds open still opens; the document
+        // owns the stream and closes it with itself.
+        var stream = SharedRead.Open(path);
+        PdfDocument document;
+        try
+        {
+            document = await PdfDocument.OpenAsync(stream, new PdfOpenOptions { Password = string.IsNullOrEmpty(password) ? null : password }, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await stream.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
 
         var vm = new PdfDocumentVm
         {
@@ -293,6 +303,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
         lock (_svgCache)
         {
             _svgCache.Clear();
+            _svgCacheChars = 0;
             FreeImagesLocked();
             _renderGeneration++; // a render already running for the old layers won't be kept (D-152)
         }
@@ -641,6 +652,8 @@ public sealed class ChuvadiPdfSession : IPdfSession
             if (generation == _renderGeneration && !_closeRequested)
             {
                 _svgCache[pageNumber] = svg;
+                _svgCacheChars += svg.Length;
+                EvictFarPagesLocked(pageNumber);
                 if (token is not null)
                 {
                     if (_imageTokens.Remove(pageNumber, out var old))
@@ -659,6 +672,35 @@ public sealed class ChuvadiPdfSession : IPdfSession
 
         return svg;
     }
+
+    // BUG-20: drawn pages were all kept for the life of the tab, here and on screen: scrolling a 500-page file kept 500
+    // drawings (5.5 GB at the peak on Windows, 3.1 GB still held after the tab closed). Only the pages near the one
+    // just drawn are kept now: at most KeepPages, and at most KeepChars of drawing; the farthest go first, with their
+    // images. A page that comes back into view is drawn again.
+    internal const int KeepPages = 24;
+    internal const long KeepChars = 48L * 1024 * 1024;   // ~96 MB of UTF-16 drawing
+    private long _svgCacheChars;   // under lock (_svgCache)
+
+    /// <summary>Under lock (_svgCache).</summary>
+    private void EvictFarPagesLocked(int near)
+    {
+        while (_svgCache.Count > 1 && (_svgCache.Count > KeepPages || _svgCacheChars > KeepChars))
+        {
+            int far = -1, farDist = -1;
+            foreach (var k in _svgCache.Keys)
+            {
+                int d = Math.Abs(k - near);
+                if (k != near && d > farDist) { far = k; farDist = d; }
+            }
+
+            if (far < 0) break;
+            if (_svgCache.Remove(far, out var gone)) _svgCacheChars -= gone.Length;
+            if (_imageTokens.Remove(far, out var token)) Images?.Remove(token);
+        }
+    }
+
+    /// <summary>Tests only: how many drawn pages the session keeps now.</summary>
+    internal int CachedPageCountForTests { get { lock (_svgCache) return _svgCache.Count; } }
 
     /// <summary>Keeps a drawn page's PNG in the store and returns its token (D-158).</summary>
     private string KeepImage(byte[] png) => Images!.Add(ImageOwner, png);
@@ -787,6 +829,7 @@ public sealed class ChuvadiPdfSession : IPdfSession
             }
 
             _svgCache.Clear();
+            _svgCacheChars = 0;
             FreeImagesLocked();
             return chars;
         }

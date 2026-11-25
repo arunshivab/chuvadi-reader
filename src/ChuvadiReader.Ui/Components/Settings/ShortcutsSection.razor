@@ -3,8 +3,10 @@
 
 @*
     Read-only list of keyboard shortcuts. "Works" rows mirror the real key handlers
-    (wwwroot/js/reader.js, wwwroot/js/bench.js, the Find boxes); planned ones from the
-    design are listed greyed out until the shell wires them.
+    (wwwroot/js/reader.js, wwwroot/js/bench.js, the Find boxes, and the keys the shell's commands declare in
+    Reader.Shell.cs and MainLayout); planned ones from the design are listed greyed out until they are wired.
+    BUG-05 / ST19: Ctrl K, 1-4, Ctrl O, Ctrl P, Ctrl B, the view tools, F11 and the Mark keys work, and the list
+    said they didn't; Image (I), Ellipse, Line, Arrow, Fit width and Ctrl S were missing.
 *@
 <SettingsSection Title="Shortcuts" Sub="Every shortcut. Greyed ones are planned and not wired yet.">
     @foreach (var group in Groups)
@@ -56,10 +58,10 @@
             new Key("Next / previous tab", null, true, "Ctrl Tab", "Ctrl Shift Tab"),
             new Key("Go to tab 1–9", null, true, "Ctrl 1 … 9"),
             new Key("Close panel / cancel", null, true, "Esc"),
-            new Key("Find or do anything", "Command bar", false, "Ctrl K"),
-            new Key("Switch mode", "Read · Mark · Arrange · Protect", false, "1 2 3 4"),
-            new Key("Open a document", null, false, "Ctrl O"),
-            new Key("Print", null, false, "Ctrl P"),
+            new Key("Find or do anything", "Command bar", true, "Ctrl K"),
+            new Key("Switch mode", "Read · Mark · Arrange · Protect", true, "1 2 3 4"),
+            new Key("Open a document", null, true, "Ctrl O"),
+            new Key("Print", null, true, "Ctrl P"),
         }),
         new Group("Read", false, new[]
         {
@@ -70,11 +72,12 @@
             new Key("Scroll a screenful", null, true, "Page Down", "Page Up", "Space", "Shift Space"),
             new Key("Top / bottom of document", null, true, "Home", "End"),
             new Key("Undo", "Page rotation", true, "Ctrl Z"),
-            new Key("Redo", null, false, "Ctrl Y"),
-            new Key("Bookmark this page", null, false, "Ctrl B"),
+            new Key("Redo", "Marks", true, "Ctrl Y"),
+            new Key("Bookmark this page", null, true, "Ctrl B"),
             new Key("Go to page", null, false, "Ctrl G"),
-            new Key("Hand · Marquee · Loupe · Snapshot", null, false, "H", "Z", "L", "S"),
-            new Key("Immersive / full screen", null, false, "F11"),
+            new Key("Hand · Marquee · Loupe · Snapshot", null, true, "H", "Z", "L", "S"),
+            new Key("Fit width", null, true, "W"),
+            new Key("Immersive / full screen", null, true, "F11"),
         }),
         new Group("Arrange", false, new[]
         {
@@ -87,9 +90,11 @@
         }),
         new Group("Mark & Protect", false, new[]
         {
-            new Key("Text · Box · Draw · Sign", null, false, "T", "B", "D", "G"),
+            new Key("Text · Box · Ellipse · Line · Arrow", null, true, "T", "B", "E", "L", "A"),
+            new Key("Draw · Image · Signature", null, true, "D", "I", "G"),
             new Key("Highlight selection", null, false, "Ctrl Shift H"),
-            new Key("Save as new PDF", null, false, "Ctrl Shift S"),
+            new Key("Save marks into this file", null, true, "Ctrl S"),
+            new Key("Save as new PDF", null, true, "Ctrl Shift S"),
         }),
     };
 }

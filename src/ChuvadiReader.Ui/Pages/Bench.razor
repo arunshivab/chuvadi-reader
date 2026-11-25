@@ -955,7 +955,7 @@
                 </div>
                 @if (_pressResult is { } r)
                 {
-                    <div class="press-result">Saved <b>@r.SavedPercent.ToString("0.#")%</b> · @Fmt(r.BeforeBytes) → @Fmt(r.AfterBytes)</div>
+                    <div class="press-result"><b>@r.SavedLabel</b> · @Fmt(r.BeforeBytes) → @Fmt(r.AfterBytes)</div>
                 }
                 <div class="modal-foot">
                     @if (_pressResult is not null)
@@ -1454,7 +1454,9 @@
         if (paths.Count == 0) return;
         foreach (var path in paths)
         {
-            BenchSvc.AddImageToDesk(deskId, path);
+            // CR70 / CR71: a damaged or enormous image is said and left out; the others still go on.
+            try { BenchSvc.AddImageToDesk(deskId, path); }
+            catch (InvalidOperationException ex) { _status = ex.Message; _error = true; _resultPath = null; }
         }
     }
 

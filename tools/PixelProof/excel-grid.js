@@ -24,7 +24,11 @@ const port = process.argv[2];
   check('D-200 no data bars or icons are drawn, the values are, and the sheet says its conditional colours return', await p.evaluate(() => document.querySelectorAll('.xv-databar, .xv-icon').length === 0 && document.querySelector('.xv-cell[data-a="A9"]').textContent.trim() === '10' && /Conditional colours return with the next update/.test((document.querySelector('.xv-condheld') || {}).textContent || '')));
   check('E-11 borders are drawn', await p.evaluate(() => getComputedStyle(document.querySelector('.xv-cell[data-a="A6"]')).borderBottomWidth === '3px'));
   check('E-15 a comment is marked', await p.evaluate(() => !!document.querySelector('.xv-cell[data-a="A12"] .xv-note')));
-  check('D-172 hidden sheets are shown, dimmed and marked', await p.evaluate(() => [...document.querySelectorAll('.xv-tab')].map(t => t.classList.contains('hidden-sheet')).join() === 'false,false,true,true' && document.querySelectorAll('.xv-tab-hidden').length === 2));
+  // D-214 (amends D-172): hidden sheets are left out, as in Excel; the View rail's switch shows them, dimmed and marked.
+  check('D-214 hidden sheets are not shown by default', await p.evaluate(() => [...document.querySelectorAll('.xv-tab')].map(t => t.classList.contains('hidden-sheet')).join() === 'false,false' && document.querySelectorAll('.xv-tab-hidden').length === 0));
+  await p.click('.srail-view .rb[aria-label^="Show hidden rows"], .srail-view button:has-text("Show hidden rows")').catch(() => {}); await p.waitForTimeout(500);
+  check('D-214 the switch shows them, dimmed and marked', await p.evaluate(() => [...document.querySelectorAll('.xv-tab')].map(t => t.classList.contains('hidden-sheet')).join() === 'false,false,true,true' && document.querySelectorAll('.xv-tab-hidden').length === 2));
+  await p.click('.srail-view .rb[aria-label^="Show hidden rows"], .srail-view button:has-text("Show hidden rows")').catch(() => {}); await p.waitForTimeout(500);
 
   // The value bar, with the link.
   await p.click('.xv-cell[data-a="A13"]');

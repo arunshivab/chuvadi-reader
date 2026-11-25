@@ -44,7 +44,7 @@ public sealed class BenchComposer
         try
         {
             foreach (var path in inputPaths)
-                docs.Add(await PdfDocument.OpenAsync(path, ct).ConfigureAwait(false));
+                docs.Add(await PdfFiles.OpenForNewFileAsync(path, ct).ConfigureAwait(false));
             var array = docs.ToArray();
             await Task.Run(() =>
             {
@@ -66,7 +66,7 @@ public sealed class BenchComposer
         => Task.Run(() =>
         {
             rows = Math.Max(1, rows); cols = Math.Max(1, cols);
-            using var src = PdfDocument.Open(inputPath);
+            using var src = PdfFiles.OpenForNewFile(inputPath);
             int per = rows * cols, total = src.PageCount;
             double cellW = (sheetW - 2 * margin - (cols - 1) * gutter) / cols;
             double cellH = (sheetH - 2 * margin - (rows - 1) * gutter) / rows;
@@ -97,7 +97,7 @@ public sealed class BenchComposer
         double sheetW, double sheetH, double gutter, double margin, CancellationToken ct = default)
         => Task.Run(() =>
         {
-            using var src = PdfDocument.Open(inputPath);
+            using var src = PdfFiles.OpenForNewFile(inputPath);
             int n = src.PageCount;
             int padded = ((n + 3) / 4) * 4;
 
@@ -176,7 +176,13 @@ public sealed class BenchComposer
                 else if (page.IsImage && !string.IsNullOrWhiteSpace(page.ImagePath))
                 {
                     var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
-                    ImagePdfConverter.ConvertFile(page.ImagePath, temp, ImagePdfOptions.Default);
+                    // CR70 / CR71: a damaged image is said in a sentence, not in the decoder's words.
+                    if (ImageCheck.Refusal(page.ImagePath!) is { } why) throw new InvalidOperationException(why + " Nothing was written.");
+                    try { ImagePdfConverter.ConvertFile(page.ImagePath, temp, ImagePdfOptions.Default); }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        throw new InvalidOperationException($"{Path.GetFileName(page.ImagePath)} is damaged and couldn't be drawn on a page. Nothing was written.", ex);
+                    }
                     tempFiles.Add(temp);
                     resolved.Add(new Resolved(temp, 0, ((page.Rotation % 360) + 360) % 360));
                 }
@@ -200,7 +206,7 @@ public sealed class BenchComposer
             {
                 foreach (var path in sourceOrder)
                 {
-                    docs.Add(await PdfDocument.OpenAsync(path, ct).ConfigureAwait(false));
+                    docs.Add(await PdfFiles.OpenForNewFileAsync(path, ct).ConfigureAwait(false));
                 }
 
                 var offset = new Dictionary<string, int>(sourceOrder.Count);
@@ -586,8 +592,7 @@ public sealed class BenchComposer
 
     private async Task<PdfDocument> OpenBytesAsync(byte[] bytes, CancellationToken ct)
     {
-        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
-        await File.WriteAllBytesAsync(temp, bytes, ct).ConfigureAwait(false);
-        return await PdfDocument.OpenAsync(temp, ct).ConfigureAwait(false);
+        // SC14: from memory; the scratch file this used to write was never deleted.
+        return await PdfDocument.OpenAsync(new MemoryStream(bytes, writable: false), ct).ConfigureAwait(false);
     }
 }

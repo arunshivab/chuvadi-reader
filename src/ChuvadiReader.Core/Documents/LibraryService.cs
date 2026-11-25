@@ -122,7 +122,7 @@ public sealed class LibraryService : IDisposable
 
             try
             {
-                using var doc = await PdfDocument.OpenAsync(entry.Path, ct).ConfigureAwait(false);
+                using var doc = await PdfFiles.OpenAsync(entry.Path, ct).ConfigureAwait(false);
                 entry.Pages = doc.PageCount;
             }
             catch

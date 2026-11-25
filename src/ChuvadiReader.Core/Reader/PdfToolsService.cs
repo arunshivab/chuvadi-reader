@@ -1,3 +1,4 @@
+using ChuvadiReader.Core.Documents;
 using Chuvadi.Pdf.Documents;
 using Chuvadi.Pdf.Operations;
 
@@ -16,7 +17,7 @@ public sealed class PdfToolsService
     /// <summary>Opens a PDF just long enough to read its page count.</summary>
     public async Task<int> GetPageCountAsync(string path, CancellationToken ct = default)
     {
-        using var doc = await PdfDocument.OpenAsync(path, ct).ConfigureAwait(false);
+        using var doc = await PdfFiles.OpenAsync(path, ct).ConfigureAwait(false);
         return doc.PageCount;
     }
 
@@ -28,7 +29,7 @@ public sealed class PdfToolsService
         {
             foreach (var path in inputPaths)
             {
-                docs.Add(await PdfDocument.OpenAsync(path, ct).ConfigureAwait(false));
+                docs.Add(await PdfFiles.OpenForNewFileAsync(path, ct).ConfigureAwait(false));
             }
 
             var array = docs.ToArray();
@@ -51,7 +52,7 @@ public sealed class PdfToolsService
     /// <paramref name="startIndex"/> is zero-based; <paramref name="count"/> pages are taken.</summary>
     public async Task ExtractRangeAsync(string inputPath, string outputPath, int startIndex, int count, CancellationToken ct = default)
     {
-        using var doc = await PdfDocument.OpenAsync(inputPath, ct).ConfigureAwait(false);
+        using var doc = await PdfFiles.OpenForNewFileAsync(inputPath, ct).ConfigureAwait(false);
         await Task.Run(() =>
         {
             using var output = File.Create(outputPath);
@@ -63,7 +64,7 @@ public sealed class PdfToolsService
     /// <paramref name="outputDir"/>, named "{source}_pNN.pdf". Returns the page count.</summary>
     public async Task<int> SplitToFolderAsync(string inputPath, string outputDir, CancellationToken ct = default)
     {
-        using var doc = await PdfDocument.OpenAsync(inputPath, ct).ConfigureAwait(false);
+        using var doc = await PdfFiles.OpenForNewFileAsync(inputPath, ct).ConfigureAwait(false);
         var pageCount = doc.PageCount;
         var baseName = Path.GetFileNameWithoutExtension(inputPath);
         var width = pageCount.ToString().Length;

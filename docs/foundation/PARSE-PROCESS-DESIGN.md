@@ -281,3 +281,36 @@ Signing reads the PDF, so it belongs in a tool engine. The certificate's private
   or refused.
 - The JSON serializer in the prototype is the slow, general one. The real contract uses generated code (also
   needed for trimming), so the Word timings above are an upper bound.
+
+## 12. Windows, measured by Arun (18 Nov), and what step 1 does about it
+
+Arun ran the bench on his PC: Windows 11 10.0.26200, x64, 12 cores, .NET 10.0.15, with only the 512 MB heap cap.
+
+| What | Windows | Linux (section 7) |
+|---|---|---|
+| Starting an engine | 153 ms first, then 51 ms (49–53) | 33–54 ms |
+| Engine memory, idle / after drawing | 23 MB / 71 MB | 27 MB / 140 MB |
+| 6 MB on the pipe, there and back | 7 ms | 23 ms |
+| Pages, engine against in-process | the same (16.0 / 16.0 ms; a CAD sheet 3.5 / 3.3 s) | the same |
+| Stack, every thread | **1,536 KB** | 8 MB |
+| **A crash noticed** | **5.7–7.4 s** (stack overflows, c08, c09, c23); sec-s1 reached the 10 s limit | 15–30 ms |
+
+**Probe files on Windows.** Every one was contained, and the app stayed up each time:
+
+| Outcome | Files |
+|---|---|
+| Engine ended | c08, c09, c23 |
+| Ended at the time limit | sec-s1 |
+| Refused | sec01 (out of memory at 512 MB, 2.1 s), the 11-million-paragraph bomb, hyperlinks-248, ins-248 |
+| Loaded | sec08, sec10 (conditional formats are off) |
+
+**What this changes in step 1:**
+- **The 16 MB parse threads (section 3) are what makes Windows safe.** Windows gives every thread only 1.5 MB, so its default is the tightest of all the hosts.
+- **Noticing a crash: from seconds to milliseconds.** On Windows a dying process is held while the system's error reporting runs, and the runtime first writes the overflowed stack to stderr. Step 1 does three things:
+  1. The engine runs in a **job object** with three settings:
+     - "die on unhandled exception": no error-reporting round;
+     - "kill on job close": the engine ends with the app;
+     - the **hard memory cap** from section 3.
+  2. The engine switches off fault dialogs and error reporting for itself as its first act (`SetErrorMode`, `WerSetFlags`).
+  3. The app always reads the engine's stderr. The moment the runtime writes "Stack overflow", "Fatal error" or "Process terminated", it ends the engine and starts the next one. It does not wait for the process to finish dying.
+- **All three are in the bench now** (`--job-mb N` for the job object's cap, and the crash watch, on by default; `--no-crash-watch` to compare), so Arun can re-run it and see the difference before step 1 is built. On Linux the crash watch makes no difference: 12–19 ms either way.

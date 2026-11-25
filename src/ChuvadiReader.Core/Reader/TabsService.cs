@@ -59,6 +59,13 @@ public sealed class ReaderTab
     public bool HasUnsavedWork =>
         Marks?.HasUnsaved == true || Bookmarks?.HasUnsaved == true || Redactions?.HasUnsaved == true;
 
+    /// <summary>HO16: the Reader has shown this tab once this run (fitted it to the window); showing it again keeps its
+    /// place instead of starting again from page 1.</summary>
+    public bool FittedOnce { get; set; }
+
+    /// <summary>D-214: this Excel tab shows the workbook's hidden rows, columns and sheets (greyed). Off by default.</summary>
+    public bool ShowHiddenParts { get; set; }
+
     /// <summary>Column widths and row heights set on screen for an Excel file in this tab (D-190). Viewing only.</summary>
     public SheetSizeMemory SheetSizes { get; } = new();
 
@@ -74,6 +81,20 @@ public sealed class ReaderTab
 
     /// <summary>The password that opened this tab's PDF. Memory only, for this tab (as Word/Excel); never persisted.</summary>
     public string? Password { get; set; }
+
+    /// <summary>D-207: the file's permissions (owner) password, when the person gave it so a change could keep the
+    /// file's lock. Memory only, for this tab; never persisted.</summary>
+    public string? OwnerPassword { get; set; }
+
+    /// <summary>D-210: the source's size and time when this tab opened it; a save into the source checks it first.</summary>
+    public FileStamp? Opened { get; set; }
+
+    /// <summary>D-210: the source as it was when unsaved work began (marks, stamps), kept in memory: Save as writes
+    /// from it, and Save into the source checks the file still matches it.</summary>
+    public SourceCopy? WorkSource { get; set; }
+
+    /// <summary>HO33: the app closed while opening this file last time; it waits for "Open it anyway".</summary>
+    public bool HeldAfterCrash { get; set; }
 
     /// <summary>Set when the last password tried didn't open the file.</summary>
     public string? PasswordError { get; set; }
@@ -142,6 +163,12 @@ public sealed class TabsService : IDisposable
 {
     private const string TabsKey = "tabs";
     private const string ActiveKey = "tabs-active";
+    /// <summary>HO33: the file being opened right now, cleared once it has opened (or failed to). Still set at the
+    /// next start: the app closed while opening it, so its tab comes back without opening it by itself.</summary>
+    private const string OpeningKey = "tabs-opening";
+
+    public const string HeldAfterCrashText =
+        "Chuvadi closed while opening this file last time, so it isn't opened again by itself.";
 
     private readonly IPdfReader _reader;
     private readonly IAppStorage _storage;
@@ -592,6 +619,8 @@ public sealed class TabsService : IDisposable
         }
 
         var activePath = await _storage.GetAsync(ActiveKey, ct).ConfigureAwait(false);
+        var crashedOn = await _storage.GetAsync(OpeningKey, ct).ConfigureAwait(false);
+        if (!string.IsNullOrEmpty(crashedOn)) await SetOpeningAsync(string.Empty, ct).ConfigureAwait(false);
 
         foreach (var d in dtos)
         {
@@ -611,6 +640,12 @@ public sealed class TabsService : IDisposable
                 Scale = d.Scale <= 0 ? 1.0 : d.Scale,
                 ScrollTop = d.ScrollTop,
             };
+            if (!string.IsNullOrEmpty(crashedOn) && string.Equals(crashedOn, d.Path, StringComparison.OrdinalIgnoreCase))
+            {
+                restored.HeldAfterCrash = true;   // HO33: one click must not crash the app again
+                restored.Error = HeldAfterCrashText;
+            }
+
             lock (_tabsGate)
             {
                 _tabs.Add(restored);
@@ -687,9 +722,42 @@ public sealed class TabsService : IDisposable
     /// <summary>WT-10: a file that can't be read (permissions, in use, a missing drive), for the Reader and the viewers.</summary>
     public const string CantRead = "Chuvadi couldn't read this file. It may be open in another app, or you may not have permission to read it.";
 
+    /// <summary>HO33: notes that <paramref name="tab"/>'s file is being opened now (viewer tabs call this as their
+    /// viewer starts; PDF tabs here).</summary>
+    public Task MarkOpeningAsync(ReaderTab tab, CancellationToken ct = default) =>
+        tab.HeldAfterCrash ? Task.CompletedTask : SetOpeningAsync(tab.Path, ct);
+
+    /// <summary>HO33: the file being opened has opened, or failed to without taking the app with it.</summary>
+    public Task OpenedAsync(CancellationToken ct = default) => SetOpeningAsync(string.Empty, ct);
+
+    // One write at a time with the tab list's own saves (the storage contract).
+    private async Task SetOpeningAsync(string value, CancellationToken ct)
+    {
+        await _persistGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await _storage.SetAsync(OpeningKey, value, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _persistGate.Release();
+        }
+    }
+
+    /// <summary>HO33: "Open it anyway" on a tab held after a crash.</summary>
+    public async Task OpenHeldAsync(string id, CancellationToken ct = default)
+    {
+        var tab = _tabs.FirstOrDefault(t => t.Id == id);
+        if (tab is null || !tab.HeldAfterCrash) return;
+        tab.HeldAfterCrash = false;
+        tab.Error = null;
+        Changed?.Invoke();
+        await EnsureLoadedAsync(tab, ct).ConfigureAwait(false);
+    }
+
     private async Task EnsureLoadedAsync(ReaderTab tab, CancellationToken ct)
     {
-        if (tab.IsLoaded || tab.IsLoading)
+        if (tab.IsLoaded || tab.IsLoading || tab.HeldAfterCrash)
         {
             return;
         }
@@ -705,6 +773,7 @@ public sealed class TabsService : IDisposable
         tab.Error = null;
         tab.ErrorDetail = null;
         tab.IsDamaged = false;
+        await MarkOpeningAsync(tab, ct).ConfigureAwait(false);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(ct);
         tab.OpenCancel = cancel;
         Changed?.Invoke(); // "Opening…" shows now, before anything touches the file
@@ -717,6 +786,7 @@ public sealed class TabsService : IDisposable
         var path = tab.Path;
         var password = tab.Password;
         var token = cancel.Token;
+        FileStamp? stamp = null;
         var open = Task.Run(
             async () =>
             {
@@ -725,6 +795,7 @@ public sealed class TabsService : IDisposable
                     throw new FileNotFoundException(null, path);
                 }
 
+                stamp = FileStamp.Of(path);
                 return await _reader.OpenAsync(path, tab.FileName, password, token, transparentBackground: true).ConfigureAwait(false);
             },
             CancellationToken.None);
@@ -739,6 +810,9 @@ public sealed class TabsService : IDisposable
             }
 
             tab.Session = session;
+            PdfPasswords.Remember(path, password, tab.OwnerPassword);   // BUG-19: every tool reuses it
+            tab.Opened = stamp;
+            tab.WorkSource = null;
             tab.NeedsPassword = false;
             tab.PasswordError = null;
             if (tab.CurrentPage > tab.Session.Document.PageCount)
@@ -787,6 +861,7 @@ public sealed class TabsService : IDisposable
         {
             tab.OpenCancel = null;
             tab.IsLoading = false;
+            try { await OpenedAsync(CancellationToken.None).ConfigureAwait(false); } catch { }
             Changed?.Invoke();
         }
     }

@@ -14,7 +14,7 @@
     }
     else if (_error is not null)
     {
-        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" />
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" OnClose="OnStopOpening" />
     }
     else if (_view is null)
     {

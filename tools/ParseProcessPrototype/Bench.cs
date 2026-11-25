@@ -16,13 +16,18 @@ static class Bench
         int heapMb = Opt(opts, "--heap-mb", 512);
         int limitS = Opt(opts, "--limit-s", 10);
         int pagesPerFile = Opt(opts, "--pages", 8);
-        var pdfs = Directory.GetFiles(folder, "*.pdf").Where(p => !Path.GetFileName(p).StartsWith("bomb")).OrderBy(p => p).ToList();
+        EngineClient.JobMb = Opt(opts, "--job-mb", 0);                 // Windows: the job object's hard cap
+        EngineClient.CrashWatch = !opts.Contains("--no-crash-watch");   // to compare against the plain wait
+        // The heaviest file first: it is the one the "first document" line and the warm-up use.
+        var pdfs = Directory.GetFiles(folder, "*.pdf").Where(p => !Path.GetFileName(p).StartsWith("bomb")).OrderByDescending(p => new FileInfo(p).Length).ThenBy(p => p).ToList();
         var bombs = Directory.GetFiles(folder, "bomb*.pdf").ToList();
         var docx = Directory.GetFiles(folder, "*.docx").OrderBy(p => p).ToList();
         var xlsx = Directory.GetFiles(folder, "*.xlsx").OrderBy(p => p).ToList();
 
         Console.WriteLine($"# Parse-process prototype — {RuntimeInformation.OSDescription}, {RuntimeInformation.ProcessArchitecture}, {Environment.ProcessorCount} cores, .NET {Environment.Version}");
-        Console.WriteLine($"engine: heap cap {heapMb} MB (DOTNET_GCHeapHardLimit), time limit {limitS} s per request");
+        Console.WriteLine($"engine: heap cap {heapMb} MB (DOTNET_GCHeapHardLimit), time limit {limitS} s per request" +
+            (OperatingSystem.IsWindows() ? $", job object {(EngineClient.JobMb > 0 ? EngineClient.JobMb + " MB cap" : "no memory cap")}" : "") +
+            $", crash watch {(EngineClient.CrashWatch ? "on" : "off")}");
         Console.WriteLine();
         Console.WriteLine($"## Stack sizes\napp process: {Stacks.Describe()}");
 
@@ -76,23 +81,53 @@ static class Bench
         Console.WriteLine("| file | pages | SVG KB/page | open in-process | open engine | page in-process (median) | page engine (median) | overhead/page |");
         Console.WriteLine("|---|---|---|---|---|---|---|---|");
         var reader = new ChuvadiPdfReader();
-        using (var engine = EngineClient.Start(heapMb))
+        // Every file is tried on its own: an engine that fails or dies is reported on that file's row with what it
+        // held, and a new engine carries on with the next file, so one bad result never ends the run.
+        var pdfEngine = EngineClient.Start(heapMb);
+        pdfEngine.Limit = TimeSpan.FromSeconds(limitS * 6);
+        var memLines = new List<string>();
+        try
         {
-            engine.Limit = TimeSpan.FromSeconds(limitS * 6);
-            if (pdfs.Count > 0) { await DrawInProcess(reader, pdfs[0], pagesPerFile); DrawEngine(engine, pdfs[0], pagesPerFile); }
+            if (pdfs.Count > 0)
+            {
+                await DrawInProcess(reader, pdfs[0], pagesPerFile);
+                try { DrawEngine(pdfEngine, pdfs[0], pagesPerFile); }
+                catch (Exception ex) when (ex is EngineFailed or EngineGone)
+                {
+                    memLines.Add($"- warm-up on {Path.GetFileName(pdfs[0])} failed: {ex.GetType().Name}: {ex.Message.Split('\n')[0]}; engine then: {pdfEngine.MemoryLine()}");
+                    pdfEngine.Dispose(); pdfEngine = EngineClient.Start(heapMb); pdfEngine.Limit = TimeSpan.FromSeconds(limitS * 6);
+                }
+            }
             foreach (var pdf in pdfs)
             {
                 Drawn a = null!, b = null!; var ae = new List<double>(); var be = new List<double>();
-                for (int round = 0; round < 3; round++)
+                string? failed = null;
+                for (int round = 0; round < 3 && failed is null; round++)
                 {
                     a = await DrawInProcess(reader, pdf, pagesPerFile); ae.AddRange(a.Each);
-                    b = DrawEngine(engine, pdf, pagesPerFile); be.AddRange(b.Each);
+                    try { b = DrawEngine(pdfEngine, pdf, pagesPerFile); be.AddRange(b.Each); }
+                    catch (Exception ex) when (ex is EngineFailed or EngineGone) { failed = $"round {round + 1}: {ex.GetType().Name}: {ex.Message.Split('\n')[0]}"; }
                 }
-                a = a with { Each = ae }; b = b with { Each = be };
-                Console.WriteLine($"| {Path.GetFileName(pdf)} | {a.Pages} | {a.SvgKb / Math.Max(1, a.Count):0} | {F(a.Open)} ms | {F(b.Open)} ms | {F(Median(a.Each))} ms | {F(Median(b.Each))} ms | {F(Median(b.Each) - Median(a.Each))} ms |");
+                a = a with { Each = ae };
+                if (failed is null)
+                {
+                    b = b with { Each = be };
+                    Console.WriteLine($"| {Path.GetFileName(pdf)} | {a.Pages} | {a.SvgKb / Math.Max(1, a.Count):0} | {F(a.Open)} ms | {F(b.Open)} ms | {F(Median(a.Each))} ms | {F(Median(b.Each))} ms | {F(Median(b.Each) - Median(a.Each))} ms |");
+                    memLines.Add($"- after {Path.GetFileName(pdf)}: {pdfEngine.MemoryLine()}");
+                }
+                else
+                {
+                    Console.WriteLine($"| {Path.GetFileName(pdf)} | {a.Pages} | {a.SvgKb / Math.Max(1, a.Count):0} | {F(a.Open)} ms | engine failed | {F(Median(a.Each))} ms | engine failed | |");
+                    memLines.Add($"- {Path.GetFileName(pdf)}: engine failed on {failed}; engine then: {pdfEngine.MemoryLine()}");
+                    pdfEngine.Dispose(); pdfEngine = EngineClient.Start(heapMb); pdfEngine.Limit = TimeSpan.FromSeconds(limitS * 6);
+                }
             }
-            Console.WriteLine($"engine memory after drawing: {engine.RssKb() / 1024} MB");
+            Console.WriteLine($"engine memory after drawing: {pdfEngine.RssKb() / 1024} MB");
+            Console.WriteLine();
+            Console.WriteLine("Engine memory per file (GC and process; on Windows the job's peak, which is what the cap counts):");
+            foreach (var l in memLines) Console.WriteLine(l);
         }
+        finally { pdfEngine.Dispose(); }
 
         // ── 3. Word and Excel: the model crosses as JSON ──
         Console.WriteLine();
@@ -128,7 +163,8 @@ static class Bench
         {
             using var e = EngineClient.Start(heapMb);
             e.Limit = TimeSpan.FromSeconds(limitS);
-            if (sample is not null) { e.CallText(Wire.Open, sample); e.CallText(Wire.Render, "0"); }
+            try { if (sample is not null) { e.CallText(Wire.Open, sample); e.CallText(Wire.Render, "0"); } }
+            catch (Exception ex) when (ex is EngineFailed or EngineGone) { Console.WriteLine($"- {name}: the sample file failed first ({ex.Message.Split('\n')[0]}); {e.MemoryLine()}"); continue; }
             long t0 = Stopwatch.GetTimestamp(); string outcome;
             try { e.Call(op); outcome = "answered (unexpected)"; }
             catch (EngineGone g) { outcome = "engine " + g.Message; }
@@ -138,8 +174,12 @@ static class Bench
             if (sample is not null)
             {
                 using var again = EngineClient.Start(heapMb);
-                again.CallText(Wire.Open, sample); var svg = again.CallText(Wire.Render, "0");
-                back = $"; new engine, file reopened and page 1 drawn again in {F(Ms(Stopwatch.GetTimestamp() - t1))} ms ({svg.Length / 1024} KB)";
+                try
+                {
+                    again.CallText(Wire.Open, sample); var svg = again.CallText(Wire.Render, "0");
+                    back = $"; new engine, file reopened and page 1 drawn again in {F(Ms(Stopwatch.GetTimestamp() - t1))} ms ({svg.Length / 1024} KB)";
+                }
+                catch (Exception ex) when (ex is EngineFailed or EngineGone) { back = $"; new engine could not draw page 1 again: {ex.Message.Split('\n')[0]}"; }
             }
             Console.WriteLine($"- {name}: {outcome}, noticed after {F(seen)} ms{back}. App still running: yes.");
         }
@@ -169,6 +209,7 @@ static class Bench
                 }
                 catch (EngineGone g) { outcome = "engine " + g.Message; }
                 catch (EngineFailed x) { outcome = "refused: " + x.Message.Split('\n')[0]; }
+                catch (Exception x) { outcome = "bench error: " + x.GetType().Name + ": " + x.Message.Split('\n')[0]; }
                 Console.WriteLine($"- {Path.GetFileName(f)}: {outcome} after {F(Ms(Stopwatch.GetTimestamp() - t0))} ms. App still running: yes.");
             }
         }

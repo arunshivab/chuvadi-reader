@@ -9,7 +9,7 @@ namespace ParseProcessPrototype;
 public static class Wire
 {
     public const byte Ping = 1, Open = 2, Render = 3, Close = 4, Word = 5, Excel = 6, StackOverflow = 7, Spin = 8,
-        Stacks = 9, Allocate = 10, Echo = 11, Quit = 0;
+        Stacks = 9, Allocate = 10, Echo = 11, Mem = 12, Quit = 0;
     public const byte Ok = 0x80, Failed = 0x81;
 
     public static void Write(Stream s, byte code, ReadOnlySpan<byte> payload)

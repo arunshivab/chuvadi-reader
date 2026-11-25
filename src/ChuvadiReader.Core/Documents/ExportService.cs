@@ -35,7 +35,7 @@ public sealed class ExportService
         CancellationToken ct = default)
         => Task.Run(() =>
         {
-            using var doc = PdfDocument.Open(pdfPath);
+            using var doc = PdfFiles.Open(pdfPath);
             var pageCount = doc.PageCount;
             if (pageCount == 0)
             {

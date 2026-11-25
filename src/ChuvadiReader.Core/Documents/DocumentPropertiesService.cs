@@ -27,7 +27,7 @@ public sealed class DocumentPropertiesService
 {
     public async Task<DocProperties> ReadAsync(string path, CancellationToken ct = default)
     {
-        using var doc = await PdfDocument.OpenAsync(path, ct).ConfigureAwait(false);
+        using var doc = await PdfFiles.OpenAsync(path, ct).ConfigureAwait(false);
         var fi = new FileInfo(path);
 
         var size = "—";

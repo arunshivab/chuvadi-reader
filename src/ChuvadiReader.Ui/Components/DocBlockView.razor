@@ -45,7 +45,7 @@ else if (Block is WordTableBlock t)
                 <tr class="@(row.Header ? "wv-tr-head" : null)">
                     @foreach (var cell in row.Cells)
                     {
-                        <td class="wv-td" colspan="@cell.ColSpan" style="@CellStyle(cell)">
+                        <td class="wv-td" colspan="@cell.ColSpan" rowspan="@(cell.RowSpan > 1 ? cell.RowSpan : null)" style="@CellStyle(cell)">
                             @foreach (var cb in cell.Content)
                             {
                                 <DocBlockView Block="cb" />

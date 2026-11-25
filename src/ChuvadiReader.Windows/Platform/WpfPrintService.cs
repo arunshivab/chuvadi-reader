@@ -1,3 +1,4 @@
+using ChuvadiReader.Core.Documents;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -51,7 +52,7 @@ public sealed class WpfPrintService : IPrintService
         try
         {
             doc = await Task.Run(
-                () => string.IsNullOrEmpty(request.Password) ? PdfDocument.Open(pdfPath) : PdfDocument.Open(pdfPath, request.Password),
+                () => PdfFiles.Open(pdfPath, request.Password),
                 ct).ConfigureAwait(false);
 
             if (!PrintPermission.Allows(doc))

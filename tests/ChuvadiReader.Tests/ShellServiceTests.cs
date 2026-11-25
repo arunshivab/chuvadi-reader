@@ -88,7 +88,7 @@ public class ShellServiceTests
     }
 
     [Fact]
-    public void Messages_keep_the_latest_four_and_can_be_dismissed()
+    public void Messages_keep_the_latest_three_and_can_be_dismissed()   // UI31: fewer stacked over the page
     {
         var s = new ShellService();
         ShellMessage? last = null;
@@ -97,8 +97,8 @@ public class ShellServiceTests
             last = s.Notify("m" + i);
         }
 
-        Assert.Equal(4, s.Messages.Count);
-        s.Dismiss(last!.Id);
         Assert.Equal(3, s.Messages.Count);
+        s.Dismiss(last!.Id);
+        Assert.Equal(2, s.Messages.Count);
     }
 }

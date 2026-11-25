@@ -17,7 +17,7 @@ public sealed class FlattenService
     /// so the Ui can show a hint (e.g. on a Certificate of Incorporation).</summary>
     public FlattenInfo Probe(string sourcePath)
     {
-        using var doc = PdfDocument.Open(sourcePath);
+        using var doc = PdfFiles.Open(sourcePath);
         return new FlattenInfo(doc.PageCount, doc.IsXfa);
     }
 
@@ -33,7 +33,7 @@ public sealed class FlattenService
         => Task.Run(() =>
         {
             ct.ThrowIfCancellationRequested();
-            using var src = PdfDocument.Open(sourcePath);
+            using var src = PdfFiles.OpenForNewFile(sourcePath);
             using var fs = File.Create(outputPath);
             AnnotationFlattener.Flatten(fs, src, new AnnotationFlattenOptions { Kinds = kinds });
         }, ct);

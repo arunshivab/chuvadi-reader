@@ -77,26 +77,41 @@
     private async Task AddFiles()
     {
         var paths = await Picker.PickDocumentsAsync();
+        int skipped = 0;
         foreach (var p in paths)
         {
+            if (DocumentFormatExtensions.FromPath(p) != DocumentFormat.Pdf) { skipped++; continue; }   // MG02
             if (!_entries.Any(x => string.Equals(x.Path, p, StringComparison.OrdinalIgnoreCase)))
             {
                 _entries.Add(new Entry(System.IO.Path.GetFileName(p), p));
             }
         }
         ResetStatus();
+        if (skipped > 0) _status = skipped == 1 ? "1 file isn't a PDF, so it was left out." : $"{skipped} files aren't PDFs, so they were left out.";
     }
 
     private void AddOpen()
     {
+        // MG02: only PDFs can be merged; Word, Excel, Markdown and text tabs are left out (and said).
+        int skipped = 0;
         foreach (var t in Tabs.Tabs)
         {
+            if (t.Format != DocumentFormat.Pdf)
+            {
+                skipped++;
+                continue;
+            }
+
             if (!_entries.Any(x => string.Equals(x.Path, t.Path, StringComparison.OrdinalIgnoreCase)))
             {
                 _entries.Add(new Entry(t.FileName, t.Path));
             }
         }
         ResetStatus();
+        if (skipped > 0)
+        {
+            _status = skipped == 1 ? "1 open document isn't a PDF, so it was left out." : $"{skipped} open documents aren't PDFs, so they were left out.";
+        }
     }
 
     private void MoveUp(int i)
@@ -148,7 +163,10 @@
         catch (Exception ex)
         {
             _error = true;
-            _status = $"Merge failed: {ex.Message}";
+            // MG02: the parser's own text ("Could not locate startxref") is not a sentence for people.
+            _status = ex is InvalidOperationException ? ex.Message
+                : ex is Chuvadi.Pdf.Primitives.PdfPasswordRequiredException ? "One of the files is locked with a password. Open and unlock it first, then merge."
+                : "Merge failed: one of the files couldn't be read as a PDF (it may be damaged). Nothing was written.";
         }
         finally
         {

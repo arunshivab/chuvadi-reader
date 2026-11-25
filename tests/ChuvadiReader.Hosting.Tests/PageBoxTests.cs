@@ -23,8 +23,9 @@ public sealed class PageBoxTests
         // Set when the active tab changes, used by the next init only.
         Assert.Matches(@"if \(id != _activeId\)\s*\{[^}]*_initNewDocument = true;", razor);
         Assert.Contains(@"await _js.InvokeVoidAsync(""init"", _desk, _ref, newDocument);", razor);
-        // A document shown for the first time starts at its top, before the fit.
-        Assert.Matches(@"_initiallyFitted\.Add\(tab\.Id\);[\s\S]*?InvokeVoidAsync\(""setScrollTop"", _desk, 0\)[\s\S]*?await ApplyFit\(", razor);
+        // A document shown for the first time starts at its top, before the fit (HO16: "shown once" is on the tab, and
+        // a tab that comes back on a later page jumps there after the fit).
+        Assert.Matches(@"tab\.FittedOnce = true;[\s\S]*?InvokeVoidAsync\(""setScrollTop"", _desk, 0\)[\s\S]*?await ApplyFit\(", razor);
     }
 
     [Fact]

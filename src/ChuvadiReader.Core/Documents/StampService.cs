@@ -34,11 +34,12 @@ public sealed class StampService
             return src;
         }
 
-        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
-        try
+        LibraryHolds.CheckTextHeld([wm.Text]);   // D-210: refuse, never garble
+
+        // D-207: opened from memory, never from a scratch file: a locked source's pages are decrypted here and must
+        // not reach the disk unlocked.
         {
-            File.WriteAllBytes(temp, src);
-            using var doc = PdfDocument.Open(temp);
+            using var doc = PdfDocument.Open(new MemoryStream(src, writable: false));
             using var ms = new MemoryStream();
             var opts = new TextWatermarkOptions(wm.Text)
             {
@@ -52,10 +53,6 @@ public sealed class StampService
             WatermarkStamper.ApplyText(ms, doc, opts);
             return ms.ToArray();
         }
-        finally
-        {
-            try { File.Delete(temp); } catch { }
-        }
     }
 
     /// <summary>Stamp a header/footer band onto the given pages. Returns the input unchanged
@@ -67,11 +64,11 @@ public sealed class StampService
             return src;
         }
 
-        var temp = ScratchFiles.NewFile(ScratchFiles.Folder(_paths));
-        try
+        LibraryHolds.CheckTextHeld([hf.HeaderLeft, hf.HeaderCenter, hf.HeaderRight, hf.FooterLeft, hf.FooterCenter, hf.FooterRight]);   // D-210
+
+        // D-207: from memory, never a scratch file (a locked source is decrypted here).
         {
-            File.WriteAllBytes(temp, src);
-            using var doc = PdfDocument.Open(temp);
+            using var doc = PdfDocument.Open(new MemoryStream(src, writable: false));
             using var ms = new MemoryStream();
 
             var header = hf.HeaderHasText
@@ -105,10 +102,6 @@ public sealed class StampService
             HeaderFooter.Apply(ms, doc, opts);
             return ms.ToArray();
         }
-        finally
-        {
-            try { File.Delete(temp); } catch { }
-        }
     }
 
     /// <summary>Per-page page/Bates numbering (#40). Executes the numbering plan from
@@ -127,6 +120,7 @@ public sealed class StampService
             return src;
         }
 
+        LibraryHolds.CheckTextHeld(plan.Select(p => p.Item2));   // D-210 / D-217: see the note to the coordinator
         var bytes = src;
         foreach (var (pageIndex, text) in plan)
         {
@@ -182,7 +176,7 @@ public sealed class StampService
         var bytes = await File.ReadAllBytesAsync(srcPath, ct).ConfigureAwait(false);
 
         int total;
-        using (var doc = PdfDocument.Open(srcPath))
+        using (var doc = PdfFiles.Open(srcPath))
         {
             total = doc.PageCount;
         }
@@ -201,6 +195,35 @@ public sealed class StampService
 
         await File.WriteAllBytesAsync(outPath, bytes, ct).ConfigureAwait(false);
     }
+
+    /// <summary>D-207: watermark and header/footer on a source already in memory, through its lock: read with
+    /// <paramref name="saveLock"/>'s open password (in memory only), returned with the same lock.</summary>
+    public Task<byte[]> ApplyAsync(
+        byte[] source, SaveLock saveLock,
+        DeskWatermark? wm, DeskHeaderFooter? hf,
+        string filePath, CancellationToken ct = default) => Task.Run(() =>
+    {
+        var plain = SourceLock.Plain(source, saveLock.OpenPassword);
+        var bytes = plain;
+        int total;
+        using (var doc = PdfDocument.Open(new MemoryStream(bytes, writable: false)))
+        {
+            total = doc.PageCount;
+        }
+
+        if (wm is not null && !string.IsNullOrWhiteSpace(wm.Text))
+        {
+            bytes = ApplyWatermark(bytes, wm, ResolveRange(wm.AllPages, wm.FromPage, wm.ToPage, total));
+        }
+
+        ct.ThrowIfCancellationRequested();
+        if (hf is not null && hf.HasAnyContent)
+        {
+            bytes = ApplyHeaderFooter(bytes, hf, ResolveRange(hf.AllPages, hf.FromPage, hf.ToPage, total), filePath, DateTimeOffset.Now);
+        }
+
+        return SourceLock.Lock(SourceLock.KeepInfo(plain, bytes), saveLock);   // BUG-03
+    }, ct);
 
     /// <summary>Resolve a 1-based inclusive AllPages / From..To range to 0-based page indices.</summary>
     public static int[] ResolveRange(bool allPages, int fromPage, int toPage, int total)

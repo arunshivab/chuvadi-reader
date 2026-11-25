@@ -112,3 +112,5 @@
 
 /* AT-25: a finger-sized "File's own sizes" on the touch shells, like every other control there. */
 html[data-shell="tablet"] .xv-resetsizes, html[data-shell="phone"] .xv-resetsizes { height: 44px; padding: 0 14px; font-size: 13.5px; }
+/* D-214: a hidden row's or column's cells, shown by "Show hidden rows, columns and sheets": greyed, view only. */
+.xv-cell.hidden-part { opacity: .5; background-image: repeating-linear-gradient(135deg, transparent 0 6px, color-mix(in srgb, var(--chvd-ink-muted) 12%, transparent) 6px 7px); }

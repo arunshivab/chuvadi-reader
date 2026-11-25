@@ -29,17 +29,45 @@ public sealed class RecoveryService
         {
             ct.ThrowIfCancellationRequested();
             var folder = string.IsNullOrEmpty(outputFolder) ? DefaultFolder : outputFolder;
-            Directory.CreateDirectory(folder);
             var outPath = ExportService.UniquePath(
                 folder, Path.GetFileNameWithoutExtension(sourcePath) + " (recovered)", "pdf");
 
-            using (var input = File.OpenRead(sourcePath))
-            using (var output = File.Create(outPath))
+            // BUG-12: repaired in memory first; a file is written only when the repair produced a PDF that opens,
+            // so a failed repair leaves nothing behind in Recovered.
+            RepairReport report;
+            byte[] repaired;
+            using (var input = SharedRead.Open(sourcePath))
+            using (var ms = new MemoryStream())
             {
-                var report = PdfRepairer.Repair(input, output);
-                return new RecoveryResult(
-                    outPath, report.Repaired, report.ObjectsRecovered,
-                    report.TrailerReconstructed, report.TruncationDetected);
+                report = PdfRepairer.Repair(input, ms);
+                repaired = ms.ToArray();
             }
+
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                using var check = Chuvadi.Pdf.Documents.PdfDocument.Open(new MemoryStream(repaired, writable: false));
+                if (check.PageCount == 0) throw new InvalidDataException("no pages");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new InvalidOperationException("This file couldn't be repaired. Nothing was saved.", ex);
+            }
+
+            Directory.CreateDirectory(folder);
+            var temp = outPath + ".chuvadi-tmp";
+            try
+            {
+                File.WriteAllBytes(temp, repaired);
+                File.Move(temp, outPath);
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+            }
+
+            return new RecoveryResult(
+                outPath, report.Repaired, report.ObjectsRecovered,
+                report.TrailerReconstructed, report.TruncationDetected);
         }, ct);
 }

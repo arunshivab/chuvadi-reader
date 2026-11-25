@@ -1442,3 +1442,11 @@ export function renderSignature(text, cssFont, color) {
         return null;
     }
 }
+
+// BUG-02: a field that has just been drawn (a new bookmark's name) takes the caret, its text selected so typing
+// replaces it; keys typed while it was on its way are put in by the shell (expectTyping).
+export function focusQuery(sel) {
+    const el = document.querySelector(sel);
+    if (!el) return;
+    try { el.focus({ preventScroll: true }); el.select(); } catch { }
+}

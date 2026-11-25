@@ -15,6 +15,10 @@
 *@
 
 @code {
+    /// <summary>H-32 (D-205): the layout's status-bar slot (D-191), passed to the touch shells. Mobile UI's D-205
+    /// files read it (the phone's "Read this file as…" row, the tablet's chip); until those land it is only received.</summary>
+    [Parameter] public ChuvadiReader.Ui.Layout.StatusBarSlot? StatusSlot { get; set; }
+
     private IJSObjectReference? _js;
     private DotNetObjectReference<TouchSupport>? _self;
     private bool _on;

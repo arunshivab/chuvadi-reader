@@ -27,7 +27,8 @@ const { chromium } = require('playwright');
   // remembered: switch tab away and back
   const tabs = await p.$$('[data-tab-id]');
   await tabs[tabs.length - 2].click(); await p.waitForTimeout(1200);
-  check('utf16 (no BOM) tab: not readable automatically, button still there', (await p.$eval('.sb-btn', e => e.innerText.trim())) === 'Automatic', await sb() + ' :: ' + await body());
+  // VW25: UTF-16 with no byte-order mark is now read automatically; the button still offers the choice.
+  check('utf16 (no BOM) tab: read automatically as UTF-16 LE (VW25), button still there', (await body()).includes('சுவடி') && /UTF-16 LE/.test(await sb()), await sb() + ' :: ' + await body());
   await p.click('.sb-btn'); await p.waitForTimeout(400);
   await p.click('.enc-row:has-text("UTF-16 LE")'); await p.waitForTimeout(900);
   check('UTF-16 LE by hand reads the Tamil text', (await body()).includes('சுவடி'), await body());
@@ -51,9 +52,9 @@ const { chromium } = require('playwright');
   // Document menu entry
   await p.keyboard.press('Escape'); await p.click('.fcard-x').catch(() => {}); await p.waitForTimeout(300);
   await p.click('.tb-doc'); await p.waitForTimeout(300);
-  const has = await p.$$eval('.tb-docmenu .pop-item', e => e.map(x => x.innerText.trim()).filter(t => /encoding/i.test(t)));
-  check('Document menu has Text encoding…', has.length === 1, has.join());
-  await p.click('.tb-docmenu .pop-item:has-text("Text encoding")'); await p.waitForTimeout(400);
+  const has = await p.$$eval('.tb-docmenu .pop-item', e => e.map(x => x.innerText.trim()).filter(t => /Read this file as/i.test(t)));
+  check('Document menu has Read this file as… (D-215)', has.length === 1, has.join());
+  await p.click('.tb-docmenu .pop-item:has-text("Read this file as")'); await p.waitForTimeout(400);
   check('menu entry opens the card', await p.$('.enc-list') !== null);
   await p.click('.fcard-x'); await p.waitForTimeout(200);
   // Ctrl F on a text tab

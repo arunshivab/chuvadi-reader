@@ -30,7 +30,7 @@ public class PageOperationAskTests
             Assert.Empty(p.Lost);
 
             var r = PageOperationCheck.Inspect(rich);
-            Assert.Equal(["bookmarks", "form fields", "links to places in the file", "page labels", "the document's language"], r.Lost);
+            Assert.Equal(["bookmarks", "form fields", "links to places in the file", "page labels", "language"], r.Lost);
             Assert.Equal(Path.GetFileName(rich), r.FileName);
 
             var missing = PageOperationCheck.Inspect(Path.Combine(Path.GetTempPath(), "no-such-file-" + Guid.NewGuid().ToString("N") + ".pdf"));

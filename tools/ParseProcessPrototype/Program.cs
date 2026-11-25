@@ -10,16 +10,18 @@ using ParseProcessPrototype;
 
 if (args.Length > 0 && args[0] == "engine") return await Engine.RunAsync();
 if (args.Length > 1 && args[0] == "bench") return await Bench.RunAsync(args[1], args.Skip(2).ToArray());
+if (args.Length > 1 && args[0] == "makecad") return MakeCad.Run(args[1], args.Length > 2 ? int.Parse(args[2]) : 5, args.Length > 3 ? int.Parse(args[3]) : 30_000, args.Length > 4 ? int.Parse(args[4]) : 40);
 if (args.Length > 1 && args[0] == "coldfirst")
 {
     // The first document a running app opens today: library code loaded and compiled in the app's own process.
     long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
     using var s = await new ChuvadiPdfReader().OpenAsync(args[1], Path.GetFileName(args[1]));
-    await s.RenderPageSvgAsync(0);
+    var svg = await s.RenderPageSvgAsync(0);
     Console.WriteLine((System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds).ToString("0.0"));
+    if (Environment.GetEnvironmentVariable("CHVD_SVG_OUT") is { Length: > 0 } o) File.WriteAllText(o, svg);
     return 0;
 }
-Console.Error.WriteLine("usage: engine | bench <fixtures folder> [--heap-mb N] [--limit-s N]");
+Console.Error.WriteLine("usage: engine | makecad <out.pdf> | bench <fixtures folder> [--heap-mb N] [--limit-s N] [--job-mb N] [--no-crash-watch]");
 return 2;
 
 static class Engine
@@ -44,6 +46,7 @@ static class Engine
 
     public static async Task<int> RunAsync()
     {
+        if (Environment.GetEnvironmentVariable("CHVD_ENGINE_QUIET") == "1") WindowsJob.QuietCrashes();
         var input = Console.OpenStandardInput();
         var output = Console.OpenStandardOutput();
         var reader = new ChuvadiPdfReader();
@@ -78,6 +81,7 @@ static class Engine
                         while (true) { var b = new byte[16 << 20]; Array.Fill(b, (byte)1); keep.Add(b); }
                     case Wire.Stacks: Wire.Write(output, Wire.Ok, Stacks.Describe()); break;
                     case Wire.Echo: Wire.Write(output, Wire.Ok, req.Payload); break;
+                    case Wire.Mem: Wire.Write(output, Wire.Ok, Engine.Memory()); break;
                     case Wire.Quit: session?.Dispose(); Wire.Write(output, Wire.Ok, ""); return 0;
                     default: Wire.Write(output, Wire.Failed, "unknown op"); break;
                 }
@@ -88,6 +92,19 @@ static class Engine
             }
         }
         return 0;
+    }
+
+    /// <summary>What the engine holds now and at most: the GC's view (heap, committed, fragmented, the hard limit)
+    /// and the process's (peak working set, private bytes). Reading it does a full collection first only for "heap
+    /// now", so the peak numbers are what drawing really reached.</summary>
+    internal static string Memory()
+    {
+        var me = Process.GetCurrentProcess();
+        var g = GC.GetGCMemoryInfo(GCKind.Any);
+        long mb(long b) => b >> 20;
+        return $"GC heap {mb(g.HeapSizeBytes)} MB, committed {mb(g.TotalCommittedBytes)} MB, fragmented {mb(g.FragmentedBytes)} MB, " +
+               $"GC limit {mb(g.TotalAvailableMemoryBytes)} MB, peak working set {mb(me.PeakWorkingSet64)} MB, private now {mb(me.PrivateMemorySize64)} MB, " +
+               $"allocated in all {mb(GC.GetTotalAllocatedBytes())} MB";
     }
 
     static int Recurse(int n) { Span<byte> pad = stackalloc byte[256]; pad[0] = (byte)n; return Recurse(n + 1) + pad[0]; }
@@ -103,6 +120,15 @@ sealed class EngineClient : IDisposable
 
     private EngineClient(Process p) { Process = p; _in = p.StandardInput.BaseStream; _out = p.StandardOutput.BaseStream; }
 
+    /// <summary>Windows: put each engine in a job object with this memory cap (MB; 0 none).</summary>
+    public static int JobMb;
+    /// <summary>Quiet crashes in the engine (no Windows Error Reporting round), and end it as soon as the runtime
+    /// says on stderr that it is going down ("Stack overflow", "Fatal error", "Process terminated").</summary>
+    public static bool CrashWatch = true;
+    private nint _job;
+    private volatile string? _dying;
+    private readonly ManualResetEventSlim _gone = new(false);
+
     public static EngineClient Start(int heapMb)
     {
         var self = Environment.ProcessPath!;
@@ -113,10 +139,27 @@ sealed class EngineClient : IDisposable
         psi.Environment["DOTNET_DbgEnableMiniDump"] = "0";
         psi.Environment["DOTNET_EnableCrashReport"] = "0";
         psi.Environment["DOTNET_gcServer"] = "0";
+        if (CrashWatch) psi.Environment["CHVD_ENGINE_QUIET"] = "1";
         var p = Process.Start(psi)!;
-        p.ErrorDataReceived += (_, e) => { if (e.Data is { Length: > 0 } d) LastError = d; };
+        var client = new EngineClient(p);
+        if (JobMb > 0 || CrashWatch) client._job = WindowsJob.Contain(p.Handle, JobMb);
+        // stderr is always read: an unread pipe can hold up a dying runtime that writes its whole stack there.
+        p.ErrorDataReceived += (_, e) =>
+        {
+            if (e.Data is not { Length: > 0 } d) return;
+            LastError = d;
+            if (CrashWatch && client._dying is null &&
+                (d.StartsWith("Stack overflow", StringComparison.Ordinal) || d.StartsWith("Fatal error", StringComparison.Ordinal) || d.StartsWith("Process terminated", StringComparison.Ordinal)))
+            {
+                client._dying = d;
+                try { p.Kill(entireProcessTree: true); } catch { }
+                client._gone.Set();
+            }
+        };
         p.BeginErrorReadLine();
-        return new EngineClient(p);
+        p.EnableRaisingEvents = true;
+        p.Exited += (_, _) => client._gone.Set();
+        return client;
     }
 
     public static string? LastError;
@@ -126,21 +169,37 @@ sealed class EngineClient : IDisposable
     {
         Wire.Write(_in, op, arg);
         var read = Task.Run(() => Wire.Read(_out));
-        if (!read.Wait(Limit))
+        int which = WaitHandle.WaitAny(new[] { ((IAsyncResult)read).AsyncWaitHandle, _gone.WaitHandle }, Limit);
+        if (which == WaitHandle.WaitTimeout)
         {
             try { Process.Kill(entireProcessTree: true); } catch { }
             throw new EngineGone($"passed its time limit ({Limit.TotalSeconds:0} s) and was ended");
         }
-        if (read.Result is not { } r)
+        if (which == 1 && !read.IsCompleted)
         {
             Process.WaitForExit(2000);
-            throw new EngineGone($"ended (exit code {(Process.HasExited ? Process.ExitCode : -1)})");
+            throw new EngineGone(_dying is { } why ? $"ended (the runtime said \"{why.Trim()}\"; ended at once)" : $"ended (exit code {(Process.HasExited ? Process.ExitCode : -1)})");
+        }
+        if (read.Result is not { } r)
+        {
+            // The pipe can close (and the read finish empty) before the gone signal wins the wait: when the crash
+            // watch ended the engine, say so, rather than only the exit code its kill left (-1 on Windows).
+            Process.WaitForExit(2000);
+            throw new EngineGone(_dying is { } why ? $"ended (the runtime said \"{why.Trim()}\"; ended at once)" : $"ended (exit code {(Process.HasExited ? Process.ExitCode : -1)})");
         }
         if (r.Code != Wire.Ok) throw new EngineFailed(Encoding.UTF8.GetString(r.Payload));
         return r.Payload;
     }
 
     public string CallText(byte op, string arg = "") => Encoding.UTF8.GetString(Call(op, arg));
+
+    /// <summary>The engine's own memory line, or why it could not be read (it may be gone).</summary>
+    public string MemoryLine()
+    {
+        string job = OperatingSystem.IsWindows() && _job != 0 ? $"; job peak {WindowsJob.PeakMb(_job)} MB" : "";
+        try { var l = Limit; Limit = TimeSpan.FromSeconds(10); try { return CallText(Wire.Mem) + job; } finally { Limit = l; } }
+        catch (Exception ex) { return "not readable (" + ex.GetType().Name + ")" + job; }
+    }
 
     public long RssKb()
     {

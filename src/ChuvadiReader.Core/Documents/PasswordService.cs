@@ -63,6 +63,11 @@ public sealed class PasswordService
         "This file's permissions don't allow changes, so the password that opens it can't remove its protection. "
         + "Enter the permissions password to remove it.";
 
+    /// <summary>Shown when re-protecting is refused for the same reason.</summary>
+    public const string ReprotectRefusedMessage =
+        "This file's permissions don't allow changes, so the password that opens it can't change its protection. "
+        + "Enter the permissions password to change it.";
+
     /// <summary>True since chuvadi-pdf 3.32.0: a protected copy can limit printing, copying and changes.</summary>
     public static bool PermissionsAvailable => true;
 
@@ -108,6 +113,13 @@ public sealed class PasswordService
         {
             ct.ThrowIfCancellationRequested();
             using var doc = Open(sourcePath, sourcePassword);
+            // PR15: re-protecting a locked file replaces its lock, which is a change: the open password may do it
+            // only when the file's permissions allow changes (as removing it).
+            if (doc.Encryption is { } had && !had.EffectiveFlags.HasFlag(PdfPermissions.ModifyContents))
+            {
+                throw new PasswordRemovalRefusedException(ReprotectRefusedMessage);
+            }
+
             string owner = string.IsNullOrEmpty(options.PermissionsPassword) ? RandomPassword() : options.PermissionsPassword!;
             var enc = EncryptionOptions.Aes256(options.OpenPassword, owner).WithPermissions(BuildPermissions(options));
             WriteAtomically(outputPath, s => doc.Save(s, enc), ct);
@@ -176,7 +188,7 @@ public sealed class PasswordService
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static PdfDocument Open(string path, string? password) =>
-        string.IsNullOrEmpty(password) ? PdfDocument.Open(path) : PdfDocument.Open(path, password);
+        PdfFiles.Open(path, password);
 
     internal static void GuardPaths(string sourcePath, string outputPath)
     {

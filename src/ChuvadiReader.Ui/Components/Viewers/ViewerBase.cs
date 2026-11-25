@@ -16,6 +16,39 @@ public sealed record ViewerEncoding(string Path, string Name, int CodePage, bool
 /// </summary>
 public abstract class ViewerBase : ComponentBase, IAsyncDisposable
 {
+    [Inject] private IServiceProvider ViewerServices { get; set; } = default!;
+
+    /// <summary>A web or mail link was clicked in a viewer (HTML, Markdown, Word). Nothing opens until the person
+    /// confirms; then the system browser / mail app opens it, outside Chuvadi (BUG-01: Markdown opened at once).</summary>
+    [JSInvokable]
+    public Task OnExternalLink(string url)
+    {
+        if (!ChuvadiReader.Core.Window.IExternalLinks.IsAllowed(url)) return Task.CompletedTask;
+        var shell = ViewerServices.GetService(typeof(ChuvadiReader.Core.Reader.ShellService)) as ChuvadiReader.Core.Reader.ShellService;
+        var links = ViewerServices.GetService(typeof(ChuvadiReader.Core.Window.IExternalLinks)) as ChuvadiReader.Core.Window.IExternalLinks;
+        if (shell is null) return Task.CompletedTask;
+        var shown = DisplayUrl(url);
+        if (links is null || !links.IsAvailable)
+        {
+            shell.Notify($"This link goes outside Chuvadi: {shown}");
+            return Task.CompletedTask;
+        }
+
+        shell.Notify($"Open {shown} in your browser?", false, "Open", async () =>
+        {
+            if (!await links.OpenAsync(url)) shell.Notify($"Couldn't open {shown}.", isError: true);
+        });
+        return Task.CompletedTask;
+    }
+
+    private static string DisplayUrl(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return url;
+        if (u.Scheme == Uri.UriSchemeMailto) return u.UserInfo.Length > 0 ? $"{u.UserInfo}@{u.Host}" : url;
+        var s = u.Host + (u.AbsolutePath == "/" ? "" : u.AbsolutePath);
+        return s.Length > 60 ? s[..57] + "…" : s;
+    }
+
     [Inject] protected IJSRuntime JS { get; set; } = default!;
 
     /// <summary>The file to show. Changing it loads the new file.</summary>

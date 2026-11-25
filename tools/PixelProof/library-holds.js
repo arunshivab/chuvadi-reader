@@ -31,7 +31,7 @@ const post = (path) => fetch(base + path, { method: 'POST' }).then(r => r.json()
 
   // A file holding bookmarks, page labels and a language: each is named.
   await toBench(RICH); await bindLast(); c = await card();
-  check(!!c && /The new file will not have the bookmarks, page labels and the document's language of rich\.pdf\./.test(c.text), 'a file with bookmarks, page labels and a language: each is named', c && c.text);
+  check(!!c && /The new file will not have the bookmarks, page labels and language of rich\.pdf\./.test(c.text), 'a file with bookmarks, page labels and a language: each is named', c && c.text);
   await p.screenshot({ path: 'holds-pageop-card.png' });
   await p.locator('.pageopq button', { hasText: 'Continue' }).click(); await p.waitForTimeout(2000);
 

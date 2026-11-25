@@ -565,3 +565,52 @@ See `docs/foundation/PAGE-IMAGES.md` for the design, the hooks per host and the 
 - **Web portal UI:** `web-ui-close-card-phone-labels.patch` (the phone close card's buttons sized to their labels, one line) and `web-ui-encoding-rows-finger-size.patch` (44 px encoding rows on touch), applied as sent.
 - **Proof:** both solutions 0 warnings; 609 tests pass, 6 skipped. Trimmed probe: 57 of 57 services, 38 encodings, code pages off at startup, the same 17 trim notes. Desktop screens against main: Protect's rail differs (Save redacted copy greyed), Home by the clock; the rest identical. close-guard-arrange 17 of 17 desktop and 4 of 4 web, arrange-comes-back 8 of 8 (new: kept desks come back on the next start, not asked about; after Reset nothing comes back), find-short-screen 4 of 4 (new), library-holds 13, close-guard 24, close-guard-work 7, excel-resize 19, excel-grid 19, patch28 13, mark-pointer 9, pinch 11 and 8, touch-markup and page-anchor 15, first-key whole at every gap, find-at-page-foot 0 of 6 off screen, find-under-bar 0 of 16 covered, sheet-pager-two, encoding-picker 22.
 - **Windows behaviour changes:** closing with changed desks asks "Keep what you arranged?" with Save / Discard / Cancel, and Save opens no dialog; the desks come back when Arrange is next opened; binding or saving a session no longer stops the question; Reset clears the kept desks; "Save redacted copy" is greyed with its reason; a Find match at a page's foot on a page taller than the view lands on its own page.
+
+### 64. Patch 35: save safety, unlocked files in every tool, the Windows test package's findings (25 Nov)
+- **Base:** Reader main 0d3c639 (PR 28, Windows host fixes and the tab strip in the shared Ui). One PR, a commit per group, in the coordinator's order: data safety first, then BUG-19, then the rest.
+- **Save safety (D-207, D-210).** Same lock in, same lock out. `SourceLock.Plan` decides what a save into a locked file needs. Opened with the owner password, the Reader locks the file again as it came (RC4 files are written as AES-128). Opened with the open password alone, a save into the file is refused with a card that asks for the owner password, or offers Save as. Before any save onto the source, `SourceGuard` checks the file is still the one that was opened (size, time and SHA-256 of the bytes taken at open). A moved, deleted or changed file is never written over silently (BUG-23, BUG-24, BUG-26, MK30). A save onto the source goes to a temporary "~name.xxxx.chuvadi-tmp" first and is then moved into place (SF12, SF13). Watermark, header/footer and flatten work from memory, with no scratch files. Tests: SaveSafetyTests (10), with an RC4 restricted fixture made with qpdf.
+- **Unlocked files in every tool (BUG-19, PR15).** The password given at open is kept in memory for the run (`PdfPasswords`), and every service opens through `PdfFiles`. A tool that makes a new file from a locked source says so rather than failing; that stays until Arun answers the locked-pages question. Press keeps the lock and uses the library's `CompressToTarget`, and it says when nothing shrank (PS09, PS10). Protect refuses to re-lock without the change permission. Tests: UnlockedToolsTests (5).
+- **Group 3:**
+  - Files open with shared read, so one open in another app still opens (FileShare). The tools' PDF opens (`PdfFiles`, with Library, Protect and Windows printing) go through the same shared stream: the library's own path open lets only other readers in, which Windows CI caught on the first PR run.
+  - A failed open's message has a Close.
+  - Markdown stops at a nesting depth of 64 and says so.
+  - Tabs that were opening when the app crashed are held at the next start and offered, not reopened (HO33).
+  - Links out of a file ask first (BUG-01).
+  - Repair works in memory.
+  - Merge lists only PDFs (MG02).
+  - Merged Word cells show as merged (VW01).
+  - Excel hidden rows, columns and sheets stay hidden, with one switch in the View card and on the View rail to show them greyed (D-214).
+  - mobile-ui-hooks-17 applied.
+- **M-29 and ST15.** The Excel column drag follows either pointer of Catalyst's pair on macOS 15 Intel. Below 760 px the side bar floats and closes after a pick (D-214).
+- **Text the file can't hold is refused, not garbled (D-210 Q2, BUG-11, BUG-18).** Stamps, watermarks, headers, footers, flatten and page numbers name the letters the standard fonts can't hold. D-215 wording ("language", "Read this file as…"). Saving keeps the document info (BUG-03). UTF-16 text without a byte-order mark is read as UTF-16 (VW25).
+- **Group 6.** Desk images are checked before they're taken (CR70, CR71). No scratch PDFs are left behind (SC14). Properties draws its answer (RD51).
+- **HO16.** A tab opens at its page on first show and keeps its place after Home.
+- **PR21.** A file signed by another tool is countersigned and keeps its signature. The library names the new field "Signature{n}" whatever is asked, so the check takes the newest signature. Proved with the Windows test's F08 and S01 (CountersignOtherToolTests).
+- **RD47, RD35.** To desk > New desk keeps its page when the kept desks come back. Save bookmarks on a desk's working copy asks where to save.
+- **BUG-02, BUG-10.** Keys typed while a field opens land in it: Ctrl K, Ctrl B and the bookmark rename. Text already selected is typed over.
+- **BUG-05, ST19.** The Shortcuts page matches the wired keys.
+- **UI30, UI31.** Errors and action messages fade after 15 s and successes after 6 s; at most three show at once. Esc or a tab switch closes Press.
+- **BUG-20 (memory on a long scroll).** A PDF tab kept every page it had ever drawn. It now keeps the 24 nearest the view (and at most 48 M characters of text) and frees the far pages' images. On F02 (500 pages), scrolled end to end: 24 drawings kept, app memory 171 → 249 MB and flat, 184 MB after close. Before: 264 drawings and 305 MB. Proof: memory-long-scroll.js; test: DrawnPagesKeptTests.
+- **Proof:**
+  - Both solutions build with 0 warnings. 641 tests pass, 6 skipped.
+  - Trimmed probe: 57 of 57 services, the same 17 trim notes.
+  - Desktop screens against main: 27 of 27 identical. A first run showed Home at 1x and 1.5x differing by the clock; a rerun was identical.
+  - Browser proofs: close-guard 24, close-guard-work 7 plus 1 skipped, library-holds 13, excel-grid 20, arrange 25, encoding-picker 22, find-short-screen 4, type-ahead 5 (new), narrow-sidebar 7 (new), shelf-lazy (new), memory-long-scroll (new), first-key whole at every gap.
+- **Windows behaviour changes:**
+  - A save into a file opened with only its open password asks for the owner password or offers Save as.
+  - A file changed or moved since it was opened is not saved over without asking.
+  - Locked files work in every tool once unlocked.
+  - Letters a stamp can't hold are named and refused.
+  - Hidden Excel parts stay hidden, with a switch to show them.
+  - Links out ask first.
+  - Tabs held after a crash are offered at the next start.
+  - Messages fade, and at most three show.
+  - Typed keys land in a field as it opens.
+- **Linux behaviour changes:** the same, plus the narrow-window side bar (below 760 px).
+- **Open, with Arun:**
+  - New files made from locked pages: the tools stop for now. Recommended: the same open password and permissions as the source.
+  - Tamil page numbers: 3.32.0's DrawTextBlock refuses LiPi, so they are refused for now (D-217).
+  - AR18: no change.
+- **With the Windows chat:** BUG-25 (repeat on this build and record WebView2's memory) and AR51 (the Save session dialog).
+- **Not reproduced:** UI32. Home's 520 MB at idle on Windows is WebView2's own, not the app's.
+- **For the library:** PdfCounterSigner ignores SignatureFieldName; document dates can't be written back (BUG-03); DrawTextBlock has no LiPi.

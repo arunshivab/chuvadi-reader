@@ -388,15 +388,15 @@ public sealed class ShellService
         }
     }
 
-    /// <summary>Show a message bottom-right. Success messages fade after 6 s (the layout
-    /// times them); errors stay until closed.</summary>
+    /// <summary>Show a message bottom-right. Success messages fade after 6 s, errors and messages with an action
+    /// after 15 s (the layout times them, UI31); at most three are shown at once.</summary>
     public ShellMessage Notify(string text, bool isError = false, string? actionLabel = null, Func<Task>? action = null)
     {
         var m = new ShellMessage(Guid.NewGuid(), text, isError, actionLabel, action);
         lock (_gate)
         {
             _messages.Add(m);
-            if (_messages.Count > 4)
+            if (_messages.Count > 3)
             {
                 _messages.RemoveAt(0);
             }

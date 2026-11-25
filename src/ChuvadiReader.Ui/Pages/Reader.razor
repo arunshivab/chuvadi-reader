@@ -272,8 +272,16 @@
                 @if (_pressResult is not null)
                 {
                     <div style="background:var(--chvd-surface-lo);border:var(--chvd-stroke) solid var(--chvd-border-soft);border-radius:10px;padding:12px 14px;margin-bottom:14px">
-                        <div style="font-size:15px;margin-bottom:6px">@SizeOf(_pressResult.BeforeBytes) → <span style="color:var(--chvd-binding)">@SizeOf(_pressResult.AfterBytes)</span> <span style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">(@_pressResult.SavedPercent.ToString("0.#")% smaller)</span></div>
+                        <div style="font-size:15px;margin-bottom:6px">@SizeOf(_pressResult.BeforeBytes) → <span style="color:var(--chvd-binding)">@SizeOf(_pressResult.AfterBytes)</span> <span style="font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-ink-muted)">(@_pressResult.SavedLabel)</span></div>
                         <div style="font-family:var(--chvd-mono);font-size:11px;color:var(--chvd-ink-muted)">@_pressResult.ImagesRecompressed images · @_pressResult.StreamsCompressed streams · @_pressResult.ObjectsRemoved objects removed</div>
+                        @if (_pressResult.TargetMissed)
+                        {
+                            <div style="font-family:var(--chvd-serif-body);font-size:12px;margin-top:6px">The target size couldn't be reached; this is the smallest Press could make it.</div>
+                        }
+                        @if (_pressResult.NewOwnerPassword)
+                        {
+                            <div style="font-family:var(--chvd-serif-body);font-size:12px;margin-top:6px">@SourceLock.NewOwnerNote</div>
+                        }
                         <button @onclick="OpenPressResult" class="rdlg-open" style="margin-top:10px;font-family:var(--chvd-mono);font-size:12px;color:var(--chvd-binding);background:none;border:var(--chvd-stroke) solid var(--chvd-binding);border-radius:6px;padding:5px 12px;cursor:pointer">open pressed file</button>
                     </div>
                 }
@@ -316,6 +324,7 @@
             <div class="rempty-sub">Chuvadi couldn't read this file, maybe because a download or copy didn't finish. Chuvadi can try to rebuild it as a new copy.</div>
             <div class="rempty-acts">
                 <button class="rempty-btn" @onclick="TryRecovery" disabled="@_recovering">@(_recovering ? "Repairing…" : "Try to repair (new copy)")</button>
+                <button class="rempty-btn" @onclick="StopOpening">Close this tab</button>
                 @if (FileManager.IsAvailable)
                 {
                     <button class="rempty-btn" @onclick="() => FileManager.RevealAsync(tab.Path)">Show in folder</button>
@@ -336,7 +345,14 @@
         <div class="rempty">
             <Icon Name="file-pdf" Size="40" />
             <div class="rempty-t">@tab.Error</div>
-            <button class="rempty-btn" @onclick="OpenViaPicker">@OpenAnotherLabel</button>
+            <div class="rempty-acts">
+                @if (tab.HeldAfterCrash)
+                {
+                    <button class="rempty-btn" @onclick="() => Tabs.OpenHeldAsync(tab.Id)">Open it anyway</button>
+                }
+                <button class="rempty-btn" @onclick="StopOpening">Close this tab</button>
+                <button class="rempty-btn" @onclick="OpenViaPicker">@OpenAnotherLabel</button>
+            </div>
             @if (!string.IsNullOrEmpty(tab.ErrorDetail))
             {
                 <details class="rempty-sub"><summary>Details</summary>@tab.ErrorDetail</details>
@@ -357,7 +373,7 @@
                     <DocxView @key="tab.Id" @ref="_viewer" Path="@tab.Path" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" OnStopOpening="StopOpening" />
                     break;
                 case DocumentFormat.Xlsx:
-                    <XlsxView @key="tab.Id" @ref="_viewer" Path="@tab.Path" Sizes="@tab.SheetSizes" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" OnStopOpening="StopOpening" />
+                    <XlsxView @key="tab.Id" @ref="_viewer" Path="@tab.Path" Sizes="@tab.SheetSizes" ShowHidden="@tab.ShowHiddenParts" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" OnStopOpening="StopOpening" />
                     break;
                 case DocumentFormat.Markdown:
                     <MarkdownView @key="tab.Id" @ref="_viewer" Path="@tab.Path" CodePage="@EncodingFor(tab)" OnEncoding="OnViewerEncoding" OnCounter="OnViewerCounter" OnOutline="OnViewerOutline" FindQuery="@_viewerFind" OnFindCount="OnViewerFindCount" TextSizePct="@_textSize" ReadingWidth="@_readWidth" WrapLines="@_wrap" ShowSource="@_showSource" OnStatus="OnViewerStatus" OnStopOpening="StopOpening" />
@@ -641,7 +657,29 @@
     }
 
     <div class="fcards">
-        @if (_markup && doc is not null)
+        @if (_lockNeed is { } lockNeed)
+        {
+            @* D-207 / D-210: a password the change needs so the file keeps its lock. *@
+            <FloatCard Title="@(lockNeed == LockNeed.OwnerPassword ? "Permissions password" : "Open password")" Meta="keeps the file's lock" OnClose="CancelLock">
+                <div class="fc-status">@_lockMsg</div>
+                <div class="fc-row">
+                    <input class="fc-grow" type="password" autocomplete="off" placeholder="Password" aria-label="Password"
+                           @bind="_lockPw" @bind:event="oninput" @onkeydown="LockKey" />
+                </div>
+                @if (_lockErr is not null)
+                {
+                    <div class="fc-status err">@_lockErr</div>
+                }
+                <div class="fc-foot">
+                    <button class="fc-btn fc-grow" @onclick="SubmitLockAsync" disabled="@(string.IsNullOrEmpty(_lockPw) || _lockBusy)">Continue</button>
+                    @if (_lockSaveAs is not null)
+                    {
+                        <button class="fc-btn fc-grow" @onclick="LockSaveAs">Save as…</button>
+                    }
+                </div>
+            </FloatCard>
+        }
+        else if (_markup && doc is not null)
         {
             @if (_sigOpen)
             {
@@ -782,6 +820,10 @@
             {
                 <FloatCard Title="Marks" Meta="@MarkCountLabel" OnClose="() => { _mkStatus = null; _mkSavedPath = null; }">
                     <div class="fc-status @(_mkError ? "err" : null)">@_mkStatus</div>
+                    @if (_mkOfferSaveAs)
+                    {
+                        <button class="fc-btn" @onclick="SaveMarkup">Save as…</button>
+                    }
                     @if (_mkSavedPath is not null)
                     {
                         <button class="fc-btn" @onclick="OpenRedacted">Open it</button>
@@ -955,6 +997,11 @@
                 <div class="fc-card-scroll">
                 @if (viewOnly)
                 {
+                    @if (tab.Format == DocumentFormat.Xlsx)
+                    {
+                        @* D-214: hidden rows, columns and sheets stay hidden, as in Excel, unless this is on. *@
+                        <label class="fc-toggle">Show hidden rows, columns and sheets <input type="checkbox" checked="@tab.ShowHiddenParts" @onchange="() => tab.ShowHiddenParts = !tab.ShowHiddenParts" /></label>
+                    }
                     <div class="fc-grp">Text size</div>
                     <div class="fc-seg">
                         @foreach (var sz in new[] { 85, 100, 115, 130, 150 })
@@ -1176,6 +1223,12 @@
                         <RailSep />
                         <RailButton Icon="list-view" Label="Wrap lines" Size="18" Active="_wrap" OnClick="() => _wrap = !_wrap" />
                     }
+                    @if (tab.Format == DocumentFormat.Xlsx)
+                    {
+                        @* D-214: hidden rows, columns and sheets stay hidden, as in Excel, unless this is on. *@
+                        <RailSep />
+                        <RailButton Icon="eye" Label="Show hidden rows, columns and sheets" Size="18" Active="tab.ShowHiddenParts" OnClick="() => tab.ShowHiddenParts = !tab.ShowHiddenParts" />
+                    }
                 </SideRail>
             }
             else if (_markup)
@@ -1340,6 +1393,12 @@
             _props = new DocProperties(System.IO.Path.GetFileName(active.Path),
                 null, null, null, null, null, null, null, null,
                 active.Session?.Document.PageCount ?? 0, "—", false, null, false, false, 0);
+        }
+        finally
+        {
+            // RD51: opened from Ctrl K (not a click on this page), nothing re-drew the card after the read, so it
+            // stayed on "reading…".
+            await InvokeAsync(StateHasChanged);
         }
     }
 
@@ -1540,7 +1599,6 @@
     private int _shownPageCount;
     private bool _restoreScroll;
     private int? _pendingJumpPage;
-    private readonly HashSet<string> _initiallyFitted = new();
     private DocProperties? _props;
     private bool _showProps;
     private static readonly ExportFormat[] _formats =
@@ -1985,6 +2043,9 @@
 
     private async Task SendPageToNewDesk(int page)
     {
+        // RD47: the kept desks (D-203) come back on the bench's first use; a desk added before that was replaced by
+        // them, so the page went nowhere. Restore first, then add.
+        await Bench.EnsureRestoredAsync();
         if (!Bench.CanAddDesk) return;
         var desk = Bench.AddDesk();
         await SendPageToDesk(page, desk.Id);
@@ -2035,12 +2096,10 @@
     {
         var active = Tabs.Active;
         if (active?.Path is null || !HasStamp) return;
-        var dir = System.IO.Path.GetDirectoryName(active.Path) ?? "";
-        var temp = System.IO.Path.Combine(dir, "~" + System.IO.Path.GetFileNameWithoutExtension(active.Path) + ".stamp-tmp.pdf");
-        await RunStamp(temp, inPlace: true, finalPath: active.Path);
+        await RunStamp(active.Path, inPlace: true);
     }
 
-    private async Task RunStamp(string output, bool inPlace, string? finalPath = null)
+    private async Task RunStamp(string output, bool inPlace)
     {
         var active = Tabs.Active;
         if (active?.Path is null) return;
@@ -2052,36 +2111,39 @@
         {
             var wm = string.IsNullOrWhiteSpace(active.Watermark.Text) ? null : active.Watermark;
             var hf = active.HeaderFooter.HasAnyContent ? active.HeaderFooter : null;
-            await Stamp.ApplyToFileAsync(active.Path, output, wm, hf, active.FileName);
+            var into = inPlace || string.Equals(System.IO.Path.GetFullPath(output), System.IO.Path.GetFullPath(active.Path), StringComparison.OrdinalIgnoreCase);
+            // D-210: never onto a file that moved or changed since it was opened; D-207: the same lock.
+            var (source, saveLock) = await Task.Run(() => TabSave.Prepare(active, intoSource: into));
+            var bytes = await Stamp.ApplyAsync(source, saveLock, wm, hf, active.FileName);
 
-            if (inPlace && finalPath is not null)
+            if (into)
             {
-                await Tabs.ReloadActiveAsync(async () =>
+                var finalPath = active.Path;
+                await Tabs.ReloadActiveAsync(() =>
                 {
-                    try
-                    {
-                        if (System.IO.File.Exists(finalPath)) System.IO.File.Replace(output, finalPath, null);
-                        else System.IO.File.Move(output, finalPath);
-                    }
-                    catch
-                    {
-                        System.IO.File.Copy(output, finalPath, true);
-                        try { System.IO.File.Delete(output); } catch { }
-                    }
-                    await Task.CompletedTask;
+                    SourceGuard.ReplaceAtomically(finalPath, bytes);
+                    return Task.CompletedTask;
                 });
                 // The stamp is now baked into the file; retire the live preview so it doesn't
                 // double over the reloaded page, and confirm with a toast.
                 active.StampOpen = false;
                 _stampStatus = null;
+                await WriteBack.DeliverOrThrowAsync(finalPath);
                 ShowToast($"Saved → {System.IO.Path.GetFileName(finalPath)}");
             }
             else
             {
-                _stampStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
+                await Task.Run(() => SourceGuard.ReplaceAtomically(output, bytes));
+                await WriteBack.DeliverOrThrowAsync(output);
+                _stampStatus = $"Saved → {System.IO.Path.GetFileName(output)}" + (saveLock.NewOwnerPassword ? ". " + SourceLock.NewOwnerNote : "");
             }
-            await WriteBack.DeliverOrThrowAsync(inPlace ? finalPath : output);
             _stampError = false;
+        }
+        catch (LockNeedsPasswordException lk)
+        {
+            _stampStatus = lk.Message;
+            _stampError = true;
+            AskLock(lk.Need, lk.Message, () => RunStamp(output, inPlace), lk.Need == LockNeed.OwnerPassword && inPlace ? StampSaveAs : null);
         }
         catch (Exception ex)
         {
@@ -2169,6 +2231,7 @@
 
     private async Task SnapshotToDesk(Guid deskId)
     {
+        await Bench.EnsureRestoredAsync();   // RD47
         var path = await SaveSnapTempAsync();
         if (path is null) { StateHasChanged(); return; }
         try
@@ -2183,6 +2246,7 @@
 
     private async Task SnapshotToNewDesk()
     {
+        await Bench.EnsureRestoredAsync();   // RD47
         if (!Bench.CanAddDesk) return;
         var desk = Bench.AddDesk();
         await SnapshotToDesk(desk.Id);
@@ -2473,7 +2537,8 @@
         await GoTo(n.PageIndex + 1, n.TopFraction);
     }
 
-    private void BmBeginRename(BookmarkNode n) { _bmSel = n; _bmRenaming = n; }
+    private void BmBeginRename(BookmarkNode n) { _bmSel = n; _bmRenaming = n; _bmFocusRename = true; }
+    private bool _bmFocusRename;   // BUG-02: the rename field takes the caret after the render that draws it
     private void BmEndRename() => _bmRenaming = null;
     private void BmRenameKey(KeyboardEventArgs e) { if (e.Key is "Enter" or "Escape") _bmRenaming = null; }
 
@@ -2483,7 +2548,7 @@
         var page = Math.Max(0, (Tab?.CurrentPage ?? 1) - 1);
         var node = new BookmarkNode($"Page {page + 1}", page);
         _bmTree.Add(node);
-        _bmSel = node; _bmRenaming = node;
+        _bmSel = node; _bmRenaming = node; _bmFocusRename = true;
     }
 
     private bool BmLocate(BookmarkNode target, List<BookmarkNode> list, BookmarkNode? owner,
@@ -2536,30 +2601,48 @@
 
     private async Task BmSave()
     {
-        var path = Tab?.Path;
-        if (path is null || _bmTree is null) return;
+        var tab = Tab;
+        var path = tab?.Path;
+        if (tab is null || path is null || _bmTree is null) return;
+        // RD35: a desk opened in the Reader is a working copy in the scratch folder, not the person's file: the
+        // bookmarks go into a copy they choose (with the desk's pages), never silently into the hidden file.
+        string target = path;
+        if (ScratchFiles.IsWorkingCopy(Paths, path))
+        {
+            var picked = await Picker.PickSavePdfAsync(tab.FileName);
+            if (string.IsNullOrWhiteSpace(picked)) return;
+            target = picked!;
+        }
+
         _bmBusy = true; _bmStatus = null; StateHasChanged();
         try
         {
-            var output = System.IO.Path.Combine(ScratchFiles.Folder(Paths), $"chuvadi-toc-{Guid.NewGuid():N}.pdf");
-            await _outline.WriteToFileAsync(path, output, _bmTree);
-            await Tabs.ReloadActiveAsync(async () =>
+            var tree = _bmTree;
+            // D-210: into the file only while it is still the one opened; D-207: it keeps its lock.
+            bool into = target == path;
+            var (source, saveLock) = await Task.Run(() => TabSave.Prepare(tab, intoSource: into));
+            var bytes = await Task.Run(() => SourceLock.Lock(_outline.Write(SourceLock.Plain(source, saveLock.OpenPassword), tree), saveLock));
+            if (into)
             {
-                try
+                await Tabs.ReloadActiveAsync(() =>
                 {
-                    if (System.IO.File.Exists(path)) System.IO.File.Replace(output, path, null);
-                    else System.IO.File.Move(output, path);
-                }
-                catch
-                {
-                    System.IO.File.Copy(output, path, true);
-                    try { System.IO.File.Delete(output); } catch { }
-                }
-                await Task.CompletedTask;
-            });
-            await WriteBack.DeliverOrThrowAsync(path);
-            _bmEdits.InFile = BookmarkEdits.Signature(_bmTree);   // the file holds them now
-            _bmStatus = $"Saved {BmFlat().Count()} bookmark(s)";
+                    SourceGuard.ReplaceAtomically(path, bytes);
+                    return Task.CompletedTask;
+                });
+                _bmEdits.InFile = BookmarkEdits.Signature(_bmTree);   // the file holds them now
+            }
+            else
+            {
+                await Task.Run(() => SourceGuard.ReplaceAtomically(target, bytes));
+            }
+
+            await WriteBack.DeliverOrThrowAsync(target);
+            _bmStatus = $"Saved {BmFlat().Count()} bookmark(s)" + (into ? "" : $" → {System.IO.Path.GetFileName(target)}");
+        }
+        catch (LockNeedsPasswordException lk)
+        {
+            _bmStatus = lk.Message;
+            AskLock(lk.Need, lk.Message, BmSave, null);
         }
         catch (Exception ex) { _bmStatus = ex.Message; }
         finally { _bmBusy = false; StateHasChanged(); }
@@ -2594,6 +2677,7 @@
         _selText = null; _selShape = null; _selImage = null;
         if (_markup)
         {
+            _ = BeginMarkWorkAsync();   // D-207 / D-210
             _ = CheckTaggedAsync();
             if (_js is not null) _ = _js.InvokeVoidAsync("enableImageDrops");
         }
@@ -3368,7 +3452,7 @@
         // Overlay-only save.
         if (active?.Path is null || OverlayCount == 0) return;
 
-        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false;
+        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false; _mkOfferSaveAs = false;
         StateHasChanged();
         await Task.Yield();
         try
@@ -3377,26 +3461,16 @@
             var texts = BuildTextsDict();
             var imgs = BuildImagesDict();
             var shps = BuildShapesDict();
-            var dir = System.IO.Path.GetDirectoryName(src) ?? "";
-            var temp = System.IO.Path.Combine(dir, "~" + System.IO.Path.GetFileNameWithoutExtension(src) + ".chuvadi-tmp.pdf");
 
-            // Build the edited file beside the original (no redactions here).
-            await Redact.FlattenToFileAsync(src, temp, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
+            // D-210: the file must still be the one the marks were placed on, and (D-207) it keeps its lock.
+            var (source, saveLock) = await Task.Run(() => TabSave.Prepare(active, intoSource: true));
+            var bytes = await Redact.FlattenAsync(source, saveLock, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
 
-            // Release the open document, swap the file in, then reopen in place.
-            await Tabs.ReloadActiveAsync(async () =>
+            // Release the open document, swap the file in (through a temporary file beside it), then reopen in place.
+            await Tabs.ReloadActiveAsync(() =>
             {
-                try
-                {
-                    if (System.IO.File.Exists(src)) System.IO.File.Replace(temp, src, null);
-                    else System.IO.File.Move(temp, src);
-                }
-                catch
-                {
-                    System.IO.File.Copy(temp, src, true);
-                    try { System.IO.File.Delete(temp); } catch { }
-                }
-                await Task.CompletedTask;
+                SourceGuard.ReplaceAtomically(src, bytes);
+                return Task.CompletedTask;
             });
 
             await WriteBack.DeliverOrThrowAsync(src);
@@ -3408,10 +3482,18 @@
             _mkStatus = $"Saved to {System.IO.Path.GetFileName(src)}";
             _mkError = false;
         }
+        catch (LockNeedsPasswordException lk)
+        {
+            ShowMarkSaveError(lk.Message, offerSaveAs: lk.Need == LockNeed.OwnerPassword);
+            AskLock(lk.Need, lk.Message, SaveInPlace, lk.Need == LockNeed.OwnerPassword ? SaveMarkup : null);
+        }
+        catch (SourceChangedException ex)
+        {
+            ShowMarkSaveError(ex.Message, offerSaveAs: true);
+        }
         catch (Exception ex)
         {
-            _mkStatus = ex.Message;
-            _mkError = true;
+            ShowMarkSaveError(ex.Message, offerSaveAs: false);
         }
         finally
         {
@@ -3428,8 +3510,13 @@
         var suggested = System.IO.Path.GetFileNameWithoutExtension(active.Path) + "-edited.pdf";
         var output = await Picker.PickSavePdfAsync(suggested);
         if (string.IsNullOrWhiteSpace(output)) return;
+        if (string.Equals(System.IO.Path.GetFullPath(output!), System.IO.Path.GetFullPath(active.Path), StringComparison.OrdinalIgnoreCase))
+        {
+            await SaveInPlace();   // the same file chosen: the into-the-source checks apply
+            return;
+        }
 
-        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false;
+        _mkSaving = true; _mkStatus = null; _mkSavedPath = null; _mkError = false; _mkOfferSaveAs = false;
         StateHasChanged();
         await Task.Yield();
         try
@@ -3438,17 +3525,24 @@
             var imgs = BuildImagesDict();
             var shps = BuildShapesDict();
 
-            await Redact.FlattenToFileAsync(active.Path, output!, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
+            // D-210: from the source as it was when the marks began (it may have moved since); D-207: same lock.
+            var (source, saveLock) = await Task.Run(() => TabSave.Prepare(active, intoSource: false));
+            var bytes = await Redact.FlattenAsync(source, saveLock, new Dictionary<int, PageRedaction>(), _mkColor, texts, imgs, shps);
+            await Task.Run(() => SourceGuard.ReplaceAtomically(output!, bytes));
             await WriteBack.DeliverOrThrowAsync(output);
             _mkSavedPath = output;
             _marks.SavedAs = _marks.Signature(); // these marks are in a file now; closing need not ask until they change
-            _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}";
+            _mkStatus = $"Saved → {System.IO.Path.GetFileName(output)}" + (saveLock.NewOwnerPassword ? ". " + SourceLock.NewOwnerNote : "");
             _mkError = false;
+        }
+        catch (LockNeedsPasswordException lk)
+        {
+            ShowMarkSaveError(lk.Message, offerSaveAs: false);
+            AskLock(lk.Need, lk.Message, SaveMarkup, null);
         }
         catch (Exception ex)
         {
-            _mkStatus = ex.Message;
-            _mkError = true;
+            ShowMarkSaveError(ex.Message, offerSaveAs: false);
         }
         finally
         {
@@ -3680,6 +3774,8 @@
             _renderFailed = false;
             _recoverBannerDismissed = false;
             _recoverStatus = null;
+            // UI30: Press belongs to the file it was opened on; another tab doesn't keep it (with that file's result).
+            if (!_pressBusy) { _showPress = false; _pressResult = null; _pressStatus = null; }
             if (tab?.Path != _pageBgPath) _ = LoadPageBgAsync(tab?.Path);
             bool otherFile = tab?.Path != _mkDocPath;
             if (UseMarksOf(tab) || otherFile)
@@ -3714,6 +3810,7 @@
         }
 
         PublishShell();
+        await NoteViewerOpeningAsync();   // HO33
         var tab = Tabs.Active;
 
         // The viewers' Find box takes the cursor when it opens, as the PDF one does (OpenFind), so the person can
@@ -3773,6 +3870,13 @@
             catch { }
         }
 
+        if (_bmFocusRename && _bmRenaming is not null)
+        {
+            _bmFocusRename = false;
+            try { await _js.InvokeVoidAsync("focusQuery", ".bm-rename"); }
+            catch { }
+        }
+
         if (_focusNewText)
         {
             _focusNewText = false;
@@ -3805,12 +3909,14 @@
                 catch { }
             }
 
-            if (!_initiallyFitted.Contains(tab.Id))
+            if (!tab.FittedOnce)
             {
                 // First time this document is shown — open it fitted to the page; on a phone, fitted to
                 // the width (Portal & Android 12g–12j: the page fills the screen's width).
-                _initiallyFitted.Add(tab.Id);
+                tab.FittedOnce = true;   // HO16: on the tab, not this page, so Home and back keeps the place
                 _restoreScroll = false;
+                // HO16: a tab that comes back on a later page (from the last session, or Resume on Home) opens there.
+                if (tab.CurrentPage > 1 && _pendingJumpPage is null) _pendingJumpPage = tab.CurrentPage;
                 tab.TwoPage = false;
                 tab.Continuous = false;
                 // From its first page: the desk is shared by every tab, so it still had the last document's
@@ -4250,6 +4356,13 @@
     [JSInvokable]
     public async Task OnEscape()
     {
+        if (_showPress && !_pressBusy)   // UI30: Esc closes Press like the other cards
+        {
+            ClosePress();
+            StateHasChanged();
+            return;
+        }
+
         if (_measureOn)
         {
             CloseMeasure();

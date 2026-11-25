@@ -30,7 +30,7 @@
     <ChuvadiReader.Ui.Components.Settings.PreferencesHost />
     @if (ShellLayout is ChuvadiReader.Platform.ShellLayout.Tablet or ChuvadiReader.Platform.ShellLayout.Phone)
     {
-        <ChuvadiReader.Ui.Components.Platform.Phone.TouchSupport />
+        <ChuvadiReader.Ui.Components.Platform.Phone.TouchSupport StatusSlot="_statusSlot" />
     }
     @if (IsPortal && Platform.Capabilities.DropFiles)
     {
@@ -45,7 +45,8 @@
                                                                Open="AddTab" Find="FindNow" Go="Go" OnDocView="OnDocView"
                                                                SwitchTab="SwitchTab" CloseTab="CloseTab"
                                                                OpenLabel="@(IsPortal ? "Upload" : "Open")" OpenIcon="@(IsPortal ? "upload" : "folder")"
-                                                               MenuFooter="@(Platform.Chrome.AccountMenu ? PortalMenuFooter : null)">
+                                                               MenuFooter="@(Platform.Chrome.AccountMenu ? PortalMenuFooter : null)"
+                                                               StatusSlot="_statusSlot">
             <CascadingValue Value="_statusSlot" IsFixed="true">@Body</CascadingValue>
         </ChuvadiReader.Ui.Components.Platform.Phone.PhoneShell>
     }
@@ -422,9 +423,28 @@
     private bool _docMenuOpen;
     private bool _leftOpen = true;
 
+    /// <summary>ST15 (D-214): the window is narrower than 760 px. The opened side bar then floats over the page
+    /// (it takes no room from it) and closes after a pick; the remembered choice is not changed.</summary>
+    private bool _narrow;
+
+    [JSInvokable]
+    public Task OnNarrow(bool narrow)
+    {
+        if (narrow == _narrow) return Task.CompletedTask;
+        _narrow = narrow;
+        if (narrow) _leftOpen = false;   // a narrow window starts with the page, not the bar over it
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private void CloseLeftIfNarrow()
+    {
+        if (_narrow) _leftOpen = false;
+    }
+
     private async Task ToggleLeft()
     {
         _leftOpen = !_leftOpen;
+        if (_narrow) return;   // ST15: opening it over a narrow window is for one pick, not a new choice
         try
         {
             await Storage.SetAsync("leftbar.open", _leftOpen ? "1" : "0");
@@ -777,7 +797,11 @@
         StateHasChanged();
     }
 
-    private void Go(string path) => Nav.NavigateTo(path);
+    private void Go(string path)
+    {
+        CloseLeftIfNarrow();
+        Nav.NavigateTo(path);
+    }
 
     // ── modes ─────────────────────────────────────────────────────────────
     private string? ModeDisabledReason(DocMode m)
@@ -793,6 +817,7 @@
 
     private async Task RequestMode(DocMode m)
     {
+        CloseLeftIfNarrow();   // ST15
         if (ModeDisabledReason(m) is not null)
         {
             return;
@@ -830,7 +855,9 @@
     private async Task SyncShelfAsync()
     {
         var ordered = Tabs.Tabs
-            .Where(t => !t.Format.IsViewOnly() && t.Error is null && System.IO.File.Exists(t.Path))
+            // BUG-19: an unlocked tab's file goes on with its password (PdfPasswords); one still waiting for its
+            // password is left until it is unlocked, instead of an error toast every time Arrange opens.
+            .Where(t => !t.Format.IsViewOnly() && t.Error is null && !t.NeedsPassword && System.IO.File.Exists(t.Path))
             .OrderBy(t => t.Id == Tabs.Active?.Id ? 0 : 1)
             .ToList();
         foreach (var t in ordered)
@@ -848,6 +875,7 @@
 
     private async Task FindNow()
     {
+        CloseLeftIfNarrow();   // ST15
         if (Shell.FindHandler is not null && OnDocView)
         {
             await Shell.FindHandler();
@@ -862,10 +890,12 @@
 
     private void OnShellChanged()
     {
-        foreach (var m in Shell.Messages.Where(m => !m.IsError && _fading.Add(m.Id)).ToList())
+        // UI31: error messages used to stay until closed, stacking over the desk's Bind button. They stay longer
+        // than a success (15 s, time to read) and then go; one carrying an action (Undo, Open) still goes after 15 s.
+        foreach (var m in Shell.Messages.Where(m => _fading.Add(m.Id)).ToList())
         {
             var id = m.Id;
-            _ = Task.Delay(6000).ContinueWith(_ => InvokeAsync(() => Shell.Dismiss(id)));
+            _ = Task.Delay(m.IsError || m.ActionLabel is not null ? 15000 : 6000).ContinueWith(_ => InvokeAsync(() => Shell.Dismiss(id)));
         }
 
         _ = InvokeAsync(StateHasChanged);
@@ -968,6 +998,7 @@
 
     private async Task AddTab()
     {
+        CloseLeftIfNarrow();   // ST15
         var path = await Picker.PickDocumentAsync();
         if (string.IsNullOrEmpty(path))
         {

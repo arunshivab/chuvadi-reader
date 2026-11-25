@@ -47,7 +47,7 @@ public sealed class OutlineService
     /// <summary>Reads the outline of a file into an editable tree.</summary>
     public IReadOnlyList<BookmarkNode> Read(string path)
     {
-        using var doc = PdfDocument.Open(path);
+        using var doc = PdfFiles.Open(path);
         return Read(doc);
     }
 
@@ -67,7 +67,7 @@ public sealed class OutlineService
     {
         await Task.Run(() =>
         {
-            using var doc = PdfDocument.Open(srcPath);
+            using var doc = PdfFiles.Open(srcPath);
             using var fs = File.Create(outPath);
             OutlineWriter.Apply(fs, doc, ToEntries(nodes, doc.PageCount));
         }, ct).ConfigureAwait(false);

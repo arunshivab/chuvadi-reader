@@ -24,4 +24,44 @@ public static class LibraryHolds
 
     /// <summary>Said under a sheet that has conditional formats.</summary>
     public const string ConditionalColoursBack = "Conditional colours return with the next update";
+
+    /// <summary>D-210 / D-211: text the saved file can't hold yet. Until Chuvadi.Pdf 3.36 routes marks, stamps,
+    /// watermarks, headers, footers and page numbers through the embedded LiPi fonts, they are written with the
+    /// standard PDF fonts, which hold plain Latin (ASCII and Latin-1: é, ñ, ß) and nothing else; dashes, curly
+    /// quotes, €, Tamil and emoji came out as garbage or "?" (BUG-11, BUG-18). Such text is refused, naming the
+    /// letters, before anything is written; the mark stays on screen.</summary>
+    public static bool TextFontsHeld => true;
+
+    /// <summary>The letters in <paramref name="text"/> the saved file can't hold yet, each once, in order.</summary>
+    public static IReadOnlyList<string> LettersNotHeld(string? text)
+    {
+        var found = new List<string>();
+        if (string.IsNullOrEmpty(text) || !TextFontsHeld) return found;
+        var e = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+        while (e.MoveNext())
+        {
+            var el = (string)e.Current;
+            bool ok = el.Length == 1 && el[0] is '\t' or '\n' or '\r' or (>= ' ' and <= '~') or (>= '\u00A0' and <= '\u00FF');
+            if (!ok && !found.Contains(el)) found.Add(el);
+        }
+
+        return found;
+    }
+
+    /// <summary>The sentence refusing <paramref name="text"/>, or null when the file can hold all of it.</summary>
+    public static string? TextNotHeld(string? text)
+    {
+        var letters = LettersNotHeld(text);
+        if (letters.Count == 0) return null;
+        var shown = string.Join(" ", letters.Take(10)) + (letters.Count > 10 ? $" and {letters.Count - 10} more" : "");
+        return $"These letters can't be saved into the file yet: {shown}. They arrive with the next update. Nothing was saved; remove them to save now.";
+    }
+
+    /// <summary>Throws <see cref="InvalidOperationException"/> with <see cref="TextNotHeld"/> when any of
+    /// <paramref name="texts"/> can't be held.</summary>
+    public static void CheckTextHeld(IEnumerable<string?> texts)
+    {
+        var all = string.Concat(texts.Where(t => !string.IsNullOrEmpty(t)));
+        if (TextNotHeld(all) is { } refusal) throw new InvalidOperationException(refusal);
+    }
 }

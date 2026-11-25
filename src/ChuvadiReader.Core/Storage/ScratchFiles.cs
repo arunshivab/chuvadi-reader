@@ -33,4 +33,15 @@ public static class ScratchFiles
 
         return path;
     }
+
+    /// <summary>RD35: true for a working copy Chuvadi made in its scratch folder (a desk bound to open in the Reader,
+    /// named "name-&lt;32 hex&gt;.pdf"), which is not the person's file: saving "into" it must ask where instead.</summary>
+    public static bool IsWorkingCopy(IAppPaths? paths, string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+        var scratch = Path.GetFullPath(Folder(paths)).TrimEnd(Path.DirectorySeparatorChar);
+        return string.Equals(dir?.TrimEnd(Path.DirectorySeparatorChar), scratch, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)
+            && System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(path), "-[0-9a-f]{32}\\.pdf$");
+    }
 }

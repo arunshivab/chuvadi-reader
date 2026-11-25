@@ -35,7 +35,8 @@ public sealed record WordTableBlock(IReadOnlyList<WordRow> Rows, IReadOnlyList<d
 
 public sealed record WordRow(bool Header, IReadOnlyList<WordCell> Cells);
 
-public sealed record WordCell(IReadOnlyList<WordBlock> Content, int ColSpan, string? ShadeHex);
+/// <summary>A drawn table cell. <see cref="RowSpan"/> &gt; 1 for a vertically merged cell (VW01).</summary>
+public sealed record WordCell(IReadOnlyList<WordBlock> Content, int ColSpan, string? ShadeHex, int RowSpan = 1);
 
 /// <summary>A run of text with inline formatting, or — when <see cref="ImageDataUrl"/> is set —
 /// an inline image (in which case <see cref="Text"/> is empty).</summary>
@@ -91,17 +92,31 @@ public sealed class DocxViewService(IPlatformInfo? platform = null)
         }
     }
 
+    // Which limit the file went past, in words. A small file refused for deep nesting was told it was "too large"
+    // (Windows bench, 18 Nov: hyperlinks-248 and ins-248 are under 2 KB).
+    internal static string RefusalText(DocxLimit limit) => limit switch
+    {
+        DocxLimit.XmlDepth =>
+            "This Word document is nested more deeply than Chuvadi allows, so it isn't opened. It may be damaged, or made to attack the reader.",
+        DocxLimit.Elements or DocxLimit.EntryCount =>
+            "This Word document has more parts than Chuvadi allows, so it isn't opened. It may be damaged.",
+        DocxLimit.SpinCount =>
+            "This document's password protection asks for more work than Chuvadi allows, so it isn't opened.",
+        _ =>
+            "This Word document is too large to open: its contents unpack to more than Chuvadi allows. It may be damaged.",
+    };
+
     private WordView LoadCore(string path, string? password, CancellationToken cancellationToken)
     {
         Document doc;
         try
         {
-            doc = Document.Load(path, string.IsNullOrEmpty(password) ? null : password, ReadOptions(_serverSide), cancellationToken);
+            using var file = SharedRead.Open(path);   // open in Word too: shared, never "used by another process"
+            doc = Document.Load(file, string.IsNullOrEmpty(password) ? null : password, ReadOptions(_serverSide), cancellationToken);
         }
         catch (DocxSecurityLimitException ex)
         {
-            throw new DocumentViewException(ViewErrorReason.TooLarge,
-                "This Word document is too large to open: its contents unpack to more than Chuvadi allows. It may be damaged.", ex);
+            throw new DocumentViewException(ViewErrorReason.TooLarge, RefusalText(ex.Limit), ex);
         }
         catch (DocxPasswordRequiredException ex)
         {
@@ -263,24 +278,52 @@ public sealed class DocxViewService(IPlatformInfo? platform = null)
 
     private static WordBlock MapTable(DocTable t, IReadOnlyDictionary<Paragraph, ListLabel> labels)
     {
+        // VW01 (Chuvadi.Docs' model): row.Cells has one entry per grid column. A cell spanning columns
+        // (ColumnSpan > 1) sits at its first column and the columns it covers stay as empty placeholders, which are
+        // skipped here, not drawn. A vertical merge starts at a Restart cell and goes on through the Continue cells
+        // below it in the same column: the Restart cell is drawn once across those rows; the Continue cells are not.
         var rows = new List<WordRow>(t.Rows.Count);
-        foreach (var row in t.Rows)
+        for (int r = 0; r < t.Rows.Count; r++)
         {
+            var row = t.Rows[r];
             var cells = new List<WordCell>(row.Cells.Count);
-            foreach (var c in row.Cells)
+            for (int c = 0; c < row.Cells.Count;)
             {
+                var cell = row.Cells[c];
+                int span = Math.Max(1, cell.ColumnSpan);
+                if (cell.VerticalMerge == VerticalMerge.Continue)
+                {
+                    c += span;
+                    continue;
+                }
+
+                int rowSpan = 1;
+                if (cell.VerticalMerge == VerticalMerge.Restart)
+                {
+                    for (int k = r + 1; k < t.Rows.Count; k++)
+                    {
+                        var below = t.Rows[k].Cells;
+                        if (c < below.Count && below[c].VerticalMerge == VerticalMerge.Continue) rowSpan++;
+                        else break;
+                    }
+                }
+
                 // D-136: a loaded cell's content is TableCell.Blocks (paragraphs and nested tables, in order);
                 // Paragraphs stayed empty for loaded files, so cells showed blank.
-                var content = new List<WordBlock>(c.Blocks.Count);
-                foreach (var cb in c.Blocks)
+                var content = new List<WordBlock>(cell.Blocks.Count);
+                foreach (var cb in cell.Blocks)
                 {
                     if (cb is Paragraph cp) content.Add(MapParagraph(cp, labels));
                     else if (cb is DocTable nested) content.Add(MapTable(nested, labels));
                 }
-                cells.Add(new WordCell(content, Math.Max(1, c.ColumnSpan), Hex(c.ShadeHex)));
+
+                cells.Add(new WordCell(content, span, Hex(cell.ShadeHex), rowSpan));
+                c += span;
             }
+
             rows.Add(new WordRow(row.IsHeader, cells));
         }
+
         return new WordTableBlock(rows, t.ColumnWidthsPt ?? Array.Empty<double>());
     }
 

@@ -28,8 +28,31 @@ public sealed record SheetView(
     public int RowCount => LastRow - FirstRow + 1;
     public int ColCount => LastCol - FirstCol + 1;
 
-    /// <summary>D-172: the sheet is hidden (or very hidden) in the file. It is still shown, dimmed and marked.</summary>
+    /// <summary>D-172 / D-214: the sheet is hidden (or very hidden) in the file. Left out of the sheet tabs, as in
+    /// Excel, unless "Show hidden rows, columns and sheets" is on; then it is shown dimmed and marked.</summary>
     public bool Hidden { get; init; }
+
+    /// <summary>D-214: the columns the file hides, with the width each has when shown.</summary>
+    public IReadOnlyDictionary<int, double> HiddenColPx { get; init; } = new Dictionary<int, double>();
+
+    /// <summary>D-214: the rows the file hides, with the height each has when shown.</summary>
+    public IReadOnlyDictionary<int, double> HiddenRowPx { get; init; } = new Dictionary<int, double>();
+
+    /// <summary>D-214: this is the sheet with its hidden rows and columns shown (greyed, view only).</summary>
+    public bool HiddenShown { get; init; }
+
+    public bool IsHiddenCell(int row, int col) => HiddenShown && (HiddenRowPx.ContainsKey(row) || HiddenColPx.ContainsKey(col));
+
+    /// <summary>D-214: the same sheet with its hidden rows and columns given room, for the switch.</summary>
+    public SheetView WithHiddenShown()
+    {
+        if (HiddenShown || (HiddenColPx.Count == 0 && HiddenRowPx.Count == 0)) return this with { HiddenShown = true };
+        var cols = new Dictionary<int, double>(ColPx);
+        foreach (var (c, w) in HiddenColPx) { if (w == DefaultColPx) cols.Remove(c); else cols[c] = w; }
+        var rows = new Dictionary<int, double>(RowPx);
+        foreach (var (r, h) in HiddenRowPx) { if (h == DefaultRowPx) rows.Remove(r); else rows[r] = h; }
+        return this with { ColPx = cols, RowPx = rows, HiddenShown = true };
+    }
 
     /// <summary>E-08: the width of a column the file gives no width for, in pixels at 100 % (Excel's rule for the
     /// workbook's default font, 7 px a digit).</summary>
@@ -191,7 +214,7 @@ public sealed class XlsxViewService
     {
         try
         {
-            using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+            using var zip = new System.IO.Compression.ZipArchive(SharedRead.Open(path), System.IO.Compression.ZipArchiveMode.Read, leaveOpen: false);
             if (zip.Entries.Count > limits.MaxPackageEntries) return true;
             long total = 0;
             foreach (var entry in zip.Entries)
@@ -214,7 +237,8 @@ public sealed class XlsxViewService
         Workbook wb;
         try
         {
-            wb = Workbook.Load(path, string.IsNullOrEmpty(password) ? null : password, ReadOptions(cancellationToken));
+            using var file = SharedRead.Open(path);   // open in Excel too: shared, never "used by another process"
+            wb = Workbook.Load(file, string.IsNullOrEmpty(password) ? null : password, ReadOptions(cancellationToken));
         }
         catch (XlsxLimitExceededException ex)
         {
@@ -316,11 +340,16 @@ public sealed class XlsxViewService
         double defaultRowPx = fmt.ZeroHeight ? 0 : HeightPx(fmt.DefaultRowHeight > 0 ? fmt.DefaultRowHeight : 15);
         var colPx = new Dictionary<int, double>();
         var widths = new Dictionary<int, double>();
+        var hiddenColPx = new Dictionary<int, double>();
+        var hiddenRowPx = new Dictionary<int, double>();
         foreach (var range in s.ColumnRanges)
         {
             double px = range.Hidden ? 0 : range.Width > 0 ? WidthPx(range.Width) : defaultColPx;
+            double shownPx = range.Width > 0 ? WidthPx(range.Width) : defaultColPx;
+            if (shownPx <= 0) shownPx = defaultColPx;
             for (int col = Math.Max(1, range.Min); col <= Math.Min(range.Max, MaxColumns); col++)
             {
+                if (range.Hidden) hiddenColPx[col] = shownPx;
                 if (px != defaultColPx)
                 {
                     colPx[col] = px;
@@ -337,6 +366,7 @@ public sealed class XlsxViewService
         foreach (var row in s.DefinedRows)
         {
             double px = row.Hidden ? 0 : row.Height > 0 ? HeightPx(row.Height) : defaultRowPx;
+            if (row.Hidden) hiddenRowPx[row.Number] = row.Height > 0 ? HeightPx(row.Height) : (defaultRowPx > 0 ? defaultRowPx : HeightPx(15));
             if (px != defaultRowPx)
             {
                 rowPx[row.Number] = px;
@@ -359,6 +389,8 @@ public sealed class XlsxViewService
             DefaultRowPx = defaultRowPx,
             ColPx = colPx,
             RowPx = rowPx,
+            HiddenColPx = hiddenColPx,
+            HiddenRowPx = hiddenRowPx,
             Merges = merges,
             ShowGridLines = s.ShowGridLines,
             RightToLeft = s.RightToLeft,

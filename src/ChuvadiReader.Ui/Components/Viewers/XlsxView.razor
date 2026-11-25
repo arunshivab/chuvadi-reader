@@ -18,7 +18,7 @@
     }
     else if (_error is not null)
     {
-        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" />
+        <ViewerMessage IconName="warning" Error="true" Text="@_error" Detail="@_errorDetail" OnClose="OnStopOpening" />
     }
     else if (_wb is null)
     {
@@ -26,7 +26,7 @@
     }
     else
     {
-        var s = _wb.Sheets[_active];
+        var s = Cur;
         var g = _grid!;
         var zoom = Zoom(s);
         <div class="xv-valbar" hidden aria-live="polite"><span class="xv-val-addr"></span><span class="xv-val-text"></span><span class="xv-val-more"></span></div>
@@ -98,6 +98,7 @@
                 @for (int i = 0; i < _wb.Sheets.Count; i++)
                 {
                     var idx = i;
+                    if (!SheetShown(idx)) continue;   // D-214
                     <button type="button" role="tab" aria-selected="@(idx == _active ? "true" : "false")"
                             class="xv-tab @(idx == _active ? "on" : null) @(_wb.Sheets[idx].Hidden ? "hidden-sheet" : null)"
                             title="@(_wb.Sheets[idx].Hidden ? "This sheet is hidden in the workbook" : null)" @onclick="() => SelectAsync(idx)">
@@ -137,11 +138,38 @@
     /// keeps them itself, for as long as it lives.</summary>
     [Parameter] public SheetSizeMemory? Sizes { get; set; }
 
+    /// <summary>D-214: "Show hidden rows, columns and sheets". Off (the default), the workbook shows as in Excel:
+    /// hidden rows, columns and sheets aren't there. On, they are shown greyed (and hidden sheets marked), view only.</summary>
+    [Parameter] public bool ShowHidden { get; set; }
+
+    private bool _shownHidden;
+    private readonly Dictionary<SheetView, SheetView> _revealed = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>The sheet in front, with its hidden rows and columns given room when the switch is on.</summary>
+    private SheetView Cur
+    {
+        get
+        {
+            var sheet = _wb!.Sheets[_active];
+            if (!ShowHidden) return sheet;
+            if (!_revealed.TryGetValue(sheet, out var shown)) _revealed[sheet] = shown = sheet.WithHiddenShown();
+            return shown;
+        }
+    }
+
+    private bool SheetShown(int i) => ShowHidden || !_wb!.Sheets[i].Hidden;
+
+    private int FirstShownSheet()
+    {
+        for (int i = 0; _wb is not null && i < _wb.Sheets.Count; i++) if (SheetShown(i)) return i;
+        return 0;
+    }
+
     private SheetSizeMemory? _localSizes;
     private SheetSizeMemory SizeMemory => Sizes ?? (_localSizes ??= new SheetSizeMemory());
 
     /// <summary>The sheet on screen's own sizes, or null when it is shown at the file's.</summary>
-    private SheetSizeMemory.Sizes? _own => _wb is null ? null : SizeMemory.Find(Path, _wb.Sheets[_active].Name);
+    private SheetSizeMemory.Sizes? _own => _wb is null ? null : SizeMemory.Find(Path, Cur.Name);
 
     private sealed record Fit(bool Column, int Index, IReadOnlyList<(SheetCell Cell, double Width)> Cells);
     private Fit? _fit;
@@ -190,6 +218,13 @@
             await LoadAsync();
             return;
         }
+        if (ShowHidden != _shownHidden && _wb is not null)
+        {
+            _shownHidden = ShowHidden;
+            if (!SheetShown(_active)) _active = FirstShownSheet();
+            Reindex();
+            await ApplyFindAsync(jumpToHits: false);
+        }
         if (Q(FindQuery) != _query)
         {
             _query = Q(FindQuery);
@@ -234,7 +269,9 @@
             _locked = false;
             _unlockError = null;
             _wb = wb;
-            _active = 0;
+            _revealed.Clear();
+            _shownHidden = ShowHidden;
+            _active = FirstShownSheet();   // D-214: a hidden first sheet isn't where the workbook opens
             Reindex();
         }
         catch (DocumentViewException ex) when (ex.Reason == ViewErrorReason.PasswordProtected)
@@ -315,6 +352,7 @@
             for (int i = 0; i < _wb.Sheets.Count; i++)
             {
                 int n = 0;
+                if (!SheetShown(i)) { _sheetHits[i] = 0; continue; }   // D-214: hidden sheets aren't searched while hidden
                 foreach (var c in _wb.Sheets[i].Cells)
                     if (Matches(c, _query)) n++;
                 _sheetHits[i] = n;
@@ -336,7 +374,7 @@
     {
         _hits = new();
         if (_wb is null || _query is null) return;
-        foreach (var c in _wb.Sheets[_active].Cells)
+        foreach (var c in Cur.Cells)
             if (Matches(c, _query)) _hits.Add((c.Row, c.Col));
     }
 
@@ -417,7 +455,7 @@
             var (row, col) = _hits.Count == 0 ? (0, 0) : _hits.OrderBy(h => h.Item1).ThenBy(h => h.Item2).First();
             if (row > 0 && row <= g.LastRow && col <= g.LastCol)
             {
-                double zoom = Zoom(_wb.Sheets[_active]);
+                double zoom = Zoom(Cur);
                 double x = row > 0 && col > g.FrozenCols ? (g.ColLeft[col] - g.FrozenW + g.ColWidth(col) / 2) * zoom : -1;
                 double y = row > g.FrozenRows ? (g.RowTop[row] - g.FrozenH + g.RowHeight(row) / 2) * zoom : -1;
                 await JsVoidAsync("scrollGridToCell", _scroll, x, y, (g.HeadW + g.FrozenW) * zoom, (HeadH + g.FrozenH) * zoom);
@@ -431,7 +469,7 @@
     public Task OnGridWindow(double left, double top, double width, double height)
     {
         if (_wb is null || _grid is not { } g || Disposed) return Task.CompletedTask;
-        double zoom = Zoom(_wb.Sheets[_active]);
+        double zoom = Zoom(Cur);
         _view = (left / zoom, top / zoom, width / zoom, height / zoom);
         if (PlaceWindow(g, force: false)) StateHasChanged();
         return Task.CompletedTask;
@@ -444,7 +482,7 @@
     public Task OnGridResize(bool column, int index, double px)
     {
         if (_wb is null || _grid is not { } g || Disposed || !Resizable(g, column, index)) return Task.CompletedTask;
-        var sheet = _wb.Sheets[_active];
+        var sheet = Cur;
         if (column) SizeMemory.SetColumn(Path, sheet.Name, index, px);
         else SizeMemory.SetRow(Path, sheet.Name, index, px);
         Replace(g, sheet);
@@ -496,7 +534,7 @@
     private void ApplyFit(Fit fit, double need)
     {
         if (_wb is null || _grid is not { } g) return;
-        var sheet = _wb.Sheets[_active];
+        var sheet = Cur;
         if (need <= 0)
         {
             // Nothing to fit to: back to the file's own size.
@@ -515,7 +553,7 @@
     private void ResetSizes()
     {
         if (_wb is null || _grid is not { } g) return;
-        var sheet = _wb.Sheets[_active];
+        var sheet = Cur;
         SizeMemory.Reset(Path, sheet.Name);
         Replace(g, sheet);
     }
@@ -604,7 +642,7 @@
         _index = new();
         _grid = null;
         if (_wb is null) return;
-        var sheet = _wb.Sheets[_active];
+        var sheet = Cur;
         foreach (var c in sheet.Cells) _index[(c.Row, c.Col)] = c;
         _grid = new GridLayout(sheet, SizeMemory.Find(Path, sheet.Name));
         _view = (0, 0, _view.W, _view.H);
@@ -866,7 +904,7 @@
         string? title = cell.StyleOnly && cell.Note is null && cell.Link is null ? null
             : cell.Value + (cell.Link is null ? null : "\n\nLink: " + cell.Link) + (cell.Note is null ? null : "\n\n" + cell.Note);
         // The box sits on the gridlines around the cell (one pixel up and to the start), where Excel draws borders.
-        return @<div class="xv-cell @(merged ? "merged" : null) @(cell.StyleOnly ? "empty" : null) @(r <= g.FrozenRows ? "frozen-row" : null) @(!cell.StyleOnly && _hits.Contains((r, c)) ? "hit" : null) @(cell.Link is null ? null : "link")"
+        return @<div class="xv-cell @(merged ? "merged" : null) @(sheet.IsHiddenCell(r, c) ? "hidden-part" : null) @(cell.StyleOnly ? "empty" : null) @(r <= g.FrozenRows ? "frozen-row" : null) @(!cell.StyleOnly && _hits.Contains((r, c)) ? "hit" : null) @(cell.Link is null ? null : "link")"
                     style="inset-inline-start:@Px(x - ox - 1);top:@Px(y - oy - 1);width:@Px(w + 1);height:@Px(h + 1);@BoxStyle(cell)"
                     title="@title" data-a="@(cell.StyleOnly ? null : address)" data-v="@(cell.StyleOnly ? null : cell.Value)" data-n="@cell.Note" data-l="@cell.Link">
             @if (cell.Bar is { } bar)
